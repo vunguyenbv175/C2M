@@ -129,12 +129,25 @@ def main() -> int:
         notes.append(f"fatload lines changed: {changed} (allow {sorted(allow)})")
     bw = {m.group(1): int(m.group(2), 0) for m in UBIWRITE_RE.finditer(base["upgrade_script_text"])}
     cw = {m.group(1): int(m.group(2), 0) for m in UBIWRITE_RE.finditer(cand["upgrade_script_text"])}
+    base_cust_size = next(r["size"] for r in base["loads"] if r["section"] == "customer.es")
+    cand_cust_size = next(r["size"] for r in cand["loads"] if r["section"] == "customer.es")
     if set(bw) != set(cw):
         block(f"ubi write volumes changed: {sorted(set(bw) ^ set(cw))}")
     for vol in set(bw) & set(cw):
-        if vol == "customer" and bw[vol] == cw[vol]:
-            block("ubi write customer size not updated")
-        if vol != "customer" and bw[vol] != cw[vol]:
+        if vol == "customer":
+            # The ubi-write size must track the customer image size exactly,
+            # in BOTH directions (grown image with stale size, or same-size
+            # image with a gratuitous edit, are both BLOCKs).
+            if (bw[vol] == base_cust_size and cw[vol] == cand_cust_size):
+                pass
+            else:
+                block(f"ubi write customer size inconsistent: script "
+                      f"{hex(bw[vol])}->{hex(cw[vol])} vs images "
+                      f"{hex(base_cust_size)}->{hex(cand_cust_size)}")
+            if base_cust_size == cand_cust_size:
+                notes.append("customer.es same size, content-only change "
+                             "(fits in existing UBIFS slack)")
+        elif bw[vol] != cw[vol]:
             block(f"ubi write {vol} size changed")
 
     # protected deep hashes from the B validation report

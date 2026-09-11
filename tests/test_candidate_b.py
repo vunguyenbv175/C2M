@@ -229,6 +229,20 @@ def main() -> int:
              "--out", str(tmp / "diff.json")], cwd=ROOT, capture_output=True, text=True)
         if r.returncode != 0:
             fails.append("allowlist OK case BLOCKED: " + r.stdout[-600:] + " ERR:" + r.stderr[-600:])
+        # delta=0 variant: same customer SIZE, changed bytes (fits in UBIFS
+        # slack — the real-Linux shape). Must also be ALLOWLIST-OK.
+        cand0 = mini_contract(0x300, 0x5000, 0x6000, ksha)
+        cand0["outer_members"][0]["sha256"] = sh(b"inner3")
+        cand0["inner_sha256"] = sh(b"inner3")
+        cand0["outer_members"][2]["sha256"] = sh(b"md5z")
+        cand0["loads"][1]["sha256"] = sh(b"C" * 0x300)
+        (tmp / "cand0.json").write_text(json.dumps(cand0))
+        r = subprocess.run(
+            [sys.executable, "tools/fw/candidate_diff.py", "--base", str(tmp / "base.json"),
+             "--cand", str(tmp / "cand0.json"), "--deep-report", str(tmp / "deep.json"),
+             "--out", str(tmp / "diff0.json")], cwd=ROOT, capture_output=True, text=True)
+        if r.returncode != 0:
+            fails.append("allowlist delta=0 OK case BLOCKED: " + r.stdout[-600:])
         # kernel tamper -> BLOCK
         cand2 = json.loads((tmp / "cand.json").read_text())
         cand2["loads"][0]["sha256"] = sh(b"evil")
