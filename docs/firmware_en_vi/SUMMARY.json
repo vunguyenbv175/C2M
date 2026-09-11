@@ -1,47 +1,17 @@
 {
   "firmwares": {
-    "EN": {
-      "file": "V2023.08.03.1_C2M_U_FR_WIFI_EN.tar",
-      "role": "golden_working",
-      "sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c",
-      "sysver": "20230803193750"
-    },
-    "VI": {
-      "file": "V2023.09.20.1_C2M_U_FR_WIFI_VI.tar",
-      "role": "vendor_vi_regression_donor",
-      "sha256": "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa",
-      "sysver": "20230920185743"
-    }
+    "EN": {"file": "V2023.08.03.1_C2M_U_FR_WIFI_EN.tar", "role": "golden_working", "sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c", "sysver": "20230803193750"},
+    "VI": {"file": "V2023.09.20.1_C2M_U_FR_WIFI_VI.tar", "role": "vendor_vi_regression_donor", "sha256": "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa", "sysver": "20230920185743"}
   },
-  "rootfs": {
-    "same": 526,
-    "different": 2,
-    "different_files": [
-      "bootconfig/bin/cardv",
-      "bootconfig/modules/4.9.227/sc7a20.ko"
-    ]
-  },
-  "adas_subtree": {
-    "total": 112,
-    "same": 98,
-    "different": 14
-  },
+  "rootfs": {"same": 526, "different": 2, "different_files": ["bootconfig/bin/cardv", "bootconfig/modules/4.9.227/sc7a20.ko"]},
+  "adas_subtree": {"total": 112, "same": 98, "different": 14},
   "confirmed_screen_export_port": 26012,
   "adas_protocol": "1.4.0",
   "vi_unique_cardv_symbol": "SendGPSSpeedToScreen(int)",
   "vi_bootarg_delta": "mmap_reserved=fb,miu=0,sz=0x800000,max_start_off=0x3F000000,max_end_off=0x3F800000",
   "overlay": {
-    "EN": {
-      "file_size": 11636008,
-      "overlay_start": 1518364,
-      "overlay_size": 10117644,
-      "overlay_sha256": "c395db153a76cd15f6e50ef003ccfa4295ec87dc01e409b0721ae8d4d24c6084"
-    },
-    "VI": {
-      "file_size": 11653870,
-      "overlay_start": 1518364,
-      "overlay_size": 10135506,
-      "overlay_sha256": "6becae4d9eb413f36d0b8418a747de5fed24d8eec7d7f5f265a54b84201e04f7"
-    }
-  }
+    "EN": {"file_size": 11636008, "overlay_start": 1529316, "overlay_start_hex": "0x1755e4", "overlay_size": 10106692, "overlay_sha256": "7c14be61f3f1618602dd020db4e5bf9960d7e34ffcb35547a2ac60c13ee62f2d", "entropy_bits_per_byte": 7.976687},
+    "VI": {"file_size": 11653870, "overlay_start": 1529316, "overlay_start_hex": "0x1755e4", "overlay_size": 10124554, "overlay_sha256": "8f0841496c7d5f42ca5fd8e67dd3aeea985ebe0af031c1dcd1e3d15e5825a423", "entropy_bits_per_byte": 7.976654}
+  },
+  "adas_symbol_diff": {"left_symbols": 3875, "right_symbols": 3875, "common_symbols": 3875, "left_only": 0, "right_only": 0, "only_size_changed_function": "_Z10SystemInitj", "system_init_size_en": 124, "system_init_size_vi": 100}
 }
