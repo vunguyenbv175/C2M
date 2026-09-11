@@ -1,0 +1,72 @@
+{
+  "aes_key_hex": "de091ce6cb35733540c86656fa1692e8",
+  "tail_size": 3602,
+  "records": [
+    {
+      "name": "d0",
+      "en_offset_hex": "0x1747fe",
+      "vi_offset_hex": "0x174d1e",
+      "offset_delta": 1312,
+      "offset_delta_hex": "0x520",
+      "size_hex": "0x2b9000",
+      "size_equal": true,
+      "blob_sha256": "0b5533eea7af01c3075b517a36a9238c7d91c82dec5fc7c34c87307da725d4f9",
+      "blob_identical": true
+    },
+    {
+      "name": "v_a",
+      "en_offset_hex": "0x431994",
+      "vi_offset_hex": "0x433056",
+      "offset_delta": 5826,
+      "offset_delta_hex": "0x16c2",
+      "size_hex": "0x1ea000",
+      "size_equal": true,
+      "blob_sha256": "342db12adb9bbeaf83595fbb7178bd2ba6b5de06f14c8fb476c4d52cad23142a",
+      "blob_identical": true
+    },
+    {
+      "name": "v_t",
+      "en_offset_hex": "0x61d75c",
+      "vi_offset_hex": "0x6212a4",
+      "offset_delta": 15176,
+      "offset_delta_hex": "0x3b48",
+      "size_hex": "0x40000",
+      "size_equal": true,
+      "blob_sha256": "f63b18df7b5d0c6e22241fc743e51ef8a5e27750503e481fabc509143108d0cf",
+      "blob_identical": true
+    },
+    {
+      "name": "p_r",
+      "en_offset_hex": "0x661b44",
+      "vi_offset_hex": "0x664ed6",
+      "offset_delta": 13202,
+      "offset_delta_hex": "0x3392",
+      "size_hex": "0x189000",
+      "size_equal": true,
+      "blob_sha256": "fb5795ec70b7d2cfdf06ce61a1fb627e18b4008d811ca1c73ddf7b9ca47239a9",
+      "blob_identical": true
+    },
+    {
+      "name": "road",
+      "en_offset_hex": "0x7ee408",
+      "vi_offset_hex": "0x7f1bd6",
+      "offset_delta": 14286,
+      "offset_delta_hex": "0x37ce",
+      "size_hex": "0x2fe000",
+      "size_equal": true,
+      "blob_sha256": "4bc0e6f262e919beeba7f384da4a8347b39943066a05963355b46e404f704914",
+      "blob_identical": true
+    },
+    {
+      "name": "tl",
+      "en_offset_hex": "0xaf14bc",
+      "vi_offset_hex": "0xaf514e",
+      "offset_delta": 15506,
+      "offset_delta_hex": "0x3c92",
+      "size_hex": "0x25000",
+      "size_equal": true,
+      "blob_sha256": "ce2da36309acab718205d63b566c45489a3683adfa412e815670abf00d424753",
+      "blob_identical": true
+    }
+  ]
+}
