@@ -1,4 +1,6 @@
 name: c2m-ci
+# Product CI — must pass on a clean checkout with NO firmware artifacts.
+# Firmware-evidence verification lives in firmware-evidence.yml (manual).
 on:
   push:
   pull_request:
@@ -19,7 +21,7 @@ jobs:
             echo "== $h"
             g++ -std=c++17 -fsyntax-only -I include -x c++ "$h"
           done
-      - name: Python tests
+      - name: Python tests (no firmware needed)
         run: |
           pip install msgpack websocket-client 2>/dev/null || pip3 install msgpack websocket-client
           python3 tools/m4/test_protocol.py
@@ -27,7 +29,5 @@ jobs:
           python3 tools/m4/test_m4_policy.py
           python3 tools/m4/make_fixture.py
           python3 tools/m4/test_real_data_path.py
-          python3 tools/fw/stock_adas_schema_v2.py
-          python3 tools/fw/cardv_symdiff.py --help >/dev/null
           python3 tools/road/osm_preprocess.py --out /tmp/roads_ci.sqlite
           python3 tools/road/test_road.py

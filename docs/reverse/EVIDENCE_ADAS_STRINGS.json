@@ -1,0 +1,1191 @@
+{
+  "method": "byte-exact search in LZO-extracted adas ELFs (hash-verified); offsets are ELF file offsets.",
+  "en": {
+    "size": 11636008,
+    "sha256": "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043"
+  },
+  "vi": {
+    "size": 11653870,
+    "sha256": "997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1"
+  },
+  "tokens": [
+    {
+      "token": "AdasScreenService",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15873c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x158724"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ScreenService",
+      "en_count": 15,
+      "en_offsets_hex": [
+        "0x2628b",
+        "0x277cb",
+        "0x28093",
+        "0x2bbbe",
+        "0x2ca99",
+        "0x2e8b2",
+        "0x2f234",
+        "0x322f5",
+        "0x34cbe",
+        "0x3830b"
+      ],
+      "vi_count": 15,
+      "vi_offsets_hex": [
+        "0x2628b",
+        "0x277cb",
+        "0x28093",
+        "0x2bbbe",
+        "0x2ca99",
+        "0x2e8b2",
+        "0x2f234",
+        "0x322f5",
+        "0x34cbe",
+        "0x3830b"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "screen_export_addr",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x259ff",
+        "0x15875c",
+        "0xb18b76"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x259ff",
+        "0x158744",
+        "0xb1d13c"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "screen_export_port",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x3c716",
+        "0x1587b8"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x3c716",
+        "0x1587a0"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "LibflowServer",
+      "en_count": 21,
+      "en_offsets_hex": [
+        "0x293e6",
+        "0x29b66",
+        "0x29ef5",
+        "0x2e20f",
+        "0x2f26a",
+        "0x2f6a3",
+        "0x2fede",
+        "0x359c4",
+        "0x37d5a",
+        "0x39881"
+      ],
+      "vi_count": 21,
+      "vi_offsets_hex": [
+        "0x293e6",
+        "0x29b66",
+        "0x29ef5",
+        "0x2e20f",
+        "0x2f26a",
+        "0x2f6a3",
+        "0x2fede",
+        "0x359c4",
+        "0x37d5a",
+        "0x39881"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "libflow",
+      "en_count": 6,
+      "en_offsets_hex": [
+        "0x1efd7",
+        "0x3b789",
+        "0x41ca5",
+        "0x47808",
+        "0x158547",
+        "0x15c9c3"
+      ],
+      "vi_count": 6,
+      "vi_offsets_hex": [
+        "0x1efd7",
+        "0x3b789",
+        "0x41ca5",
+        "0x47808",
+        "0x15852f",
+        "0x15c9ab"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "subscribe",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 0,
+      "vi_offsets_hex": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "token": "unsubscribe",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 0,
+      "vi_offsets_hex": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "token": "26012",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x1587b0"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x158798"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vehicle",
+      "en_count": 449,
+      "en_offsets_hex": [
+        "0x2453e",
+        "0x2467f",
+        "0x248f6",
+        "0x24c69",
+        "0x24d34",
+        "0x24e3f",
+        "0x24f86",
+        "0x25220",
+        "0x25291",
+        "0x253a2"
+      ],
+      "vi_count": 449,
+      "vi_offsets_hex": [
+        "0x2453e",
+        "0x2467f",
+        "0x248f6",
+        "0x24c69",
+        "0x24d34",
+        "0x24e3f",
+        "0x24f86",
+        "0x25220",
+        "0x25291",
+        "0x253a2"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ped",
+      "en_count": 66,
+      "en_offsets_hex": [
+        "0x1c345",
+        "0x1c867",
+        "0x1c9a6",
+        "0x1cae8",
+        "0x1cb69",
+        "0x1cbe1",
+        "0x1cead",
+        "0x1d1b4",
+        "0x1d25a",
+        "0x1d558"
+      ],
+      "vi_count": 66,
+      "vi_offsets_hex": [
+        "0x1c345",
+        "0x1c867",
+        "0x1c9a6",
+        "0x1cae8",
+        "0x1cb69",
+        "0x1cbe1",
+        "0x1cead",
+        "0x1d1b4",
+        "0x1d25a",
+        "0x1d558"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "lane",
+      "en_count": 184,
+      "en_offsets_hex": [
+        "0x20f6c",
+        "0x21121",
+        "0x246fd",
+        "0x24765",
+        "0x24b81",
+        "0x24c5b",
+        "0x25011",
+        "0x25262",
+        "0x2554b",
+        "0x25887"
+      ],
+      "vi_count": 184,
+      "vi_offsets_hex": [
+        "0x20f6c",
+        "0x21121",
+        "0x246fd",
+        "0x24765",
+        "0x24b81",
+        "0x24c5b",
+        "0x25011",
+        "0x25262",
+        "0x2554b",
+        "0x25887"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "frame_id",
+      "en_count": 4,
+      "en_offsets_hex": [
+        "0x2a1a8",
+        "0x156db5",
+        "0x156ec8",
+        "0x15c58b"
+      ],
+      "vi_count": 4,
+      "vi_offsets_hex": [
+        "0x2a1a8",
+        "0x156d9d",
+        "0x156eb0",
+        "0x15c573"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vehicleWarning",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x156c78"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x156c60"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vehicleMeasure",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x156c90"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x156c78"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "pedestrians",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x156c5c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x156c44"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "laneWarningRes",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15dccc"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15dc68"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vehicle_id",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x156fec"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x156fd4"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "headway",
+      "en_count": 18,
+      "en_offsets_hex": [
+        "0x35931",
+        "0x3c693",
+        "0x4151a",
+        "0x43941",
+        "0x156ff8",
+        "0x157000",
+        "0x158290",
+        "0x15c056",
+        "0x15c838",
+        "0x15e2f8"
+      ],
+      "vi_count": 18,
+      "vi_offsets_hex": [
+        "0x35931",
+        "0x3c693",
+        "0x4151a",
+        "0x43941",
+        "0x156fe0",
+        "0x156fe8",
+        "0x158278",
+        "0x15c03e",
+        "0x15c820",
+        "0x15e294"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "warning_level",
+      "en_count": 9,
+      "en_offsets_hex": [
+        "0x2699b",
+        "0x3f751",
+        "0x3fb6f",
+        "0x156fdc",
+        "0x15805b",
+        "0x158298",
+        "0x15c24a",
+        "0x15fb94",
+        "0xb1815f"
+      ],
+      "vi_count": 9,
+      "vi_offsets_hex": [
+        "0x2699b",
+        "0x3f751",
+        "0x3fb6f",
+        "0x156fc4",
+        "0x158043",
+        "0x158280",
+        "0x15c232",
+        "0x15fb30",
+        "0xb1c725"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "fcw",
+      "en_count": 188,
+      "en_offsets_hex": [
+        "0x24810",
+        "0x2495c",
+        "0x257d9",
+        "0x25a1f",
+        "0x25f7d",
+        "0x26385",
+        "0x26673",
+        "0x266eb",
+        "0x2682a",
+        "0x2705e"
+      ],
+      "vi_count": 188,
+      "vi_offsets_hex": [
+        "0x24810",
+        "0x2495c",
+        "0x257d9",
+        "0x25a1f",
+        "0x25f7d",
+        "0x26385",
+        "0x26673",
+        "0x266eb",
+        "0x2682a",
+        "0x2705e"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "headway_warning",
+      "en_count": 8,
+      "en_offsets_hex": [
+        "0x35931",
+        "0x43941",
+        "0x157000",
+        "0x158290",
+        "0x15c838",
+        "0x15fb8c",
+        "0x160510",
+        "0xb183a8"
+      ],
+      "vi_count": 8,
+      "vi_offsets_hex": [
+        "0x35931",
+        "0x43941",
+        "0x156fe8",
+        "0x158278",
+        "0x15c820",
+        "0x15fb28",
+        "0x1604a8",
+        "0xb1c96e"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vb_warning",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x157010",
+        "0x158153",
+        "0xb18477"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x156ff8",
+        "0x15813b",
+        "0xb1ca3d"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "sag_warning",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x15701c",
+        "0x158167",
+        "0xb1855a"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x157004",
+        "0x15814f",
+        "0xb1cb20"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vehicle_class",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x157030",
+        "0x15ba79",
+        "0x15da34"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x157018",
+        "0x15ba61",
+        "0x15d9d0"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "vehicle_width",
+      "en_count": 8,
+      "en_offsets_hex": [
+        "0x156289",
+        "0x157040",
+        "0x15ba8d",
+        "0x15f95d",
+        "0x15f981",
+        "0x15f9a1",
+        "0x15f9c5",
+        "0x15f9e9"
+      ],
+      "vi_count": 8,
+      "vi_offsets_hex": [
+        "0x156271",
+        "0x157028",
+        "0x15ba75",
+        "0x15f8f9",
+        "0x15f91d",
+        "0x15f93d",
+        "0x15f961",
+        "0x15f985"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "longitude_dist",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x157050"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x157038"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "lateral_dist",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x157060",
+        "0x15bab9",
+        "0xb18624"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x157048",
+        "0x15baa1",
+        "0xb1cbea"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ttc",
+      "en_count": 27,
+      "en_offsets_hex": [
+        "0x20c4b",
+        "0xc3b33",
+        "0xc49a3",
+        "0x157070",
+        "0x1570a4",
+        "0x15818c",
+        "0x1581a4",
+        "0x1581bc",
+        "0x1581d4",
+        "0x1581f0"
+      ],
+      "vi_count": 27,
+      "vi_offsets_hex": [
+        "0x20c4b",
+        "0xc3b1b",
+        "0xc498b",
+        "0x157058",
+        "0x15708c",
+        "0x158174",
+        "0x15818c",
+        "0x1581a4",
+        "0x1581bc",
+        "0x1581d8"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "is_crucial",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x157074"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15705c"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "is_second_crucial",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x157080"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x157068"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "world_x",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x157094"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15707c"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "world_y",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15709c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x157084"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "is_key",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x1570b8"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x1570a0"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "is_danger",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x1570c0"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x1570a8"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ttc_m",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x1570a4"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15708c"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "have_bike",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x1570ac"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x157094"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "pedWarning",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x156c3c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x156c24"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ped_on",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x156c48",
+        "0x15c1d5"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x156c30",
+        "0x15c1bd"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "pcw_on",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x156c50",
+        "0x15c1e2"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x156c38",
+        "0x15c1ca"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "lanelines",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15dfa4"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15df40"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ldw_info",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15df98"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15df34"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "deviate_state",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x15c009",
+        "0x15c4bc",
+        "0x15dec8"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x15bff1",
+        "0x15c4a4",
+        "0x15de64"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "turn_radius",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15df8c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15df28"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "turn_frequently",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15df7c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15df18"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "bird_view_poly_coeff",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x15ddc4"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x15dd60"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ScreenWarningRes",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x29936"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x29936"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ScreenAudioMsg",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x26465",
+        "0x3c160"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x26465",
+        "0x3c160"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "VehicleRun",
+      "en_count": 23,
+      "en_offsets_hex": [
+        "0x25ed8",
+        "0x26328",
+        "0x264bb",
+        "0x28ff3",
+        "0x2904a",
+        "0x2a1e9",
+        "0x2f09c",
+        "0x2fc35",
+        "0x2ff20",
+        "0x30022"
+      ],
+      "vi_count": 23,
+      "vi_offsets_hex": [
+        "0x25ed8",
+        "0x26328",
+        "0x264bb",
+        "0x28ff3",
+        "0x2904a",
+        "0x2a1e9",
+        "0x2f09c",
+        "0x2fc35",
+        "0x2ff20",
+        "0x30022"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ReadVehicle",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x402d5"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x402d5"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ReadPed",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x26333"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x26333"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "LaneRun",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x3a12f",
+        "0x15dbc2"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x3a12f",
+        "0x15db5e"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "C1VehicleWarning",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x262a5"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x262a5"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "C1VehicleMeasureRes",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x2bbe2",
+        "0x2dc62",
+        "0x3a6af"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x2bbe2",
+        "0x2dc62",
+        "0x3a6af"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "C1PedRes",
+      "en_count": 4,
+      "en_offsets_hex": [
+        "0x277ee",
+        "0x2a398",
+        "0x3877e",
+        "0x3c26a"
+      ],
+      "vi_count": 4,
+      "vi_offsets_hex": [
+        "0x277ee",
+        "0x2a398",
+        "0x3877e",
+        "0x3c26a"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "TsrProcess",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x43dbf"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x43dbf"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ReadTsr",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x4712a"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x4712a"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "TsrMsg",
+      "en_count": 7,
+      "en_offsets_hex": [
+        "0x273b7",
+        "0x29d1f",
+        "0x2a749",
+        "0x2fd7e",
+        "0x3099b",
+        "0x31345",
+        "0x3dd30"
+      ],
+      "vi_count": 7,
+      "vi_offsets_hex": [
+        "0x273b7",
+        "0x29d1f",
+        "0x2a749",
+        "0x2fd7e",
+        "0x3099b",
+        "0x31345",
+        "0x3dd30"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "TsrRes",
+      "en_count": 10,
+      "en_offsets_hex": [
+        "0x2673d",
+        "0x28784",
+        "0x2bc9b",
+        "0x3374c",
+        "0x35a24",
+        "0x36484",
+        "0x3a931",
+        "0x3ca31",
+        "0x44bbf",
+        "0x4581f"
+      ],
+      "vi_count": 10,
+      "vi_offsets_hex": [
+        "0x2673d",
+        "0x28784",
+        "0x2bc9b",
+        "0x3374c",
+        "0x35a24",
+        "0x36484",
+        "0x3a931",
+        "0x3ca31",
+        "0x44bbf",
+        "0x4581f"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "TsrTraceRes",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x2676e",
+        "0x323e9"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x2676e",
+        "0x323e9"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "TsrWarning",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x26785",
+        "0x416bf"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x26785",
+        "0x416bf"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SpeedLimitReport",
+      "en_count": 7,
+      "en_offsets_hex": [
+        "0x28ed7",
+        "0x2e057",
+        "0x2f1c0",
+        "0x34583",
+        "0x3cb21",
+        "0x42b02",
+        "0x43367"
+      ],
+      "vi_count": 7,
+      "vi_offsets_hex": [
+        "0x28ed7",
+        "0x2e057",
+        "0x2f1c0",
+        "0x34583",
+        "0x3cb21",
+        "0x42b02",
+        "0x43367"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SpeedLimitReporter",
+      "en_count": 7,
+      "en_offsets_hex": [
+        "0x28ed7",
+        "0x2e057",
+        "0x2f1c0",
+        "0x34583",
+        "0x3cb21",
+        "0x42b02",
+        "0x43367"
+      ],
+      "vi_count": 7,
+      "vi_offsets_hex": [
+        "0x28ed7",
+        "0x2e057",
+        "0x2f1c0",
+        "0x34583",
+        "0x3cb21",
+        "0x42b02",
+        "0x43367"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SetTsrResult",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x2673a"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x2673a"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "model_root_dir",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x15e3c8",
+        "0xb1881c"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x15e364",
+        "0xb1cde2"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "switch_file",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x4138a",
+        "0x157f20",
+        "0xb17f18"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x4138a",
+        "0x157f08",
+        "0xb1c4de"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "adas_de.flag",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xb17f3d"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0xb1c503"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "FLAGS_m0",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x25622"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x25622"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "sdk_use_msgpack",
+      "en_count": 4,
+      "en_offsets_hex": [
+        "0x3b20f",
+        "0x40288",
+        "0x15bb6c",
+        "0xb18783"
+      ],
+      "vi_count": 4,
+      "vi_offsets_hex": [
+        "0x3b20f",
+        "0x40288",
+        "0x15bb54",
+        "0xb1cd49"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "raw_adas",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x15d3d4",
+        "0xb18860"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x15d370",
+        "0xb1ce26"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "fortest",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 0,
+      "vi_offsets_hex": [],
+      "verdict": "ABSENT"
+    }
+  ]
+}

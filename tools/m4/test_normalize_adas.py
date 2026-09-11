@@ -55,13 +55,13 @@ def main():
     s4 = normalize_stock(snap)
     assert s4["lead"] is None, s4["lead"]
 
-    # second_crucial still yields lead with reason
+    # second_crucial alone must NOT create lead (R2: metadata only)
     snap = {**BASE, "nums": {**BASE["nums"], "vehicleMeasure": [
         {"vehicle_class": 0, "vehicle_id": 4, "vehicle_width": 1.7,
          "longitude_dist": 25.0, "lateral_dist": -1.2, "ttc": 4.0,
          "is_crucial": 0, "is_second_crucial": 1}]}}
     s5 = normalize_stock(snap)
-    assert s5["lead"]["reason"] == "second_crucial", s5["lead"]
+    assert s5["lead"] is None and s5["raw"]["second_crucial_count"] == 1, (s5["lead"], s5["raw"])
 
     # HONEST HEALTH: no frames -> Unknown (never A_ProcessAbsent from socket)
     s6 = normalize_stock({**BASE, "frame_seen": False, "libflow_reachable": False})
@@ -72,6 +72,10 @@ def main():
     # stale frames -> C_InputPathSuspect
     s8 = normalize_stock({**BASE, "now_ms": 5000})
     assert s8["stale"] and s8["runtime_class"] == "C_InputPathSuspect", s8
+    # R1: age advances with caller time, no new ingest
+    assert normalize_stock(BASE, now_ms=1200)["stale"] is False
+    s9 = normalize_stock(BASE, now_ms=1601)
+    assert s9["stale"] and s9["runtime_class"] == "C_InputPathSuspect", s9
     print("normalize_adas Gate B smoke: OK")
 
 

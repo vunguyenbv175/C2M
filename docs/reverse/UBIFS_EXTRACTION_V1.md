@@ -61,6 +61,28 @@ The reconstructed sizes, hashes and ELF Build IDs match the binaries used in the
 
 This is deliberately a small forensic extractor, not a general UBIFS repair/repack implementation. It must not be used to rewrite stock UBIFS.
 
+## LZO route (no system liblzo2 required)
+
+`tools/fw/lzo_helper.py` batch-decompresses LZO1X blocks through a local helper
+compiled once from the upstream LZO `minilzo` amalgamation (GPL, downloaded at
+tool time — not vendored in the repo):
+
+```sh
+# fetch + build helper (Windows example with WinLibs/MinGW GCC):
+python -c "import urllib.request; urllib.request.urlretrieve(
+  'https://www.oberhumer.com/opensource/lzo/download/lzo-2.10.tar.gz',
+  'build/lzo-2.10.tar.gz')"
+# extract lzo-2.10/minilzo/{minilzo.c,minilzo.h} + lzo-2.10/include/lzo/
+gcc -O2 -o build/lzo_blockdec[.exe] tools/fw/lzo_blockdec.c <minilzo>/minilzo.c \
+  -I <minilzo> -I <lzo-include>/lzo
+```
+
+The helper template `tools/fw/lzo_blockdec.c` is project code (not GPL); only
+`minilzo.c` itself is GPL and stays out of the repo. `lzo_helper.py` uses
+`build/lzo_blockdec[.exe]` or `$C2M_LZO_HELPER` automatically when system
+liblzo2 is absent. Verified: EN/VI adas reassembly matches the expected
+SHA-256 below.
+
 ## Confidence
 
 - **CONFIRMED:** reproduces exact EN/VI `adas` binaries from original vendor customer images.

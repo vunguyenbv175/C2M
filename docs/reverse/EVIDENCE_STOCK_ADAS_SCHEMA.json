@@ -15,42 +15,90 @@
     {
       "field": "vehicleWarning",
       "group": "adas.key",
-      "verdict": "HIGH-CONFIDENCE",
+      "verdict": "CONFIRMED",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "vehicleWarning": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x156c78"
+            ],
+            "vi_offsets": [
+              "0x156c60"
+            ]
+          }
+        }
       },
-      "note": "topic/key routing; inner data fields below are RAW-ONLY unless noted"
+      "note": "topic/key routing proven present in both adas binaries + prior callsite"
     },
     {
       "field": "vehicleMeasure",
       "group": "adas.key",
-      "verdict": "HIGH-CONFIDENCE",
+      "verdict": "CONFIRMED",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "vehicleMeasure": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x156c90"
+            ],
+            "vi_offsets": [
+              "0x156c78"
+            ]
+          }
+        }
       },
-      "note": "topic/key routing; inner data fields below are RAW-ONLY unless noted"
+      "note": "topic/key routing proven present in both adas binaries + prior callsite"
     },
     {
       "field": "pedestrians",
       "group": "adas.key",
-      "verdict": "HIGH-CONFIDENCE",
+      "verdict": "CONFIRMED",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "pedestrians": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x156c5c"
+            ],
+            "vi_offsets": [
+              "0x156c44"
+            ]
+          }
+        }
       },
-      "note": "topic/key routing; inner data fields below are RAW-ONLY unless noted"
+      "note": "topic/key routing proven present in both adas binaries + prior callsite"
     },
     {
       "field": "laneWarningRes",
       "group": "adas.key",
-      "verdict": "HIGH-CONFIDENCE",
+      "verdict": "CONFIRMED",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "laneWarningRes": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x15dccc"
+            ],
+            "vi_offsets": [
+              "0x15dc68"
+            ]
+          }
+        }
       },
-      "note": "topic/key routing; inner data fields below are RAW-ONLY unless noted"
+      "note": "topic/key routing proven present in both adas binaries + prior callsite"
     },
     {
       "field": "vehicleWarning.vehicle_id",
@@ -58,7 +106,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "vehicle_id": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x156fec"
+            ],
+            "vi_offsets": [
+              "0x156fd4"
+            ]
+          }
+        }
       },
       "note": "join key Warning<->Measure"
     },
@@ -68,7 +128,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "headway": {
+            "en_count": 18,
+            "vi_count": 18,
+            "en_offsets": [
+              "0x35931",
+              "0x3c693",
+              "0x4151a"
+            ],
+            "vi_offsets": [
+              "0x35931",
+              "0x3c693",
+              "0x4151a"
+            ]
+          }
+        }
       },
       "note": "unit unverified"
     },
@@ -78,7 +154,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "warning_level": {
+            "en_count": 9,
+            "vi_count": 9,
+            "en_offsets": [
+              "0x2699b",
+              "0x3f751",
+              "0x3fb6f"
+            ],
+            "vi_offsets": [
+              "0x2699b",
+              "0x3f751",
+              "0x3fb6f"
+            ]
+          }
+        }
       },
       "note": "generic level; NEVER drives FCW"
     },
@@ -88,7 +180,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "headway_warning": {
+            "en_count": 8,
+            "vi_count": 8,
+            "en_offsets": [
+              "0x35931",
+              "0x43941",
+              "0x157000"
+            ],
+            "vi_offsets": [
+              "0x35931",
+              "0x43941",
+              "0x156fe8"
+            ]
+          }
+        }
       },
       "note": "class exists (HMW.wav); trigger mapping UNKNOWN"
     },
@@ -98,7 +206,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "vb_warning": {
+            "en_count": 3,
+            "vi_count": 3,
+            "en_offsets": [
+              "0x157010",
+              "0x158153",
+              "0xb18477"
+            ],
+            "vi_offsets": [
+              "0x156ff8",
+              "0x15813b",
+              "0xb1ca3d"
+            ]
+          }
+        }
       },
       "note": "class exists (VB.wav); mapping UNKNOWN"
     },
@@ -108,7 +232,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "sag_warning": {
+            "en_count": 3,
+            "vi_count": 3,
+            "en_offsets": [
+              "0x15701c",
+              "0x158167",
+              "0xb1855a"
+            ],
+            "vi_offsets": [
+              "0x157004",
+              "0x15814f",
+              "0xb1cb20"
+            ]
+          }
+        }
       },
       "note": "class exists (SAG.wav); mapping UNKNOWN"
     },
@@ -118,7 +258,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "vehicle_class": {
+            "en_count": 3,
+            "vi_count": 3,
+            "en_offsets": [
+              "0x157030",
+              "0x15ba79",
+              "0x15da34"
+            ],
+            "vi_offsets": [
+              "0x157018",
+              "0x15ba61",
+              "0x15d9d0"
+            ]
+          }
+        }
       },
       "note": "enum unverified"
     },
@@ -128,7 +284,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "vehicle_width": {
+            "en_count": 8,
+            "vi_count": 8,
+            "en_offsets": [
+              "0x156289",
+              "0x157040",
+              "0x15ba8d"
+            ],
+            "vi_offsets": [
+              "0x156271",
+              "0x157028",
+              "0x15ba75"
+            ]
+          }
+        }
       },
       "note": "unit unverified"
     },
@@ -138,7 +310,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "longitude_dist": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x157050"
+            ],
+            "vi_offsets": [
+              "0x157038"
+            ]
+          }
+        }
       },
       "note": "vendor spelling; unit/sign unverified"
     },
@@ -148,7 +332,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "lateral_dist": {
+            "en_count": 3,
+            "vi_count": 3,
+            "en_offsets": [
+              "0x157060",
+              "0x15bab9",
+              "0xb18624"
+            ],
+            "vi_offsets": [
+              "0x157048",
+              "0x15baa1",
+              "0xb1cbea"
+            ]
+          }
+        }
       },
       "note": "unit/sign unverified"
     },
@@ -158,7 +358,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "ttc": {
+            "en_count": 27,
+            "vi_count": 27,
+            "en_offsets": [
+              "0x20c4b",
+              "0xc3b33",
+              "0xc49a3"
+            ],
+            "vi_offsets": [
+              "0x20c4b",
+              "0xc3b1b",
+              "0xc498b"
+            ]
+          }
+        }
       },
       "note": "unit unverified"
     },
@@ -168,7 +384,8 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {}
       },
       "note": "id only"
     },
@@ -178,7 +395,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "world_x": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x157094"
+            ],
+            "vi_offsets": [
+              "0x15707c"
+            ]
+          }
+        }
       },
       "note": "frame unverified"
     },
@@ -188,7 +417,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "world_y": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x15709c"
+            ],
+            "vi_offsets": [
+              "0x157084"
+            ]
+          }
+        }
       },
       "note": "frame unverified"
     },
@@ -198,7 +439,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "ttc_m": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x1570a4"
+            ],
+            "vi_offsets": [
+              "0x15708c"
+            ]
+          }
+        }
       },
       "note": "unit unverified"
     },
@@ -208,7 +461,23 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "ttc": {
+            "en_count": 27,
+            "vi_count": 27,
+            "en_offsets": [
+              "0x20c4b",
+              "0xc3b33",
+              "0xc49a3"
+            ],
+            "vi_offsets": [
+              "0x20c4b",
+              "0xc3b1b",
+              "0xc498b"
+            ]
+          }
+        }
       },
       "note": "unit unverified"
     },
@@ -218,7 +487,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "have_bike": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x1570ac"
+            ],
+            "vi_offsets": [
+              "0x157094"
+            ]
+          }
+        }
       },
       "note": "attribute"
     },
@@ -228,7 +509,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "is_key": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x1570b8"
+            ],
+            "vi_offsets": [
+              "0x1570a0"
+            ]
+          }
+        }
       },
       "note": "selection flag; NEVER drives PCW"
     },
@@ -238,7 +531,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "lanelines": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x15dfa4"
+            ],
+            "vi_offsets": [
+              "0x15df40"
+            ]
+          }
+        }
       },
       "note": "array; poly encoding unverified"
     },
@@ -248,7 +553,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "bird_view_poly_coeff": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x15ddc4"
+            ],
+            "vi_offsets": [
+              "0x15dd60"
+            ]
+          }
+        }
       },
       "note": "encoding unverified"
     },
@@ -258,7 +575,8 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {}
       },
       "note": "enum unverified"
     },
@@ -268,7 +586,8 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {}
       },
       "note": "enum unverified"
     },
@@ -278,7 +597,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "turn_radius": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x15df8c"
+            ],
+            "vi_offsets": [
+              "0x15df28"
+            ]
+          }
+        }
       },
       "note": "unit unverified"
     },
@@ -288,7 +619,19 @@
       "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "turn_frequently": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x15df7c"
+            ],
+            "vi_offsets": [
+              "0x15df18"
+            ]
+          }
+        }
       },
       "note": "bool"
     },
@@ -298,7 +641,7 @@
       "verdict": "HIGH-CONFIDENCE",
       "drives_normalized_warning": true,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs). Explicit field name (vs generic warning_level); FCW.wav asset proves the FCW class exists in stock audio.",
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer. Explicit field name (vs generic warning_level); FCW.wav asset proves the FCW class exists in stock audio.",
         "audio_asset": "customer:/minieye/adas/audios/FCW.wav (identical EN/VI)"
       },
       "note": "SOLE driver of fcw.active: active=(fcw!=0). warning_level never drives FCW."
@@ -309,19 +652,31 @@
       "verdict": "HIGH-CONFIDENCE",
       "drives_normalized_warning": true,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer."
       },
       "note": "SOLE lead-vehicle signal. No min-distance fallback (F11)."
     },
     {
       "field": "vehicleMeasure.is_second_crucial",
       "group": "adas.field",
-      "verdict": "HIGH-CONFIDENCE",
+      "verdict": "RAW-ONLY",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs)."
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
+        "direct": {
+          "is_second_crucial": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x157080"
+            ],
+            "vi_offsets": [
+              "0x157068"
+            ]
+          }
+        }
       },
-      "note": "secondary marker only; never invents lead alone."
+      "note": "Metadata only (R2). Never creates lead; counted in raw.second_crucial_count."
     },
     {
       "field": "pedestrians.is_danger",
@@ -329,7 +684,7 @@
       "verdict": "HIGH-CONFIDENCE",
       "drives_normalized_warning": true,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs). PCW.wav asset proves the PCW class exists.",
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer. PCW.wav asset proves the PCW class exists.",
         "audio_asset": "customer:/minieye/adas/audios/PCW.wav (VI re-recorded)"
       },
       "note": "SOLE driver of pcw.active."
@@ -340,7 +695,7 @@
       "verdict": "HIGH-CONFIDENCE",
       "drives_normalized_warning": true,
       "evidence": {
-        "basis": "adas .rodata strings live in LZO blocks of customer UBIFS (inode 136 EN / 199 VI); direct string proof pending LZO decompression. Key routing is HIGH-CONFIDENCE via prior callsite disassembly (M4_STATIC_PROTOCOL_V1 \u00a72) + adas-side confinement (absent from libflow.so/rootfs). LDW.wav asset proves the LDW class exists.",
+        "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer. LDW.wav asset proves the LDW class exists.",
         "audio_asset": "customer:/minieye/adas/audios/LDW.wav (VI re-recorded)"
       },
       "note": "SOLE driver of ldw.active. Enum values UNKNOWN."
@@ -351,10 +706,163 @@
       "verdict": "UNKNOWN",
       "drives_normalized_warning": false,
       "evidence": {
-        "upgrade_image_search": "SpeedLimit/speed_limit ASCII present in both upgrade images (weak: component unattributed)",
-        "basis": "enablement/routing unproven; needs runtime config proof"
+        "direct": {
+          "TsrProcess": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x43dbf"
+            ],
+            "vi_offsets": [
+              "0x43dbf"
+            ]
+          },
+          "ReadTsr": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x4712a"
+            ],
+            "vi_offsets": [
+              "0x4712a"
+            ]
+          },
+          "TsrWarning": {
+            "en_count": 2,
+            "vi_count": 2,
+            "en_offsets": [
+              "0x26785",
+              "0x416bf"
+            ],
+            "vi_offsets": [
+              "0x26785",
+              "0x416bf"
+            ]
+          },
+          "TsrTraceRes": {
+            "en_count": 2,
+            "vi_count": 2,
+            "en_offsets": [
+              "0x2676e",
+              "0x323e9"
+            ],
+            "vi_offsets": [
+              "0x2676e",
+              "0x323e9"
+            ]
+          },
+          "SpeedLimitReport": {
+            "en_count": 7,
+            "vi_count": 7,
+            "en_offsets": [
+              "0x28ed7",
+              "0x2e057",
+              "0x2f1c0"
+            ],
+            "vi_offsets": [
+              "0x28ed7",
+              "0x2e057",
+              "0x2f1c0"
+            ]
+          },
+          "SpeedLimitReporter": {
+            "en_count": 7,
+            "vi_count": 7,
+            "en_offsets": [
+              "0x28ed7",
+              "0x2e057",
+              "0x2f1c0"
+            ],
+            "vi_offsets": [
+              "0x28ed7",
+              "0x2e057",
+              "0x2f1c0"
+            ]
+          },
+          "SetTsrResult": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x2673a"
+            ],
+            "vi_offsets": [
+              "0x2673a"
+            ]
+          }
+        },
+        "basis": "TSR code-name presence is CONFIRMED in both adas binaries, but presence does NOT prove TSR is enabled/outputting on this unit; needs runtime config/output proof"
       },
       "note": "No normalized speed-limit from camera until proven. detected_speed_limit stays empty."
+    },
+    {
+      "field": "adas.screen.ScreenAudioMsg",
+      "group": "adas.screen",
+      "verdict": "HIGH-CONFIDENCE",
+      "drives_normalized_warning": false,
+      "evidence": {
+        "direct": {
+          "ScreenAudioMsg": {
+            "en_count": 2,
+            "vi_count": 2,
+            "en_offsets": [
+              "0x26465",
+              "0x3c160"
+            ],
+            "vi_offsets": [
+              "0x26465",
+              "0x3c160"
+            ]
+          }
+        },
+        "basis": "symbol present 2x in both adas binaries; audio routing still UNKNOWN"
+      },
+      "note": "Existence proven; routing semantics need runtime."
+    },
+    {
+      "field": "adas.ped.pedWarning_path",
+      "group": "adas.field",
+      "verdict": "HIGH-CONFIDENCE",
+      "drives_normalized_warning": false,
+      "evidence": {
+        "direct": {
+          "pedWarning": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x156c3c"
+            ],
+            "vi_offsets": [
+              "0x156c24"
+            ]
+          },
+          "ped_on": {
+            "en_count": 2,
+            "vi_count": 2,
+            "en_offsets": [
+              "0x156c48",
+              "0x15c1d5"
+            ],
+            "vi_offsets": [
+              "0x156c30",
+              "0x15c1bd"
+            ]
+          },
+          "pcw_on": {
+            "en_count": 2,
+            "vi_count": 2,
+            "en_offsets": [
+              "0x156c50",
+              "0x15c1e2"
+            ],
+            "vi_offsets": [
+              "0x156c38",
+              "0x15c1ca"
+            ]
+          }
+        },
+        "basis": "separate ped-warning tokens present; do not conflate with pedestrians array"
+      },
+      "note": "Supports keeping is_danger as sole PCW driver."
     },
     {
       "field": "ScreenWarningRes",
@@ -362,19 +870,21 @@
       "verdict": "HIGH-CONFIDENCE",
       "drives_normalized_warning": false,
       "evidence": {
-        "basis": "serializer SendScreenMsg<sdk::ScreenWarningRes> in M4_STATIC_PROTOCOL_V1 \u00a76; direct string proof pending LZO"
+        "direct": {
+          "ScreenWarningRes": {
+            "en_count": 1,
+            "vi_count": 1,
+            "en_offsets": [
+              "0x29936"
+            ],
+            "vi_offsets": [
+              "0x29936"
+            ]
+          }
+        },
+        "basis": "serializer SendScreenMsg<sdk::ScreenWarningRes> in M4_STATIC_PROTOCOL_V1 \u00a76 + direct string proof"
       },
       "note": "laneWarningRes carrier type."
-    },
-    {
-      "field": "ScreenAudioMsg",
-      "group": "adas.screen",
-      "verdict": "UNKNOWN",
-      "drives_normalized_warning": false,
-      "evidence": {
-        "basis": "absent from plain-block scan; needs LZO/runtime"
-      },
-      "note": "audio routing unproven."
     },
     {
       "field": "cardv.json.GPSLevel",

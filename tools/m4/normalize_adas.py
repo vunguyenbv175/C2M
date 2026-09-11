@@ -17,8 +17,10 @@ def _num(row: dict, key: str, dflt: float = 0.0) -> float:
         return dflt
 
 
-def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
-    now_ms = int(snapshot.get("now_ms", 0))
+def normalize_stock(snapshot: dict, now_ms: int | None = None, stale_after_ms: int = 500) -> dict:
+    # R1: caller time drives age. Defaults to ingest time only for back-compat.
+    if now_ms is None:
+        now_ms = int(snapshot.get("now_ms", 0))
     last_frame_ms = int(snapshot.get("last_frame_ms", 0))
     libflow = bool(snapshot.get("libflow_reachable", snapshot.get("libflow_connected", False)))
     sub = bool(snapshot.get("subscription_active", libflow))
@@ -60,15 +62,16 @@ def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
         vehicles.append(v)
 
     lead: dict[str, Any] | None = None
+    # R2: is_crucial is the SOLE lead signal; second_crucial is metadata only.
+    second_crucial_count = 0
     for v in vehicles:
         if v["is_crucial"]:
             lead = {"long_dist": v["long_dist"], "ttc": v["ttc"], "reason": "crucial"}
             break
-    if lead is None:
-        for v in vehicles:
-            if v["is_second_crucial"]:
-                lead = {"long_dist": v["long_dist"], "ttc": v["ttc"], "reason": "second_crucial"}
-                break
+    for v in vehicles:
+        if v["is_second_crucial"]:
+            second_crucial_count += 1
+    raw["second_crucial_count"] = second_crucial_count
 
     pedestrians: list[dict[str, Any]] = []
     pcw = False

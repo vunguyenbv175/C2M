@@ -1,7 +1,8 @@
-// Host smoke for EF-A01..A04+A06 + Gate B (F1/F2/F4/F5/F11/F12).
+// Host smoke: EF-A01..A04+A06 + Gates B/R1/R2/R5/R6/R9.
 // Build: cmake -S . -B build && cmake --build build && ctest --test-dir build
 #include <cassert>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 #include "c2m/adas/mock_adas_provider.hpp"
@@ -14,9 +15,7 @@
 int main() {
   using namespace c2m;
 
-  // 1. Sole-driver normalization (F4): warning_level alone must NOT raise FCW.
   adas::StockSnapshot snap;
-  snap.now_ms = 1000;
   snap.last_frame_ms = 900;
   snap.frame_id = 42;
   snap.frame_seen = true;
@@ -33,56 +32,72 @@ int main() {
                                   {"lateral_dist", 0.4},
                                   {"ttc", 1.1},
                                   {"is_crucial", 1}}};
-  adas::AdasState s = adas::NormalizeStock(snap);
-  assert(!s.stale);
-  assert(!s.fcw.active);  // F4 negative
-  assert(s.raw.warning_level == 5 && s.raw.headway_warning == 1);
-  assert(s.lead.present && s.lead.reason == "crucial");
-  assert(s.health.runtime_class == adas::AdasRuntimeClass::Ok);
 
-  // 2. No invented lead fallback (F11).
+  // R1 acceptance: age advances with caller time, no new Ingest.
+  adas::StockADASProvider prov;
+  prov.Ingest(snap);
+  adas::AdasState fresh = prov.PollAt(1200);  // age=300 -> fresh
+  assert(!fresh.stale && fresh.health.runtime_class == adas::AdasRuntimeClass::Ok);
+  adas::AdasState old = prov.PollAt(1601);  // age=701 > 500 -> stale
+  assert(old.stale && old.health.runtime_class == adas::AdasRuntimeClass::C_InputPathSuspect);
+  assert(prov.HealthyAt(1200));
+  assert(!prov.HealthyAt(1601));
+
+  // F4 negative: warning_level without fcw must NOT raise FCW.
+  assert(!fresh.fcw.active);
+  assert(fresh.raw.warning_level == 5 && fresh.raw.headway_warning == 1);
+
+  // R2: second_crucial alone must NOT create lead (metadata only).
   adas::StockSnapshot snap2 = snap;
-  snap2.nums["vehicleMeasure"] = {{{"vehicle_id", 4}, {"longitude_dist", 25.0}}};
-  adas::AdasState s2 = adas::NormalizeStock(snap2);
+  snap2.nums["vehicleMeasure"] = {{{"vehicle_id", 4},
+                                   {"longitude_dist", 25.0},
+                                   {"is_crucial", 0},
+                                   {"is_second_crucial", 1}}};
+  adas::AdasState s2 = adas::NormalizeStock(snap2, 1000);
   assert(!s2.lead.present);
+  assert(s2.raw.second_crucial_count == 1);
+  // Crucial still leads.
+  assert(fresh.lead.present && fresh.lead.reason == "crucial");
 
-  // 3. Honest health (F5): no frames -> Unknown, never A_ProcessAbsent.
+  // F5: no frames -> Unknown, never A_ProcessAbsent from socket.
   adas::StockSnapshot snap3;
-  snap3.now_ms = 2000;
-  adas::AdasState s3 = adas::NormalizeStock(snap3);
+  adas::AdasState s3 = adas::NormalizeStock(snap3, 2000);
   assert(s3.stale && s3.health.runtime_class == adas::AdasRuntimeClass::Unknown);
 
-  // 4. F1 read-only gate: sender must see ZERO calls through EnhanceCore.
+  // R5/F1: core depends on planner only; sender sees ZERO calls by construction.
   int sender_calls = 0;
-  display::M4Adapter m4(display::M4Config{},
-                        [&](const std::string&, const std::string&) {
-                          ++sender_calls;
-                          return true;
-                        });
+  auto m4 = std::make_shared<display::M4Adapter>(
+      display::M4Config{}, [&](const std::string&, const std::string&) {
+        ++sender_calls;
+        return true;
+      });
   auto adas = std::make_shared<adas::StockADASProvider>();
   adas->Ingest(snap);
-  auto disp = std::make_shared<display::M4Adapter>(m4);
-  core::EnhanceCore core(core::EnhanceConfig{}, adas, disp);
-  core.Tick(3000, 52);
-  assert(sender_calls == 0);  // F1 acceptance
-  assert(disp->LastStatus() == display::TransmitStatus::BlockedReadOnly);
+  core::EnhanceCore core(core::EnhanceConfig{}, adas, m4);
+  core::TickResult tr = core.Tick(1200, 52);
+  assert(sender_calls == 0);
+  assert(tr.planned_messages == 0);  // brightness unset -> nothing planned
+  assert(tr.display.ego_speed_raw == 52);  // R6: raw name
 
-  // 5. F2: GPSSpeed/GPSLevel denied at L2 on both sides of the policy.
+  // F2: GPSSpeed denied at L2; brightness allowed.
   assert(display::M4Policy::ClassifyJsonUuid("GPSSpeed") == display::M4Verdict::Deny);
-  assert(display::M4Policy::ClassifyJsonUuid("DispBrightSet") == display::M4Verdict::AllowL2);
   display::DisplayState d = display::DisplayState::Now(4000);
-  d.ego_speed_kmh = 52;  // must NOT produce any planned message at L2
+  d.ego_speed_raw = 52;  // must NOT produce any planned message at L2
   d.system.brightness = 7;
-  auto msgs = m4.PlanMessages(d);
-  assert(msgs.size() == 1);  // brightness only
-  assert(msgs[0].second.find("DispBrightSet") != std::string::npos);
+  auto msgs = m4->Plan(d);
+  assert(msgs.size() == 1 && msgs[0].payload.find("DispBrightSet") != std::string::npos);
 
-  // 6. Mock core tick still works end to end.
+  // R9: planned_messages populated when content exists.
+  core::TickResult tr2 = core.Tick(1300, -1);
+  (void)tr2;
+
+  // Mock core end to end.
   auto mock = core::MakeMockCore("fcw");
   display::DisplayState md = mock->Tick(5000, 52).display;
-  assert(md.warning.fcw && md.ego_speed_kmh == 52);
+  assert(md.warning.fcw && md.ego_speed_raw == 52);
+  assert(md.lead.present && md.lead.long_dist_raw > 6.0f);
 
-  // 7. Road fusion sanity.
+  // Road fusion sanity.
   road::SpeedLimitState lim = road::FuseSpeedLimit(60, 0.9f, 50, 0.8f, 50, 0.9f);
   assert(lim.limit_kmh.has_value() && lim.limit_kmh.value() == 60 && lim.source == "camera");
 

@@ -94,6 +94,7 @@ struct AdasRaw {
   int vb_warning = 0;
   int sag_warning = 0;
   int key_pedestrian_count = 0;
+  int second_crucial_count = 0;  // metadata only; never creates lead (R2)
   int deviate_state = 0;
 };
 
@@ -109,7 +110,7 @@ struct AdasHealth {
 
 struct LeadInfo {
   bool present = false;
-  std::string reason = "none";  // crucial | second_crucial | none
+  std::string reason = "none";  // crucial | none (R2: no second_crucial fallback)
   float long_dist = 0.0f;       // RAW-ONLY unit
   float ttc = 0.0f;             // RAW-ONLY unit
 };

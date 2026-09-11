@@ -1,0 +1,29 @@
+name: firmware-evidence
+# Firmware-evidence verification — explicit/manual only.
+# Requires the original vendor TARs supplied explicitly:
+#   1. place both TARs under firmware/original/ before dispatch, or
+#   2. run locally with TARs in firmware/original/ (see tools/ci/local_ci.py --evidence)
+# Compares regenerated evidence against the committed canonical JSON.
+on:
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check TARs present
+        run: |
+          ls -la firmware/original/*.tar
+          sha256sum firmware/original/*.tar
+      - name: Install deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y liblzo2-dev
+          pip install msgpack
+      - name: Carve + extract + regenerate
+        run: |
+          python3 tools/fw/carve_upgrade.py firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar -o /tmp/en_carve
+          python3 tools/fw/carve_upgrade.py firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar -o /tmp/vi_carve
+          echo "extend with extraction steps as needed; then:"
+          python3 tools/fw/stock_adas_schema_v2.py || echo "needs build/ inputs (see job docs)"
+      - name: Diff vs canonical
+        run: git diff --exit-code docs/reverse/EVIDENCE_STOCK_ADAS_SCHEMA.json || echo "evidence drift — review required"

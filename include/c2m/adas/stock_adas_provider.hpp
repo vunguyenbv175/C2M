@@ -32,16 +32,18 @@ inline double GetNum(const NumMap& m, const std::string& k, double dflt = 0.0) {
 }
 
 // Pure function: snapshot -> normalized state. Mirrors tools/m4/normalize_adas.py.
-inline AdasState NormalizeStock(const StockSnapshot& s, std::uint64_t stale_after_ms = 500) {
+// now_ms is caller time (R1): age advances even when no new frame arrives.
+inline AdasState NormalizeStock(const StockSnapshot& s, std::uint64_t now_ms,
+                                std::uint64_t stale_after_ms = 500) {
   AdasState out;
-  out.timestamp_ms = s.now_ms;
+  out.timestamp_ms = now_ms;
   out.frame_id = s.frame_id;
   out.health.frame_seen = s.frame_seen;
   out.health.libflow_reachable = s.libflow_reachable;
   out.health.subscription_active = s.subscription_active;
   out.health.cardv_reachable = s.cardv_reachable;
   out.health.process = s.process.value_or(ProcessPresence::Unknown);
-  out.health.age_ms = (s.frame_seen && s.now_ms >= s.last_frame_ms) ? (s.now_ms - s.last_frame_ms) : 0;
+  out.health.age_ms = (s.frame_seen && now_ms >= s.last_frame_ms) ? (now_ms - s.last_frame_ms) : 0;
   out.stale = !s.frame_seen || (out.health.age_ms > stale_after_ms);
 
   // --- vehicleWarning (7 keys, RAW-ONLY except fcw) ---
@@ -72,21 +74,17 @@ inline AdasState NormalizeStock(const StockSnapshot& s, std::uint64_t stale_afte
       out.vehicles.push_back(v);
     }
   }
-  // Lead ONLY on stock markers. No min-distance fallback (F11).
+  // Lead ONLY on the stock crucial marker (R2: is_second_crucial is metadata
+  // only — schema/implementation contradiction resolved in favor of no-lead).
   for (const auto& v : out.vehicles) {
     if (v.is_crucial) {
       out.lead = LeadInfo{true, "crucial", v.long_dist, v.ttc};
       break;
     }
   }
-  if (!out.lead.present) {
-    for (const auto& v : out.vehicles) {
-      if (v.is_second_crucial) {
-        out.lead = LeadInfo{true, "second_crucial", v.long_dist, v.ttc};
-        break;
-      }
-    }
-  }
+  out.raw.second_crucial_count = 0;
+  for (const auto& v : out.vehicles)
+    if (v.is_second_crucial) out.raw.second_crucial_count++;
   // SOLE driver: explicit fcw field. warning_level NEVER drives FCW (F4).
   out.fcw.active = (fcw_raw != 0);
   out.fcw.level = fcw_raw;
@@ -160,15 +158,16 @@ class StockADASProvider : public IAdasProvider {
   explicit StockADASProvider(StockProviderConfig cfg = {}) : cfg_(cfg) {}
   void Ingest(const StockSnapshot& s) { last_ = s; has_ = true; }
   std::string Name() const override { return "StockADASProvider"; }
-  AdasState Poll() const override {
+  AdasState PollAt(std::uint64_t now_ms) const override {
     if (!has_) {
       AdasState s;
+      s.timestamp_ms = now_ms;
       s.stale = true;
       return s;
     }
-    return NormalizeStock(last_, cfg_.stale_after_ms);
+    return NormalizeStock(last_, now_ms, cfg_.stale_after_ms);
   }
-  bool Healthy() const override { return has_ && !Poll().stale; }
+  bool HealthyAt(std::uint64_t now_ms) const override { return has_ && !PollAt(now_ms).stale; }
 
  private:
   StockProviderConfig cfg_;

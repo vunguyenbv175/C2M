@@ -482,9 +482,16 @@ libflow.so EN/VI identity
 customer audio/model inventory
 ```
 
-Important nuance:
+Important nuance (updated 2026-09-11 delta):
 
 > The ADAS-side key/field layer was **not fully re-derived independently yet** in `a58f697`, because relevant ADAS `.rodata` lives in LZO-backed UBIFS blocks. `stock_adas_schema_v2.py` explicitly falls back to prior callsite disassembly for those HIGH-CONFIDENCE rows.
+
+Resolution 2026-09-11 (post-`a58f697` delta, unreviewed): minilzo helper route
+extracted both adas binaries with exact expected hashes; direct string proof in
+`docs/reverse/EVIDENCE_ADAS_STRINGS.json` (68/71 tokens BOTH, identical counts);
+key routing upgraded to CONFIRMED; schema regenerated (53 fields). Producer/
+consumer xref depth and TSR-enablement/wire-units remain open — see the new
+delta report. Gate A status change needs owner confirmation.
 
 Therefore Gate A is currently:
 
@@ -551,6 +558,10 @@ A dead/stalled provider can therefore remain healthy indefinitely.
 
 Required fix: provider needs current monotonic time at Poll or injected clock. Add an advancing-time stale test.
 
+Resolution 2026-09-11 (unreviewed): `PollAt(now_ms)` + `IClock`/`ManualClock`;
+`EnhanceCore::Tick` passes caller time; C++/Python advancing-time tests
+(Ingest@1000/last_frame@900 → fresh@1200, stale@1601) pass in local CI.
+
 ---
 
 ## R2 — HIGH — `is_second_crucial` schema/implementation contradiction
@@ -565,6 +576,10 @@ is_second_crucial = secondary marker; never invents lead alone
 Current C++ provider nevertheless falls back to `is_second_crucial` and creates normalized `LeadInfo`.
 
 Either prove that stock semantics intentionally permit second-crucial fallback, or keep it raw and do not create `lead` from it.
+
+Resolution 2026-09-11 (unreviewed): option 1 chosen — `is_second_crucial` is
+metadata only (`raw.second_crucial_count`), never creates `lead`; schema wording
+and both normalizers + tests updated. No stock proof of fallback exists.
 
 ---
 
@@ -607,6 +622,11 @@ Firmware-evidence verification:
 
 Also make local CI strict: missing compiler/CMake should fail in verification mode instead of silently SKIP and return green.
 
+Resolution 2026-09-11 (unreviewed): product CI split (`ci.yml` clean-checkout
+only; `firmware-evidence.yml` manual); `local_ci.py --strict` fails on missing
+toolchain; `--evidence` regenerates + diffs canonical JSON. Remote-green needs
+owner confirmation after push (no local GitHub Actions access).
+
 ---
 
 ## R4 — MEDIUM/HIGH — read-only improved, but type-level capability is incomplete
@@ -627,6 +647,10 @@ Current M4 implementation is safe; the architecture is not yet universally read-
 
 Prefer separate planner/transmitter interfaces or explicit capability token.
 
+Resolution 2026-09-11 (unreviewed): `IDisplayPlanner` (pure) +
+`IStockTransmitter::Transmit(msgs, AllowTransmit)`; core depends on planner
+only; `M4Adapter` implements both; zero-sender test retained.
+
 ---
 
 ## R5 — MEDIUM — unverified units leak into product field names
@@ -643,6 +667,10 @@ Do not silently turn raw unknown units into meters/km/h through API naming.
 
 Use neutral/raw representation until unit conversion is proven.
 
+Resolution 2026-09-11 (unreviewed): `lateral_raw/longitudinal_raw`,
+`LeadView.long_dist_raw/ttc_raw`, `ego_speed_raw`, `NavState.distance_raw`;
+OSM `speed_limit_kmh` kept (defined source).
+
 ---
 
 ## R6 — MEDIUM — Gate E is synthetic, not captured stock evidence
@@ -657,6 +685,9 @@ Correct interpretation:
 fixture decoder→normalizer path works
 real captured EN frame compatibility UNKNOWN until L1 passive capture
 ```
+
+Resolution 2026-09-11 (unreviewed): fixtures/tests relabeled SYNTHETIC
+everywhere (docstrings, output, design note); pipeline kept.
 
 ---
 
@@ -679,6 +710,11 @@ optionally continuity/road class
 
 Also handle nontrivial OSM `maxspeed` formats before Vietnam-scale processing.
 
+Resolution 2026-09-11 (unreviewed): `score = distance_m + 1.0*heading_deg +
+500m oneway-violation penalty`; fixture way104 proves closest-beats-heading;
+`parse_maxspeed` explicit reasons (ok/mph-converted/non-numeric/conditional/
+ambiguous-multi/missing/unparsable).
+
 ---
 
 ## R8 — LOW/MEDIUM — planned_messages currently meaningless
@@ -686,6 +722,9 @@ Also handle nontrivial OSM `maxspeed` formats before Vietnam-scale processing.
 `TickResult.planned_messages` exists but current core returns zero unconditionally.
 
 Populate it from a planner result or remove it until meaningful.
+
+Resolution 2026-09-11 (unreviewed): populated from `IDisplayPlanner::Plan`
+size in every `Tick`; asserted in smoke test.
 
 ---
 

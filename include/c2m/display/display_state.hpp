@@ -14,8 +14,9 @@ namespace display {
 struct DisplayObject {
   int id = -1;
   std::string kind = "vehicle";  // vehicle|pedestrian
-  float lateral_m = 0.0f;
-  float longitudinal_m = 0.0f;
+  // RAW stock numbers (units/sign unverified per schema V2) — R6: no _m suffix.
+  float lateral_raw = 0.0f;
+  float longitudinal_raw = 0.0f;
   bool crucial = false;
 };
 
@@ -28,14 +29,14 @@ struct LaneView {
 struct LeadView {
   bool present = false;
   std::string reason = "none";
-  float long_dist = 0.0f;  // RAW-ONLY unit (vendor longitude_dist)
-  float ttc = 0.0f;        // RAW-ONLY unit
+  float long_dist_raw = 0.0f;  // RAW-ONLY unit (vendor longitude_dist)
+  float ttc_raw = 0.0f;        // RAW-ONLY unit
 };
 
 struct NavState {
   bool active = false;
   std::string arrow = "none";  // none|left|right|straight|uturn
-  int distance_m = -1;
+  int distance_raw = -1;  // provider units unverified (R6: no _m suffix)
   std::string road_name;
 };
 
@@ -67,7 +68,8 @@ struct WarningView {
 
 struct DisplayState {
   std::uint64_t timestamp_ms = 0;
-  int ego_speed_kmh = -1;  // -1 = unknown (GPS-derived; unit pending runtime proof)
+  // RAW GPS-derived speed (cardv GPSSpeed unit unverified — R6: no _kmh suffix).
+  int ego_speed_raw = -1;  // -1 = unknown
   std::optional<int> speed_limit_kmh;  // empty until TSR/fusion proven
   float speed_limit_confidence = 0.0f;
 
@@ -89,11 +91,11 @@ struct DisplayState {
 
 // Pure build step: AdasState (+ speed/system inputs) -> DisplayState.
 // Host-testable without M4 hardware.
-inline DisplayState BuildFromAdas(const adas::AdasState& a, int ego_speed_kmh = -1,
+inline DisplayState BuildFromAdas(const adas::AdasState& a, int ego_speed_raw = -1,
                                   std::optional<int> fused_limit = std::nullopt,
                                   float fused_conf = 0.0f) {
   DisplayState d = DisplayState::Now(a.timestamp_ms);
-  d.ego_speed_kmh = ego_speed_kmh;
+  d.ego_speed_raw = ego_speed_raw;
   d.speed_limit_kmh = fused_limit.has_value() ? fused_limit : a.detected_speed_limit;
   d.speed_limit_confidence = fused_conf;
   d.lane.visible = !a.stale;
@@ -101,14 +103,14 @@ inline DisplayState BuildFromAdas(const adas::AdasState& a, int ego_speed_kmh = 
   d.lane.ldw_active = a.ldw.active;
   d.lead.present = a.lead.present;
   d.lead.reason = a.lead.reason;
-  d.lead.long_dist = a.lead.long_dist;
-  d.lead.ttc = a.lead.ttc;
+  d.lead.long_dist_raw = a.lead.long_dist;
+  d.lead.ttc_raw = a.lead.ttc;
   for (const auto& v : a.vehicles) {
     DisplayObject o;
     o.id = v.id;
     o.kind = "vehicle";
-    o.lateral_m = v.lat_dist;
-    o.longitudinal_m = v.long_dist;
+    o.lateral_raw = v.lat_dist;
+    o.longitudinal_raw = v.long_dist;
     o.crucial = v.is_crucial;
     d.objects.push_back(o);
   }
@@ -116,8 +118,8 @@ inline DisplayState BuildFromAdas(const adas::AdasState& a, int ego_speed_kmh = 
     DisplayObject o;
     o.id = p.id;
     o.kind = "pedestrian";
-    o.lateral_m = p.world_x;
-    o.longitudinal_m = p.world_y;
+    o.lateral_raw = p.world_x;
+    o.longitudinal_raw = p.world_y;
     o.crucial = p.is_danger;
     d.objects.push_back(o);
   }

@@ -45,6 +45,10 @@ def main() -> int:
     en_inv = json.loads((BUILD / "en_customer_inventory.json").read_text())
     vi_inv = json.loads((BUILD / "vi_customer_inventory.json").read_text())
     adas_plain = json.loads((BUILD / "adas_plain_en.json").read_text())
+    adas_str = json.loads(Path("docs/reverse/EVIDENCE_ADAS_STRINGS.json").read_text())
+    adas_tok = {r["token"]: r for r in adas_str["tokens"]}
+    assert adas_str["en"]["sha256"] == "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043"
+    assert adas_str["vi"]["sha256"] == "997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1"
 
     assert hashlib.sha256(en_cardv).hexdigest() == \
         "344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c"
@@ -66,15 +70,22 @@ def main() -> int:
         F.append({"field": name, "group": group, "verdict": verdict,
                   "drives_normalized_warning": drives, "evidence": evidence, "note": note})
 
-    ADAS_SIDE = ("adas .rodata strings live in LZO blocks of customer UBIFS "
-                 "(inode 136 EN / 199 VI); direct string proof pending LZO "
-                 "decompression. Key routing is HIGH-CONFIDENCE via prior "
-                 "callsite disassembly (M4_STATIC_PROTOCOL_V1 §2) + adas-side "
-                 "confinement (absent from libflow.so/rootfs).")
+    def adas_direct(*toks: str) -> dict:
+        return {t: {"en_count": adas_tok[t]["en_count"], "vi_count": adas_tok[t]["vi_count"],
+                    "en_offsets": adas_tok[t]["en_offsets_hex"][:3],
+                    "vi_offsets": adas_tok[t]["vi_offsets_hex"][:3]}
+                for t in toks if t in adas_tok}
+
+    ADAS_SIDE = ("DIRECT string proof in hash-verified adas ELFs "
+                 "(EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982… / VI 997b71c2…). "
+                 "Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE "
+                 "per below. History: these rows were HIGH-CONFIDENCE via prior callsite "
+                 "disassembly before LZO extraction closed the string layer.")
 
     for key in ("vehicleWarning", "vehicleMeasure", "pedestrians", "laneWarningRes"):
-        add(key, "adas.key", "HIGH-CONFIDENCE", False, {"basis": ADAS_SIDE},
-            "topic/key routing; inner data fields below are RAW-ONLY unless noted")
+        add(key, "adas.key", "CONFIRMED", False,
+            {"basis": ADAS_SIDE, "direct": adas_direct(key)},
+            "topic/key routing proven present in both adas binaries + prior callsite")
 
     for f, note in (
         ("vehicleWarning.vehicle_id", "join key Warning<->Measure"),
@@ -98,7 +109,9 @@ def main() -> int:
         ("laneWarningRes.turn_radius", "unit unverified"),
         ("laneWarningRes.turn_frequently", "bool"),
     ):
-        add(f, "adas.field", "RAW-ONLY", False, {"basis": ADAS_SIDE}, note)
+        tok = f.split(".", 1)[1]
+        add(f, "adas.field", "RAW-ONLY", False,
+            {"basis": ADAS_SIDE, "direct": adas_direct(tok)}, note)
 
     add("vehicleWarning.fcw", "adas.field", "HIGH-CONFIDENCE", True,
         {"basis": ADAS_SIDE + " Explicit field name (vs generic warning_level); "
@@ -107,8 +120,9 @@ def main() -> int:
         "SOLE driver of fcw.active: active=(fcw!=0). warning_level never drives FCW.")
     add("vehicleMeasure.is_crucial", "adas.field", "HIGH-CONFIDENCE", True,
         {"basis": ADAS_SIDE}, "SOLE lead-vehicle signal. No min-distance fallback (F11).")
-    add("vehicleMeasure.is_second_crucial", "adas.field", "HIGH-CONFIDENCE", False,
-        {"basis": ADAS_SIDE}, "secondary marker only; never invents lead alone.")
+    add("vehicleMeasure.is_second_crucial", "adas.field", "RAW-ONLY", False,
+        {"basis": ADAS_SIDE, "direct": adas_direct("is_second_crucial")},
+        "Metadata only (R2). Never creates lead; counted in raw.second_crucial_count.")
     add("pedestrians.is_danger", "adas.field", "HIGH-CONFIDENCE", True,
         {"basis": ADAS_SIDE + " PCW.wav asset proves the PCW class exists.",
          "audio_asset": "customer:/minieye/adas/audios/PCW.wav (VI re-recorded)"},
@@ -119,15 +133,24 @@ def main() -> int:
         "SOLE driver of ldw.active. Enum values UNKNOWN.")
 
     add("camera.TSR_limit", "adas.tsr", "UNKNOWN", False,
-        {"upgrade_image_search": "SpeedLimit/speed_limit ASCII present in both upgrade "
-         "images (weak: component unattributed)",
-         "basis": "enablement/routing unproven; needs runtime config proof"},
+        {"direct": adas_direct("TsrProcess", "ReadTsr", "TsrWarning", "TsrTraceRes",
+                               "SpeedLimitReport", "SpeedLimitReporter", "SetTsrResult"),
+         "basis": "TSR code-name presence is CONFIRMED in both adas binaries, but "
+                  "presence does NOT prove TSR is enabled/outputting on this unit; "
+                  "needs runtime config/output proof"},
         "No normalized speed-limit from camera until proven. detected_speed_limit stays empty.")
+    add("adas.screen.ScreenAudioMsg", "adas.screen", "HIGH-CONFIDENCE", False,
+        {"direct": adas_direct("ScreenAudioMsg"),
+         "basis": "symbol present 2x in both adas binaries; audio routing still UNKNOWN"},
+        "Existence proven; routing semantics need runtime.")
+    add("adas.ped.pedWarning_path", "adas.field", "HIGH-CONFIDENCE", False,
+        {"direct": adas_direct("pedWarning", "ped_on", "pcw_on"),
+         "basis": "separate ped-warning tokens present; do not conflate with pedestrians array"},
+        "Supports keeping is_danger as sole PCW driver.")
     add("ScreenWarningRes", "adas.screen", "HIGH-CONFIDENCE", False,
-        {"basis": "serializer SendScreenMsg<sdk::ScreenWarningRes> in M4_STATIC_PROTOCOL_V1 §6; "
-                  "direct string proof pending LZO"}, "laneWarningRes carrier type.")
-    add("ScreenAudioMsg", "adas.screen", "UNKNOWN", False,
-        {"basis": "absent from plain-block scan; needs LZO/runtime"}, "audio routing unproven.")
+        {"direct": adas_direct("ScreenWarningRes"),
+         "basis": "serializer SendScreenMsg<sdk::ScreenWarningRes> in M4_STATIC_PROTOCOL_V1 §6 + "
+                  "direct string proof"}, "laneWarningRes carrier type.")
 
     # cardv JSON — CONFIRMED with ELF offsets
     ce = cardv_ev("GPSLevel", "GPSSpeed", "DispBrightSet", "StorageStatus", "ClientConn",

@@ -43,7 +43,11 @@ def lzo_decompress(src: bytes, out_len: int) -> bytes:
     if _lzo is None:
         name = ctypes.util.find_library("lzo2")
         if not name:
-            raise RuntimeError("LZO block encountered but system liblzo2 was not found")
+            # Fall back to the local batch helper (single-block path used only
+            # when batch extraction is unavailable, e.g. unit probes).
+            from lzo_helper import batch_decompress
+            return batch_decompress([(src, out_len)])[0]
+        _lzo = ctypes.CDLL(name)
         _lzo = ctypes.CDLL(name)
         _lzo.lzo1x_decompress_safe.argtypes = [
             ctypes.c_void_p,
@@ -218,11 +222,27 @@ def extract(image_path: Path, target: str) -> tuple[bytes, dict[str, Any]]:
         raise RuntimeError(f"no data blocks found for inode {inode}")
     output = bytearray(int(meta["size"]))
     cstats: dict[int, int] = defaultdict(int)
+    lzo_jobs: list[tuple[int, dict[str, Any]]] = []
     for block, rec in sorted(blocks.items()):
+        cstats[int(rec["compression"])] += 1
+        if int(rec["compression"]) == 1:
+            lzo_jobs.append((block, rec))
+    if lzo_jobs:
+        # One helper process for all LZO blocks (fast path; same bytes as
+        # per-block decompress_block).
+        from lzo_helper import batch_decompress
+        outs = batch_decompress([(r["payload"], int(r["usize"])) for _, r in lzo_jobs])
+        for (block, rec), decoded in zip(lzo_jobs, outs):
+            if len(decoded) != int(rec["usize"]):
+                raise RuntimeError(f"lzo size mismatch block {block}")
+            start = block * 4096
+            output[start:start + len(decoded)] = decoded
+    for block, rec in sorted(blocks.items()):
+        if int(rec["compression"]) == 1:
+            continue
         decoded = decompress_block(rec)
         start = block * 4096
-        output[start : start + len(decoded)] = decoded
-        cstats[int(rec["compression"])] += 1
+        output[start:start + len(decoded)] = decoded
     blob = bytes(output)
     report = {
         "image": str(image_path),

@@ -25,4 +25,13 @@
     <tag k="highway" v="residential"/>
     <tag k="name" v="Ngo-sample"/>
   </way>
+  <way id="104">
+    <nd ref="6"/><nd ref="7"/>
+    <tag k="highway" v="secondary"/>
+    <tag k="maxspeed" v="30"/>
+    <tag k="name" v="SongHanh-sample"/>
+    <tag k="oneway" v="no"/>
+  </way>
+  <node id="6" lat="21.0283" lon="105.8357"/>
+  <node id="7" lat="21.0288" lon="105.836628"/>
 </osm>

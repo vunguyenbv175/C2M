@@ -56,10 +56,10 @@ int main(int argc, char** argv) {
   for (int t = 0; t < args.ticks && !g_stop.load(); ++t, now_ms += (std::uint64_t)args.period_ms) {
     c2m::core::TickResult r = core->Tick(now_ms, /*ego_speed_kmh=*/-1);
     std::printf("{\"tick\":%d,\"ts\":%llu,\"objects\":%zu,\"fcw\":%d,\"ldw\":%d,\"pcw\":%d,"
-                "\"lead\":%d,\"transport\":%d}\n",
+                "\"lead\":%d,\"planned\":%zu}\n",
                 t, (unsigned long long)r.display.timestamp_ms, r.display.objects.size(),
                 (int)r.display.warning.fcw, (int)r.display.warning.ldw, (int)r.display.warning.pcw,
-                (int)r.display.lead.present, (int)r.transmit);
+                (int)r.display.lead.present, r.planned_messages);
     std::fflush(stdout);
     if (t + 1 < args.ticks) std::this_thread::sleep_for(std::chrono::milliseconds(args.period_ms));
   }

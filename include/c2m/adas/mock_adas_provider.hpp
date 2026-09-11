@@ -17,9 +17,9 @@ class MockADASProvider : public IAdasProvider {
   explicit MockADASProvider(MockScenario sc = {}) : sc_(sc), tick_(0) {}
   void SetScenario(MockScenario sc) { sc_ = sc; }
   std::string Name() const override { return "MockADASProvider:" + sc_.name; }
-  AdasState Poll() const override {
+  AdasState PollAt(std::uint64_t now_ms) const override {
     AdasState s;
-    s.timestamp_ms = ++tick_ * 100;
+    s.timestamp_ms = now_ms;
     s.frame_id = tick_;
     s.stale = false;
     s.health.frame_seen = true;
@@ -63,7 +63,10 @@ class MockADASProvider : public IAdasProvider {
     }
     return s;
   }
-  bool Healthy() const override { return true; }
+  bool HealthyAt(std::uint64_t now_ms) const override {
+    (void)now_ms;
+    return true;
+  }
 
  private:
   MockScenario sc_;

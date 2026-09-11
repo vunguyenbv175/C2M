@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Gate E test: captured-frame path decoder -> provider -> DisplayState.
+"""Gate E test (SYNTHETIC — R7): fixture integration, NOT captured-wire proof.
 
 Uses build/fixtures/*.bin (stand-ins for hardware pcap frames until a real
-capture exists). Proves the read path integrates without stock writes.
+capture exists). Proves the decoder→normalizer consumer pipeline handles the
+project's stock-compatible fixture contract. Real EN frame compatibility stays
+UNKNOWN until L1 passive capture.
 """
 from pathlib import Path
 from normalize_adas import normalize_stock
@@ -49,7 +51,7 @@ def main():
     disp = {"objects": len(s["vehicles"]) + len(s["pedestrians"]),
             "warnings": {"fcw": s["fcw"]["active"], "pcw": s["pcw"]["active"], "ldw": s["ldw"]["active"]}}
     assert disp == {"objects": 2, "warnings": {"fcw": True, "pcw": True, "ldw": True}}, disp
-    print("real-data-path (fixture) smoke: OK")
+    print("SYNTHETIC fixture-path smoke: OK (captured-wire proof still UNKNOWN)")
 
 
 if __name__ == "__main__":
