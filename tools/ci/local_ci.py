@@ -61,7 +61,8 @@ def main() -> int:
     py = sys.executable
     for t in ["tools/m4/test_protocol.py", "tools/m4/test_normalize_adas.py",
               "tools/m4/test_m4_policy.py", "tools/m4/test_real_data_path.py",
-              "tools/road/test_road.py", "tests/test_firmware_pipeline.py"]:
+              "tools/road/test_road.py", "tests/test_firmware_pipeline.py",
+              "fw/device_minimal/test_check_elf.py"]:
         run([py, t], t)
     run([py, "tools/m4/make_fixture.py"], "make_fixture")
     if args.evidence:

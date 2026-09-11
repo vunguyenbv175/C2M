@@ -40,9 +40,10 @@ SHA-256 `3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c`
 
 ## 5. TARGET ABI FINDINGS
 
-- 32-bit LE ARM EXEC (`EM_ARM=0x28`), hard-float EABI (`/lib/ld-linux-armhf.so.3`), glibc 2.30, app-profile ARMv7 + Thumb-2 + VFP (`.ARM.attributes` `Tag_CPU_arch=0x0A`, profile `A`), compilers GCC 9.1.0 (+ Linaro 4.9.4 in adas libs), kernel 4.9.227 (uImage + modules).
-- Minimum build assumption: `-march=armv7-a -mfloat-abi=hard -mfpu=neon`; soft-float/armv6 UNSUPPORTED.
-- Minimal binary contract: start → print → best-effort `/tmp/c2m_idle.marker` → sleep; no socket/M4/camera/ADAS/config. CI asserts ELF class/machine only.
+- 32-bit LE ARM EXEC (`EM_ARM=0x28`), EABI v5 + hard-float (`e_flags=0x5000400`), loader `/lib/ld-linux-armhf.so.3`, glibc 2.30 baseline (stock cardv max need `GLIBC_2.29`), app-profile ARMv7 + Thumb-2 + **VFPv3-D16** (decoded `.ARM.attributes`: `CPU_arch=10`, profile `'A'`, `FP_arch=4`, `VFP_args=1`, NO Advanced_SIMD tag — see `tools/fw/arm_attributes.py`), compilers GCC 9.1.0 (+ Linaro 4.9.4 in adas libs), kernel 4.9.227 (uImage + modules).
+- Build flags (evidence-exact, NO NEON): `-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16 -static`; soft-float/armv6/NEON UNSUPPORTED. Static link removes the glibc/loader question (no PT_INTERP/NEEDED/version-needs, all asserted by gate); tradeoff: larger binary, no shared-lib servicing.
+- Minimal binary contract: start -> print -> best-effort `/tmp/c2m_idle.marker` -> sleep; no socket/M4/camera/ADAS/config. CI asserts the full static ELF gate (flags/attrs/absence-of-dynamic), not just class/machine.
+- Delta note (owner review F1-F4, applied after `adf94d2`): absolute toolchain path + Ninja generator (CI RED fixed); `-mfpu=neon` withdrawn for lack of evidence; ELF gate strengthened (EABI/hard-float/attrs/static-or-glibc-cap); toolchain documented as runner-pinned/version-recorded, NOT fully pinned.
 
 ## 6. SAFEST INJECTION POINT
 
@@ -70,9 +71,9 @@ Result: OK.
 - 24 B tail past `oneed_cust` end (`12345678\n# File Partitio`, same shape in EN+VI): preserved verbatim, meaning UNKNOWN.
 - Outer TAR `ustar  ` magic/version encoding origin (payload-irrelevant).
 - Whether U-Boot pre-validates inner MD5 (script itself does not per-payload-check).
-- SoC stepping/FPU beyond attribute bytes; kernel config/DT; NAND geometry beyond `mtdparts`.
-- Hardware watchdog launcher; `mutualism`→`adas` launch handoff detail (run.sh runs `./mutualism`; adas exec chain below that is not fully traced — irrelevant to idle daemon but noted).
-- glibc-forward-compat of runner-built ARM binary against on-device `ld-2.30` (only `printf/sleep/fopen` used to minimize risk).
+- SoC stepping/FPU revision beyond the attribute bytes; kernel config/DT; NAND geometry beyond `mtdparts`.
+- Hardware watchdog launcher; `mutualism`->`adas` launch handoff detail (run.sh runs `./mutualism`; adas exec chain below that is not fully traced — irrelevant to idle daemon but noted).
+- (Delta: static link removes the runner-glibc-vs-`ld-2.30` question rather than mitigating it — no dynamic dependency remains to be version-checked.)
 
 ## 10. HARDWARE TESTS STILL REQUIRED (in order)
 
@@ -86,7 +87,7 @@ Result: OK.
 
 - No hardware for ~2 weeks: all boot/flash claims are explicitly NOT made.
 - No UBIFS writer: any B/C image not built via a real writer is fabrication — refused.
-- Runner glibc newer than device 2.30: mitigated by minimal symbol use, NOT eliminated.
+- (Delta: static link chosen, so runner-glibc drift can no longer leak into the device binary; remaining ABI risk is the attribute/flag boundary, asserted per-build by the ELF gate.)
 - Hook edit, however small, is still a stock-file change: must be re-validated byte-for-byte on hardware (config backup path in `adas_upgrade.sh` is the model).
 - Bricking risk if anyone touches CIS/IPL/U-Boot/kernel/rootfs — forbidden without separate justification.
 

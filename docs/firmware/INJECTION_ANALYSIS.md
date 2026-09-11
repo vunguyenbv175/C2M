@@ -59,7 +59,7 @@ insmod SoC stack (lines 6-35) -> `source /oneed_cust/sensor_insmod.sh` (:39) ->
 ## 5. Conclusion (binding)
 
 - Safest layer: **customer / UBI layer** (`ubi0:customer`): new standalone files
-  under `/customer/c2m/` (daemon + libs only) + one appended hook line at H1.
+  under `/customer/c2m/` (static daemon binary, no extra libs) + one appended hook line at H1.
   No stock binary replaced, no rootfs/kernel/bootloader change, no calibration
   touched, no M4 transmit, no camera access.
 - Daemon constraints (binding on any B/C build): run as background `&`,
