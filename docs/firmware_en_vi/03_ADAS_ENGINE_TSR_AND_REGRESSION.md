@@ -85,22 +85,27 @@ This sharply narrows the regression search.
 
 ## Main ADAS binary has a large appended payload
 
-The ELF section table ends around:
+A strict ELF file-backed boundary analysis places the appended-payload start at:
 
 ```text
-0x172b1c
+0x1755e4
 ```
-
-but the files are ~11.6 MB.
 
 Measured appended region:
 
 ```text
-EN overlay size: 10,117,644 bytes
-VI overlay size: 10,135,506 bytes
+EN overlay size: 10,106,692 bytes
+VI overlay size: 10,124,554 bytes
 ```
 
-The overlays are high-entropy and have different SHA-256 hashes.
+Canonical hashes:
+
+```text
+EN 7c14be61f3f1618602dd020db4e5bf9960d7e34ffcb35547a2ac60c13ee62f2d
+VI 8f0841496c7d5f42ca5fd8e67dd3aeea985ebe0af031c1dcd1e3d15e5825a423
+```
+
+Both overlays have entropy around 7.9767 bits/byte. Their exact container/encoding is still unknown.
 
 The final area contains plaintext default flags including:
 
@@ -135,17 +140,37 @@ EN: --switch_file=...
 VI: h--switch_file=...
 ```
 
-This is **not** evidence of a malformed VI switch-file flag.
-
-Exact byte inspection proves the VI file contains the correct byte sequence:
+This is **not** evidence of a malformed VI switch-file flag. Exact byte inspection proves the VI file contains the correct byte sequence:
 
 ```text
 --switch_file=/customer/minieye/config/adas_de.flag
 ```
 
-The preceding `h` is simply byte `0x68` from the high-entropy payload with no NUL separator.
+The preceding `h` is simply byte `0x68` from the high-entropy payload with no NUL separator. Do not pursue this as a bug.
 
-Do not pursue this as a bug.
+## ABI/symbol stability and `SystemInit`
+
+A `readelf -Ws` comparison finds 3,875 symbols on each build, with all 3,875 symbol names common and zero EN-only/VI-only symbols. This makes same-name function matching especially useful.
+
+Only one function changes reported symbol size:
+
+```text
+SystemInit(unsigned int)
+EN: 124 bytes
+VI: 100 bytes
+```
+
+`.text` shrinks by exactly 24 bytes. Thumb-2 disassembly plus PLT relocation mapping shows both builds retain the essential startup sequence:
+
+```text
+MI_SYS_Init
+MI_SCL_CreateDevice
+IPUCreateDevice
+```
+
+The visible `SystemInit` delta is mainly the failure logging path: EN uses `google::LogMessage` and C++ stream insertion, while VI uses a shorter direct `fwrite` path. Therefore `SystemInit` itself is now a lower-probability explanation for complete ADAS failure.
+
+Raw per-function byte hashes over-report differences because the 24-byte code shrink moves later addresses and changes branch immediates/PC-relative references. A normalized ARM/Thumb semantic diff is required before ranking same-sized functions.
 
 ## One meaningful default-tail delta: `m0`
 
@@ -159,7 +184,7 @@ Possibilities include:
 - license-related material,
 - build-specific cryptographic metadata.
 
-Coding agent should trace references to the gflag/symbol rather than guessing.
+Trace references to the gflag/symbol rather than guessing.
 
 ## TSR is real implementation, not dead strings
 
@@ -185,9 +210,7 @@ TsrTraceRes
 TsrWarning
 ```
 
-Static strings/flags include speed-limit warning thresholds and warning-state outputs.
-
-Therefore the binary contains a genuine traffic-sign/speed-limit processing path.
+Static strings/flags include speed-limit warning thresholds and warning-state outputs. Therefore the binary contains a genuine traffic-sign/speed-limit processing path.
 
 ## Default TSR state
 
@@ -209,9 +232,7 @@ base64 decode
 /customer/minieye/config/adas_de.flag
 ```
 
-and `run.sh` exits if required config/calibration is missing.
-
-Thus per-device persistent config can override defaults.
+and `run.sh` exits if required config/calibration is missing. Thus per-device persistent config can override defaults.
 
 ## Why persistent config alone is no longer the leading explanation
 
@@ -219,13 +240,7 @@ The vendor updater explicitly preserves `/customer/minieye/config`.
 
 If the same physical unit was flashed VI then EN without reprovisioning, the exact same persistent ADAS config/calibration/license material can survive both flashes.
 
-Therefore, given EN-good / VI-bad:
-
-```text
-pure config difference
-```
-
-is less likely than:
+Therefore, given EN-good / VI-bad, pure config difference is less likely than:
 
 ```text
 new adas executable regression
@@ -251,17 +266,7 @@ VehicleMeasureRes
 Warner::Process(...)
 ```
 
-Functions explicitly expose/get:
-
-```text
-distance
-TTC
-relative speed/slowdown
-on-route state
-warning levels
-```
-
-This supports a reuse-first strategy.
+Functions explicitly expose/get distance, TTC, relative speed/slowdown, on-route state and warning levels. This supports a reuse-first strategy.
 
 ## Pedestrian/lane
 
@@ -288,9 +293,7 @@ tsr::GreenWarningState
 product::Distribution::SetTlrResult
 ```
 
-and `audios.txt` declares `tlr_green_on.wav`, though the referenced WAV is not present in the compared customer trees.
-
-Treat this as codebase capability, not proven enabled C2M feature.
+and `audios.txt` declares `tlr_green_on.wav`, though the referenced WAV is not present in the compared customer trees. Treat this as codebase capability, not proven enabled C2M feature.
 
 ## Highest-probability regression suspects
 
@@ -330,7 +333,7 @@ Audio is clearly different, but audio alone should not normally prevent all visu
 
 ## Recommended binary-diff targets
 
-Coding agent should use Ghidra/Binary Ninja/IDA/radare2 with function matching on:
+Prioritize same-name function diff on:
 
 ```text
 main/init
@@ -346,4 +349,4 @@ TSR init
 error paths
 ```
 
-Because both ELF binaries retain many semantic C++ symbol names, function matching should be unusually productive.
+Use `docs/reverse/ADAS_STATIC_DIFF_V1.md` and `tools/fw/elf_*_diff.py` as the reproducible baseline.
