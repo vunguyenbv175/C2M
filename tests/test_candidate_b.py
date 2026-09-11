@@ -139,9 +139,12 @@ def main() -> int:
                            "--out-manifest", str(tmp / "mut2.json"))
             if rc == 0:
                 fails.append("double-hook not rejected")
-            # verify_b_manifest OK on actual
+            # verify_b_manifest OK on actual (dir entry carries no sha by design)
             actual = manifest([
                 reg("/wifi/rcInsDriver.sh", hook_new),
+                {"path": "/c2m", "inode": 9, "type": "dir", "mode": 0o755,
+                 "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+                 "size": 96, "mtime": 1691062662},
                 reg("/c2m/c2m-idle", b"ARMFAKE", mode=0o755),
             ])
             (tmp / "actual.json").write_text(json.dumps(actual))
@@ -155,6 +158,9 @@ def main() -> int:
             # violation: unexpected extra path
             actual_bad = manifest([
                 reg("/wifi/rcInsDriver.sh", hook_new),
+                {"path": "/c2m", "inode": 9, "type": "dir", "mode": 0o755,
+                 "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+                 "size": 96, "mtime": 1691062662},
                 reg("/c2m/c2m-idle", b"ARMFAKE", mode=0o755),
                 reg("/evil", b"x"),
             ])
@@ -166,6 +172,32 @@ def main() -> int:
                 cwd=ROOT, capture_output=True, text=True)
             if r.returncode == 0:
                 fails.append("verify_b_manifest extra path not BLOCKED")
+            # F2 regression: /c2m omitted from the allowlist must BLOCK
+            # (this is exactly the shipped-bug shape the review caught).
+            mut_nodir = json.loads((tmp / "mut.json").read_text())
+            mut_nodir["added"] = [a for a in mut_nodir["added"] if a["path"] != "/c2m"]
+            (tmp / "mut_nodir.json").write_text(json.dumps(mut_nodir))
+            r = subprocess.run(
+                [sys.executable, "tools/fw/verify_b_manifest.py", "--stock",
+                 str(tmp / "stock.json"), "--mut", str(tmp / "mut_nodir.json"),
+                 "--actual", str(tmp / "actual.json")],
+                cwd=ROOT, capture_output=True, text=True)
+            if r.returncode == 0 or "UNEXPECTED-PATHS" not in (r.stdout + r.stderr):
+                fails.append("missing /c2m from allowlist not BLOCKED")
+            # F2 regression: unexpected extra DIRECTORY must BLOCK.
+            actual_baddir = manifest(actual["entries"] + [
+                {"path": "/c2m/oops", "inode": 10, "type": "dir", "mode": 0o755,
+                 "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+                 "size": 64, "mtime": 1691062662},
+            ])
+            (tmp / "actualbaddir.json").write_text(json.dumps(actual_baddir))
+            r = subprocess.run(
+                [sys.executable, "tools/fw/verify_b_manifest.py", "--stock",
+                 str(tmp / "stock.json"), "--mut", str(tmp / "mut.json"),
+                 "--actual", str(tmp / "actualbaddir.json")],
+                cwd=ROOT, capture_output=True, text=True)
+            if r.returncode == 0:
+                fails.append("unexpected extra directory not BLOCKED")
         # wrong base manifest must fail
         tree2 = tmp / "tree2"
         (tree2 / "wifi").mkdir(parents=True)

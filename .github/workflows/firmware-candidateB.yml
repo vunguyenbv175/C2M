@@ -1,8 +1,18 @@
 name: firmware-candidateB
-# MANUAL ONLY. Full Candidate-B chain on Linux (needs mtd-utils + the
-# original vendor TARs placed on the runner — same pattern as
-# firmware-evidence.yml). No firmware is committed; uploaded artifacts are
-# manifests/contracts/reports/hashes ONLY (never *.tar / *.bin).
+# MANUAL ONLY. Full Candidate-B chain on Linux.
+#
+# Firmware input path (F1): the original EN TAR lives in the PRIVATE vault
+# repo vunguyenbv175/c2m-firmware-vault (never in this public repo). This job
+# clones it with the read-only deploy key in secret FIRMWARE_VAULT_KEY, then
+# MANDATORILY verifies EN TAR SHA-256 before any use:
+#   3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c
+# Local-Linux equivalent (no GitHub needed): place the same TAR at
+# firmware/original/<name> on any Ubuntu 24.04 box with mtd-utils +
+# gcc-arm-linux-gnueabihf + ninja-build + liblzo2-dev, then run the same
+# commands as the steps below (see docs/firmware/CANDIDATEB_RUNBOOK.md).
+#
+# Never uploads firmware bytes: artifacts are manifests/contracts/reports/
+# hashes ONLY (explicit path list, no *.tar / *.bin).
 # All gates are fail-closed: any nonzero step stops the job RED.
 on:
   workflow_dispatch:
@@ -11,11 +21,23 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Require original TARs (missing -> RED with message)
+      - name: Fetch EN TAR from private vault + verify SHA-256 (fail-closed)
+        env:
+          FIRMWARE_VAULT_KEY: ${{ secrets.FIRMWARE_VAULT_KEY }}
         run: |
-          test -f firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar || \
-            { echo "place the original EN TAR under firmware/original/ first"; exit 1; }
-          sha256sum firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
+          test -n "$FIRMWARE_VAULT_KEY" || \
+            { echo "FIRMWARE_VAULT_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh firmware/original
+          printf '%s\n' "$FIRMWARE_VAULT_KEY" > ~/.ssh/fw_vault
+          chmod 600 ~/.ssh/fw_vault
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/fw-vault
+          cp /tmp/fw-vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar \
+            firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
+          echo "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c  firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar" \
+            | sha256sum -c -
+          rm -rf /tmp/fw-vault ~/.ssh/fw_vault
       - name: Install toolchain (versions recorded below)
         run: |
           sudo apt-get update && sudo apt-get install -y \

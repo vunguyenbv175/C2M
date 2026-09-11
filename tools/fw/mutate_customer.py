@@ -2,12 +2,13 @@
 """P2: apply the narrow Candidate-B mutation to an extracted customer tree.
 
 Mutation (exactly):
-  1. add `c2m/c2m-idle` (mode 0755) from --idle-bin (ARM binary built by the
+  1. add directory `c2m/` (mode 0755);
+  2. add `c2m/c2m-idle` (mode 0755) from --idle-bin (ARM binary built by the
      product-CI arm-dyn path);
-  2. append ONE background launch line to the stock hook script
+  3. append ONE background launch line to the stock hook script
      (default `wifi/rcInsDriver.sh`, i.e. on-device
-     /customer/wifi/rcInsDriver.sh after `sleep 1` context — appended at EOF
-     to avoid disturbing stock control flow).
+     /customer/wifi/rcInsDriver.sh — appended at EOF to avoid disturbing
+     stock control flow).
 
 Fail-closed guards:
   - --manifest (stock manifest JSON) REQUIRED: hook file content must hash
@@ -78,6 +79,7 @@ def main() -> int:
         print("MUTATE-FAIL: c2m/c2m-idle already exists in tree")
         return 1
     idle.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(idle.parent, 0o755)
     idle.write_bytes(args.idle_bin.read_bytes())
     os.chmod(idle, 0o755)
 
@@ -85,7 +87,10 @@ def main() -> int:
 
     doc = {"hook": hook_img_path,
            "hook_line": args.hook_line,
-           "added": [{"path": "/c2m/c2m-idle", "type": "reg",
+           "added": [{"path": "/c2m", "type": "dir",
+                      "mode": 0o755, "mode_oct": "0o755",
+                      "uid": 1001, "gid": 1001},
+                     {"path": "/c2m/c2m-idle", "type": "reg",
                       "mode": 0o755, "mode_oct": "0o755",
                       "size": idle.stat().st_size,
                       "sha256": sha_file(idle)}],

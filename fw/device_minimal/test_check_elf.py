@@ -56,20 +56,24 @@ def encode_attr(rows: list[tuple[int, object]]) -> bytes:
 
 
 def make_elf(etype: int, attr: bytes) -> bytes:
-    shstr = b"\x00.ARM.attributes\x00.shstrtab\x00"
-    ehsize, shentsize, shnum = 52, 40, 3
+    # Sections: null, .ARM.attributes, .shstrtab, .note.GNU-stack (non-exec,
+    # like every real toolchain output — the gate requires its presence).
+    shstr = b"\x00.ARM.attributes\x00.shstrtab\x00.note.GNU-stack\x00"
+    ehsize, shentsize, shnum = 52, 40, 4
     shoff = ehsize
     attr_off = shoff + shentsize * shnum
     str_off = attr_off + len(attr)
+    note_off = str_off + len(shstr)
     hdr = (b"\x7fELF" + bytes([1, 1, 1, 0]) + b"\x00" * 8
            + struct.pack("<HHIIIIIHHHHHH", etype, 0x28, 1, 0, 0, shoff,
                          0x5000400, ehsize, 0, 0, shentsize, shnum, 2))
     null = b"\x00" * 40
     s_attr = struct.pack("<IIIIIIIIII", 1, 0x70000003, 0, 0, attr_off,
                          len(attr), 0, 0, 1, 0)
-    s_str = struct.pack("<IIIIIIIIII", 18, 3, 0, 0, str_off, len(shstr),
+    s_str = struct.pack("<IIIIIIIIII", 17, 3, 0, 0, str_off, len(shstr),
                         0, 0, 1, 0)
-    return hdr + null + s_attr + s_str + attr + shstr
+    s_note = struct.pack("<IIIIIIIIII", 27, 7, 0, 0, note_off, 0, 0, 0, 4, 0)
+    return hdr + null + s_attr + s_str + s_note + attr + shstr
 
 
 def run_gate(*argv: str) -> tuple[int, str]:
@@ -119,9 +123,18 @@ def main() -> int:
         bad_obj.write_bytes(make_elf(1, encode_attr(simd_rows)))
         rc, out = run_gate(str(linked), "--object", str(bad_obj), "--allow-libc-simd")
         assert rc != 0 and "tu.no_simd" in out, out
+        # 5. an executable GNU-stack note must FAIL (hazard, not warning).
+        import struct as _st
+        raw = bytearray(make_elf(2, encode_attr(STOCK_ROWS)))
+        shoff = _st.unpack_from("<I", raw, 32)[0]
+        raw[shoff + 3 * 40 + 2:shoff + 3 * 40 + 6] = _st.pack("<I", 0x4)
+        execstack = tmp / "execstack"
+        execstack.write_bytes(bytes(raw))
+        rc, out = run_gate(str(execstack), "--object", str(obj), "--allow-libc-simd")
+        assert rc != 0 and "stack.note" in out, out
 
     print("check_elf unit: OK (stock attrs = v7-A/VFPv3-D16/VFP-args no-SIMD; "
-          "TU-proof + inherited-tag paths proven)")
+          "TU-proof + inherited-tag + execstack paths proven)")
     return 0
 
 

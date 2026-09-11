@@ -50,6 +50,12 @@ def main() -> int:
         if r is None:
             bad.append(f"MISSING-ADDED {p}")
             continue
+        if a.get("type") == "dir":
+            # Directories carry no content hash: enforce identity metadata.
+            for k in ("type", "mode", "uid", "gid"):
+                if r.get(k) != a.get(k):
+                    bad.append(f"ADDED-DIR-MISMATCH {p} {k}: {a.get(k)!r} -> {r.get(k)!r}")
+            continue
         for k in ("type", "mode", "size", "sha256"):
             if r.get(k) != a.get(k):
                 bad.append(f"ADDED-MISMATCH {p} {k}: {a.get(k)!r} -> {r.get(k)!r}")

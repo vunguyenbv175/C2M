@@ -224,6 +224,15 @@ def main() -> int:
               "Advanced_SIMD tag present (no NEON evidence; use --object + "
               "--allow-libc-simd only with a passing TU proof)")
     check("attr.vfp_args", attrs.get(28) == 1, f"VFP_args={attrs.get(28)!r} (want 1=hard)")
+    check("attr.align8", attrs.get(24) == 1 and attrs.get(25) == 1,
+          f"align8_needed={attrs.get(24)!r} align8_preserved={attrs.get(25)!r} (want 1/1)")
+
+    gnustack = e["sections"].get(".note.GNU-stack")
+    if gnustack is None:
+        check("stack.note", False, "missing .note.GNU-stack (link warns: executable stack?)")
+    else:
+        check("stack.note", not (gnustack[2] & 0x4),
+              f".note.GNU-stack flags={hex(gnustack[2])} (SHF_EXECINSTR must be clear)")
 
     if args.object is not None:
         o = parse_elf(args.object)

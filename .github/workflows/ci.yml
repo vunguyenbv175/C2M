@@ -33,6 +33,7 @@ jobs:
           python3 tools/road/test_road.py
           python3 tests/test_firmware_pipeline.py
           python3 fw/device_minimal/test_check_elf.py
+          python3 fw/device_minimal/test_startup_abi.py
           python3 tests/test_candidate_b.py
   arm-minimal:
     # Reproducible cross-build of the MINIMAL idle binary (static analysis only).
@@ -84,5 +85,14 @@ jobs:
             -DCMAKE_BUILD_TYPE=MinSizeRel
           cmake --build build/arm-dyn --verbose
           arm-linux-gnueabihf-gcc --version > build/arm-dyn/toolchain_version.txt
+      - name: Startup disassembly evidence (_start contract)
+        run: |
+          arm-linux-gnueabihf-gcc -march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16 -Os -Wall -Wextra \
+            -include fw/device_minimal/glibc_compat.h \
+            -c fw/device_minimal/start.S -o build/arm-dyn/start_check.o
+          arm-linux-gnueabihf-objdump -d build/arm-dyn/start_check.o
+          arm-linux-gnueabihf-objdump -d build/arm-dyn/start_check.o | grep -q "bl.*__libc_start_main"
+          arm-linux-gnueabihf-objdump -d build/arm-dyn/start_check.o | grep -q "pop"
+          arm-linux-gnueabihf-readelf -S build/arm-dyn/start_check.o | grep -q "note.GNU-stack"
       - name: ELF gate (dynamic, interp + NEEDED + GLIBC<=2.30 + VFPv3-D16, no SIMD)
         run: python3 fw/device_minimal/check_elf.py build/arm-dyn/c2m-idle --allow-dynamic
