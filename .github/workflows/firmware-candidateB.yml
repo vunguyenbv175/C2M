@@ -42,11 +42,13 @@ jobs:
         run: |
           mkdir -p work
           sudo apt-get update && sudo apt-get install -y \
-            mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev
+            mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev \
+            qemu-user-static cpio
           mkfs.ubifs -h 2>&1 | head -3
           arm-linux-gnueabihf-gcc --version
+          qemu-arm-static --version | head -1
           dpkg-query -W mtd-utils gcc-arm-linux-gnueabihf libc6-dev-armhf-cross liblzo2-dev \
-            > work/tool_versions.txt || true
+            qemu-user-static cpio > work/tool_versions.txt
       - name: Inspect EN package + geometry + manifest
         run: |
           mkdir -p work
@@ -76,6 +78,25 @@ jobs:
           arm-linux-gnueabihf-objdump -d build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | head -30
           python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
           sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
+      - name: QEMU stock-rootfs runtime proof (exact B binary)
+        # Runs the EXACT c2m-idle bytes later inserted into Candidate B under
+        # qemu-arm-static with the STOCK rootfs as sysroot (stock
+        # ld-linux-armhf.so.3 + glibc 2.30). The daemon loops forever, so
+        # `timeout -KILL` rc=137 is expected; the gates are stdout + marker.
+        run: |
+          mkdir -p work/sysroot && cd work/sysroot
+          gunzip -c ../carve/rootfs.es.load0.*.bin | cpio -id --no-absolute-filenames
+          cd ../..
+          mkdir -p work/sysroot/tmp
+          cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/c2m-idle
+          sha256sum work/sysroot/tmp/c2m-idle > work/qemu_bin.sha256
+          timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
+            > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
+          cat work/qemu_out.txt
+          grep -q "c2m-idle 0.1.0-sprint1" work/qemu_out.txt
+          cat work/sysroot/tmp/c2m_idle.marker
+          grep -qx "c2m-idle 0.1.0-sprint1" work/sysroot/tmp/c2m_idle.marker
+          echo "QEMU-RUNTIME: PASS (stock glibc-2.30 userspace; stdout + marker verified)"
       - name: P2 mutate + P1 mutated rebuild (GATE)
         run: |
           python3 tools/fw/mutate_customer.py --tree work/tree \
@@ -95,6 +116,73 @@ jobs:
             --workdir work/candidates --customer-b work/customer_B.es
           sha256sum work/candidates/EN_ENHANCE_IDLE.tar work/candidates/EN_REPACK_GOLDEN.tar \
             > work/candidate_hashes.txt
+      - name: Assemble private release layout (A + B + flash folders)
+        run: |
+          R=release/c2m-flash
+          mkdir -p "$R/C2M_FLASH_A" "$R/C2M_FLASH_B" "$R/BUILD_EVIDENCE"
+          cp work/candidates/EN_REPACK_GOLDEN.tar work/candidates/EN_ENHANCE_IDLE.tar "$R/"
+          tar -C "$R/C2M_FLASH_A" -xf "$R/EN_REPACK_GOLDEN.tar"
+          tar -C "$R/C2M_FLASH_B" -xf "$R/EN_ENHANCE_IDLE.tar"
+          test "$(ls "$R/C2M_FLASH_A" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          test "$(ls "$R/C2M_FLASH_B" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          cp work/candidate_hashes.txt work/c2m_idle.sha256 work/qemu_bin.sha256 \
+            work/qemu_out.txt work/mutation.json work/tool_versions.txt "$R/BUILD_EVIDENCE/"
+          cp work/candidates/EN_PACKAGE_CONTRACT_B.json work/candidates/candidate_B_diff.json \
+            work/candidates/validate_A_deep.json work/candidates/validate_B_deep.json \
+            work/candidates/validate_B_deep.md "$R/BUILD_EVIDENCE/"
+          cd "$R" && sha256sum EN_REPACK_GOLDEN.tar EN_ENHANCE_IDLE.tar \
+            C2M_FLASH_A/* C2M_FLASH_B/* > SHA256SUMS.txt && cd ../..
+          cat > "$R/FLASH_README.txt" <<'EOF'
+          C2M FLASH PACKAGES — FLASH-READY / NOT YET FLASH-PROVEN.
+          Do NOT treat these as boot-proven until the hardware checklist passes.
+
+          ### Candidate A (EN_REPACK_GOLDEN.tar)
+          Stock EN byte-identical control image (rebuilt from the golden EN
+          vendor TAR with zero intended changes).
+
+          ### Candidate B (EN_ENHANCE_IDLE.tar)
+          Stock EN + minimal idle daemon ONLY:
+            ADD /c2m, ADD /c2m/c2m-idle, MODIFY /wifi/rcInsDriver.sh
+            (one appended line: /customer/c2m/c2m-idle &).
+          No ADAS/M4/camera/kernel/bootloader/model/calibration change.
+
+          ### Physical flashing sequence
+          1. Format known-good microSD FAT32.
+          2. Copy the CONTENTS of C2M_FLASH_A/ directly to the card root.
+          3. Flash Candidate A first.
+          4. Verify stock boot/camera/recording/ADAS/display/Wi-Fi/reboot.
+          5. Only if A PASSes, erase/reformat the card.
+          6. Copy the CONTENTS of C2M_FLASH_B/ directly to the card root.
+          7. Flash Candidate B.
+          8. Verify all stock functions.
+          9. Verify: ps | grep c2m-idle
+          10. Verify: cat /tmp/c2m_idle.marker
+          Expected marker: c2m-idle 0.1.0-sprint1
+          Full procedure: docs/firmware/FLASH_HW_CHECKLIST.md
+          EOF
+          cat "$R/SHA256SUMS.txt"
+      - name: Publish release to private vault (firmware bytes stay private)
+        env:
+          FIRMWARE_VAULT_PUSH_KEY: ${{ secrets.FIRMWARE_VAULT_PUSH_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_PUSH_KEY" || \
+            { echo "FIRMWARE_VAULT_PUSH_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$FIRMWARE_VAULT_PUSH_KEY" > ~/.ssh/fw_vault_push
+          chmod 600 ~/.ssh/fw_vault_push
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault_push -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/vault-out
+          D="deliverables/$(date -u +%Y%m%d)-r${GITHUB_RUN_ID}"
+          echo "VAULT_DIR=$D" >> $GITHUB_ENV
+          mkdir -p "/tmp/vault-out/$D"
+          cp -r release/c2m-flash "/tmp/vault-out/$D/"
+          cd /tmp/vault-out && git add "$D" \
+            && git -c user.name=c2m-ci -c user.email=c2m-ci@local \
+               commit -m "flash deliverables ${D} (from verifiable pipeline)" \
+            && git push origin main
+          rm -rf /tmp/vault-out ~/.ssh/fw_vault_push
+          echo "VAULT-DIR: $D"
       - name: Upload evidence (manifests/reports/hashes ONLY)
         uses: actions/upload-artifact@v4
         with:
@@ -116,4 +204,6 @@ jobs:
             work/candidates/repack_A.json
             work/candidate_hashes.txt
             work/c2m_idle.sha256
+            work/qemu_bin.sha256
+            work/qemu_out.txt
             work/tool_versions.txt

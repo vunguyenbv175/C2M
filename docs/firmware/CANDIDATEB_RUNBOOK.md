@@ -46,6 +46,15 @@ cmake -S fw/device_minimal -B build/arm-dyn-b -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE=fw/device_minimal/toolchain-armhf-dyn.cmake \
   -DCMAKE_BUILD_TYPE=MinSizeRel && cmake --build build/arm-dyn-b
 python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
+sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
+# QEMU stock-rootfs runtime proof (exact binary that goes into B):
+sudo apt-get install -y qemu-user-static cpio
+mkdir -p work/sysroot && cd work/sysroot
+gunzip -c ../carve/rootfs.es.load0.*.bin | cpio -id --no-absolute-filenames
+cd ../..
+mkdir -p work/sysroot/tmp && cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/
+timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle
+# expect rc=137 (killed after proving itself), stdout + work/sysroot/tmp/c2m_idle.marker
 python3 tools/fw/mutate_customer.py --tree work/tree \
   --manifest work/customer_manifest.json \
   --idle-bin build/arm-dyn-b/c2m-idle --out-manifest work/mutation.json
@@ -57,6 +66,15 @@ sudo bash tools/fw/rebuild_customer.sh --mode mutated \
   --out work/customer_B.es --report work/rebuild_B.json
 python3 tools/fw/build_candidates.py --en-tar "$EN" \
   --workdir work/candidates --customer-b work/customer_B.es
+# Assemble private release layout (TARs + flash folders + sums + readme):
+R=release/c2m-flash
+mkdir -p "$R/C2M_FLASH_A" "$R/C2M_FLASH_B" "$R/BUILD_EVIDENCE"
+cp work/candidates/EN_REPACK_GOLDEN.tar work/candidates/EN_ENHANCE_IDLE.tar "$R/"
+tar -C "$R/C2M_FLASH_A" -xf "$R/EN_REPACK_GOLDEN.tar"
+tar -C "$R/C2M_FLASH_B" -xf "$R/EN_ENHANCE_IDLE.tar"
+cd "$R" && sha256sum EN_REPACK_GOLDEN.tar EN_ENHANCE_IDLE.tar \
+  C2M_FLASH_A/* C2M_FLASH_B/* > SHA256SUMS.txt && cd ../..
+# (FLASH_README.txt content lives in firmware-candidateB.yml; keep in sync.)
 ```
 
 ## Alternative: self-hosted Linux runner
