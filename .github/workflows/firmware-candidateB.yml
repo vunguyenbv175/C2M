@@ -71,6 +71,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
             -DCMAKE_BUILD_TYPE=MinSizeRel
           cmake --build build/arm-dyn-b --verbose
+          arm-linux-gnueabihf-readelf -S build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | grep -E "note|attributes"
+          arm-linux-gnueabihf-objdump -d build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | head -30
           python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
           sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
       - name: P2 mutate + P1 mutated rebuild (GATE)
