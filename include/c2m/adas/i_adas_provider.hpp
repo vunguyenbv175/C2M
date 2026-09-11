@@ -11,7 +11,7 @@ class IAdasProvider {
   virtual ~IAdasProvider() = default;
   virtual std::string Name() const = 0;
   // Non-blocking. Returns stale state on timeout; never throws to caller.
-  virtual AdasState Poll() = 0;
+  virtual AdasState Poll() const = 0;
   virtual bool Healthy() const = 0;
 };
 

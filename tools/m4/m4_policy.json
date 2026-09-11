@@ -1,0 +1,7 @@
+{
+  "_comment": "Canonical M4 safety policy (review F2). C++ projection: include/c2m/display/m4_policy.hpp. Parity-tested by tools/m4/test_m4_policy.py. Default-deny.",
+  "allow_l2_json_uuids": ["DispBrightSet", "StorageStatus", "ScreenModeSet", "ClientConn"],
+  "deny_json_uuids": ["AdasStatus", "HeavyCalibStatus", "GPSLevel", "GPSSpeed", "RecordVoice"],
+  "deny_inner_keys": ["vehicleWarning", "vehicleMeasure", "pedestrians", "laneWarningRes"],
+  "l3_status": "BLOCKED"
+}

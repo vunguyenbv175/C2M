@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""EF-A01 Python mirror of include/c2m/adas/stock_adas_provider.hpp::NormalizeStock.
+"""EF-A01 Python mirror of NormalizeStock (Gate B hardened).
 
-Converts already-decoded stock inner payloads into a normalized AdasState dict.
-Used by host-sim, Web V0, and synthetic tests. No sockets here.
+Sole warning drivers per STOCK_ADAS_SCHEMA_V2: fcw field, is_danger,
+deviate_state, is_crucial. Transport never implies process state.
+Mirrors include/c2m/adas/stock_adas_provider.hpp exactly.
 """
 from __future__ import annotations
 from typing import Any
@@ -19,12 +20,15 @@ def _num(row: dict, key: str, dflt: float = 0.0) -> float:
 def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
     now_ms = int(snapshot.get("now_ms", 0))
     last_frame_ms = int(snapshot.get("last_frame_ms", 0))
-    libflow = bool(snapshot.get("libflow_connected", False))
-    cardv_conn = bool(snapshot.get("cardv_connected", False))
+    libflow = bool(snapshot.get("libflow_reachable", snapshot.get("libflow_connected", False)))
+    sub = bool(snapshot.get("subscription_active", libflow))
+    cardv_conn = bool(snapshot.get("cardv_reachable", snapshot.get("cardv_connected", False)))
+    frame_seen = bool(snapshot.get("frame_seen", snapshot.get("libflow_connected", False)))
+    process = snapshot.get("process", "Unknown")  # Unknown|Present|Absent (collector only)
     nums: dict[str, list[dict]] = snapshot.get("nums", {})
     cardv: dict[str, str] = snapshot.get("cardv", {})
-    age_ms = max(0, now_ms - last_frame_ms)
-    stale = (not libflow) or (age_ms > stale_after_ms)
+    age_ms = max(0, now_ms - last_frame_ms) if frame_seen else 0
+    stale = (not frame_seen) or (age_ms > stale_after_ms)
 
     warn_rows = nums.get("vehicleWarning", [])
     warn = warn_rows[0] if warn_rows else {}
@@ -32,6 +36,11 @@ def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
     headway = _num(warn, "headway", 0.0)
     warning_level = int(_num(warn, "warning_level", 0))
     fcw_raw = int(_num(warn, "fcw", 0))
+    raw = {"vehicle_warning": dict(warn), "warning_level": warning_level,
+           "headway_warning": int(_num(warn, "headway_warning", 0)),
+           "vb_warning": int(_num(warn, "vb_warning", 0)),
+           "sag_warning": int(_num(warn, "sag_warning", 0)),
+           "key_pedestrian_count": 0, "deviate_state": 0}
 
     vehicles: list[dict[str, Any]] = []
     for r in nums.get("vehicleMeasure", []):
@@ -50,18 +59,16 @@ def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
             v["headway"] = headway
         vehicles.append(v)
 
-    lead = None
+    lead: dict[str, Any] | None = None
     for v in vehicles:
         if v["is_crucial"]:
-            lead = v
+            lead = {"long_dist": v["long_dist"], "ttc": v["ttc"], "reason": "crucial"}
             break
     if lead is None:
         for v in vehicles:
             if v["is_second_crucial"]:
-                lead = v
+                lead = {"long_dist": v["long_dist"], "ttc": v["ttc"], "reason": "second_crucial"}
                 break
-    if lead is None and vehicles:
-        lead = min(vehicles, key=lambda x: x["long_dist"])
 
     pedestrians: list[dict[str, Any]] = []
     pcw = False
@@ -76,7 +83,9 @@ def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
             "ttc": _num(r, "ttc", 0.0),
             "have_bike": bool(_num(r, "have_bike", 0.0)),
         }
-        if p["is_danger"] or p["is_key"]:
+        if p["is_key"]:
+            raw["key_pedestrian_count"] += 1
+        if p["is_danger"]:
             pcw = True
         pedestrians.append(p)
 
@@ -88,10 +97,12 @@ def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
             "turn_radius": _num(lane_rows[0], "turn_radius", 0.0),
             "turn_frequently": bool(_num(lane_rows[0], "turn_frequently", 0.0)),
         }
-    ldw = lane["deviate_state"] != 0
+    raw["deviate_state"] = lane["deviate_state"]
 
-    if not libflow:
+    if process == "Absent":
         runtime_class = "A_ProcessAbsent"
+    elif not frame_seen:
+        runtime_class = "Unknown"
     elif stale:
         runtime_class = "C_InputPathSuspect"
     else:
@@ -103,13 +114,19 @@ def normalize_stock(snapshot: dict, stale_after_ms: int = 500) -> dict:
         "stale": stale,
         "age_ms": age_ms,
         "runtime_class": runtime_class,
+        "process": process,
+        "libflow_reachable": libflow,
+        "subscription_active": sub,
+        "cardv_reachable": cardv_conn,
         "vehicles": vehicles,
-        "lead": {"long_dist": lead["long_dist"], "ttc": lead["ttc"]} if lead else None,
-        "fcw": {"active": bool(fcw_raw or warning_level), "level": warning_level},
-        "pcw": {"active": pcw},
-        "ldw": {"active": ldw, "level": lane["deviate_state"]},
+        "lead": lead,
+        "fcw": {"active": bool(fcw_raw), "level": fcw_raw, "evidence": "HighConfidence" if fcw_raw else "Unknown"},
+        "pcw": {"active": pcw, "evidence": "HighConfidence" if pcw else "Unknown"},
+        "ldw": {"active": lane["deviate_state"] != 0, "level": lane["deviate_state"],
+                "evidence": "HighConfidence" if lane["deviate_state"] else "Unknown"},
         "lane": lane,
         "pedestrians": pedestrians,
+        "raw": raw,
         "cardv_status": {
             "adas_status": cardv.get("AdasStatus", "UNKNOWN"),
             "calib_status": cardv.get("HeavyCalibStatus", "UNKNOWN"),

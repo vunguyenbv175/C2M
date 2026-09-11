@@ -1,0 +1,62 @@
+{
+  "en_symbols": 4478,
+  "vi_symbols": 4476,
+  "common": 4474,
+  "en_only": [
+    "_Z11Is_Gps_infoPh",
+    "_Z12nmea_satinfoiP9_nmeaINFO",
+    "_Z18nema_calc_checksumPhPi",
+    "g_zkw_gps_module"
+  ],
+  "vi_only": [
+    "_Z18nmea_BDGSV2info_naP10_nmeaBDGSV",
+    "_Z20SendGPSSpeedToScreeni"
+  ],
+  "size_changed": [
+    {
+      "name": "_Z11nmea_parse1P11_nmeaPARSERPKciP9_nmeaINFO",
+      "en_size": 792,
+      "vi_size": 680
+    },
+    {
+      "name": "_Z15nmea_pack_type1Phi",
+      "en_size": 388,
+      "vi_size": 616
+    },
+    {
+      "name": "_Z19SendGPSInfoToScreenv",
+      "en_size": 112,
+      "vi_size": 92
+    },
+    {
+      "name": "_Z21GsensorSetSensitivitya",
+      "en_size": 1304,
+      "vi_size": 1624
+    },
+    {
+      "name": "_Z22GsensorSetPowerOnByIntv",
+      "en_size": 1048,
+      "vi_size": 1104
+    },
+    {
+      "name": "_Z22nmea_parser_real_push1P11_nmeaPARSERPKci",
+      "en_size": 1408,
+      "vi_size": 1436
+    },
+    {
+      "name": "_Z31cardv_cmd_handler_system_restarhhPPc",
+      "en_size": 344,
+      "vi_size": 612
+    },
+    {
+      "name": "_Z36cardv_cmd_handler_GsensorSensitivityhhPPc",
+      "en_size": 148,
+      "vi_size": 140
+    },
+    {
+      "name": "minieye_init",
+      "en_size": 1212,
+      "vi_size": 1216
+    }
+  ]
+}

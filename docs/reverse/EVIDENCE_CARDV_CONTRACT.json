@@ -1,0 +1,502 @@
+{
+  "method": "byte-exact search in cardv ELFs extracted from original EN/VI rootfs (gzip-cpio) images; offsets are ELF file offsets.",
+  "en": {
+    "size": 1225780,
+    "sha256": "344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c",
+    "matches_contract_doc": true
+  },
+  "vi": {
+    "size": 1225780,
+    "sha256": "56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23",
+    "matches_contract_doc": true
+  },
+  "tokens": [
+    {
+      "token": "minieye-websocket",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xf374c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x100970"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "raw_adas",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xff340"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0xf5794"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "fortest",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xff34c"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0xf57a0"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "GPSLevel",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x301e1",
+        "0x4109a",
+        "0xf33c6"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x30194",
+        "0x4103b",
+        "0x100602"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "GPSSpeed",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x34204",
+        "0xf342e"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x341b7",
+        "0x387fa",
+        "0x10066a"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "DispBrightSet",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xf33f6"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x100632"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "StorageStatus",
+      "en_count": 4,
+      "en_offsets_hex": [
+        "0x2b4d7",
+        "0x35555",
+        "0xf346e",
+        "0xf34a2"
+      ],
+      "vi_count": 4,
+      "vi_offsets_hex": [
+        "0x2b48a",
+        "0x35508",
+        "0x1006aa",
+        "0x1006de"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ClientConn",
+      "en_count": 12,
+      "en_offsets_hex": [
+        "0x28bc7",
+        "0x28c7b",
+        "0x28e75",
+        "0x28fad",
+        "0x298c3",
+        "0x29c11",
+        "0x2a163",
+        "0x2a349",
+        "0x2a7e1",
+        "0x2ab1e",
+        "0x2bdb1",
+        "0x2c3a4"
+      ],
+      "vi_count": 12,
+      "vi_offsets_hex": [
+        "0x28b97",
+        "0x28c4b",
+        "0x28e45",
+        "0x28f60",
+        "0x29876",
+        "0x29bc4",
+        "0x2a116",
+        "0x2a2fc",
+        "0x2a794",
+        "0x2aad1",
+        "0x2bd64",
+        "0x2c357"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "RecordVoice",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xf357a"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x1007a6"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "ScreenModeSet",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xf35ea"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x100816"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "AdasStatus",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xf3642"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x100866"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "HeavyCalibStatus",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0xf3696"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x1008ba"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "WSGetConnectStatus",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x3d389"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x3d345"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendADASInfoToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x432b7"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x43246"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendGPSInfoToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x2b8f9"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x2b8ac"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendGPSSpeedToScreen",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x387f6"
+      ],
+      "verdict": "VI-ONLY"
+    },
+    {
+      "token": "SendBacklightLevelInfoToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x2c417"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x2c3ca"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendDisplayModeToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x41d1d"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x41cbe"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendStorageInfoToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x37699"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x3764c"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendWifiStatusToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x33d37"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x33cea"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "SendAudioRecordStatusToScreen",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x3f183"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x3f13f"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "GetADASStatus",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x3532b"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x352de"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "GetADASCalibStatus",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x42e40"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x42dcf"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "adas_minieye_send_frame_task",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x3fc45",
+        "0xff2a2"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x3fc01",
+        "0xf56f6"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "CRingBuf",
+      "en_count": 5,
+      "en_offsets_hex": [
+        "0x2673b",
+        "0x2677b",
+        "0x2679c",
+        "0x3e9cf",
+        "0xff252"
+      ],
+      "vi_count": 5,
+      "vi_offsets_hex": [
+        "0x2670b",
+        "0x2674b",
+        "0x2676c",
+        "0x3e98b",
+        "0xf56a6"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "RequestWriteFrame",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x26745",
+        "0xff26c"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x26715",
+        "0xf56c0"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "CommitWrite",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x26785"
+      ],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x26755"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "nmea_parse",
+      "en_count": 12,
+      "en_offsets_hex": [
+        "0x2bb7e",
+        "0x2bc9f",
+        "0x2be48",
+        "0x2fd3d",
+        "0x30f6d",
+        "0x328b1",
+        "0x335a6",
+        "0x33e4b",
+        "0x33ee1",
+        "0x34511",
+        "0x35770",
+        "0x35a93"
+      ],
+      "vi_count": 12,
+      "vi_offsets_hex": [
+        "0x2bb31",
+        "0x2bc52",
+        "0x2bdfb",
+        "0x2fcf0",
+        "0x30f20",
+        "0x32864",
+        "0x33559",
+        "0x33dfe",
+        "0x33e94",
+        "0x344c4",
+        "0x35723",
+        "0x35a46"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "nmea_pack_type",
+      "en_count": 4,
+      "en_offsets_hex": [
+        "0x2d0af",
+        "0x4081e",
+        "0xf4060",
+        "0x10f5fc"
+      ],
+      "vi_count": 4,
+      "vi_offsets_hex": [
+        "0x2d062",
+        "0x407bf",
+        "0xf9a90",
+        "0x10fb74"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "nmea_BDGSV2info_na",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 1,
+      "vi_offsets_hex": [
+        "0x444ff"
+      ],
+      "verdict": "VI-ONLY"
+    },
+    {
+      "token": "nmea_satinfo",
+      "en_count": 1,
+      "en_offsets_hex": [
+        "0x28f5d"
+      ],
+      "vi_count": 0,
+      "vi_offsets_hex": [],
+      "verdict": "EN-ONLY"
+    },
+    {
+      "token": "GsensorSetSensitivity",
+      "en_count": 3,
+      "en_offsets_hex": [
+        "0x398ec",
+        "0xf1168",
+        "0xf11ad"
+      ],
+      "vi_count": 3,
+      "vi_offsets_hex": [
+        "0x398b9",
+        "0xfa151",
+        "0xfa170"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "GsensorSetPowerOnByInt",
+      "en_count": 2,
+      "en_offsets_hex": [
+        "0x43573",
+        "0xf0fd1"
+      ],
+      "vi_count": 2,
+      "vi_offsets_hex": [
+        "0x43502",
+        "0xf9f09"
+      ],
+      "verdict": "BOTH"
+    },
+    {
+      "token": "26012",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 0,
+      "vi_offsets_hex": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "token": "8080",
+      "en_count": 0,
+      "en_offsets_hex": [],
+      "vi_count": 0,
+      "vi_offsets_hex": [],
+      "verdict": "ABSENT"
+    }
+  ]
+}

@@ -33,13 +33,14 @@ def mock_snapshot(scenario: str, tick: int) -> dict:
         nums["pedestrians"] = [{"id": 7, "world_x": 1.2, "world_y": 8.0, "is_key": 0,
                                 "is_danger": 1, "ttc_m": 1.4, "ttc": 1.4, "have_bike": 0}]
     return {"now_ms": now, "last_frame_ms": now - 100, "frame_id": tick,
-            "libflow_connected": True, "cardv_connected": True, "nums": nums,
+            "libflow_reachable": True, "subscription_active": True,
+            "cardv_reachable": True, "frame_seen": True, "nums": nums,
             "cardv": {"AdasStatus": "ON", "HeavyCalibStatus": "CALIB_OK"}}
 
 
-INDEX_HTML = """<!doctype html><meta charset=utf-8><title>C2M Enhanced V0</title>
-<h1>C2M Enhanced — read-only V0</h1>
-<p>Stock app/recorder untouched. Scenario: <b>{scenario}</b></p>
+INDEX_HTML = """<!doctype html><meta charset=utf-8><title>C2M Enhanced V0 (HOST PROTOTYPE)</title>
+<h1>C2M Enhanced — read-only V0 — HOST PROTOTYPE</h1>
+<p>Mock transport only; not connected to device. Stock app/recorder untouched. Scenario: <b>{scenario}</b></p>
 <ul><li><a href=/status>/status</a></li><li><a href=/diagnostics>/diagnostics</a></li></ul>
 <pre id=s>loading…</pre>
 <script>setInterval(async()=>{s.textContent=JSON.stringify(await(await fetch('/status')).json(),null,2)},1000)</script>
@@ -66,6 +67,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/status":
             adas = normalize_stock(mock_snapshot(Handler.scenario, Handler.tick))
             body = {"service": "c2m-enhance-v0", "mode": "read-only",
+                    "transport": "mock (HOST PROTOTYPE)",
                     "scenario": Handler.scenario, "uptime_s": round(time.time() - Handler.started, 1),
                     "adas": adas,
                     "display": {"objects": len(adas["vehicles"]) + len(adas["pedestrians"]),

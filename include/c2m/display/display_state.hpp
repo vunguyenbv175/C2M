@@ -1,6 +1,7 @@
 #pragma once
 // DisplayState — EF-A03. Provider-neutral display model.
 // No M4 packet types allowed here (see M4_ADAPTER_DESIGN.md).
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -24,6 +25,13 @@ struct LaneView {
   bool ldw_active = false;
 };
 
+struct LeadView {
+  bool present = false;
+  std::string reason = "none";
+  float long_dist = 0.0f;  // RAW-ONLY unit (vendor longitude_dist)
+  float ttc = 0.0f;        // RAW-ONLY unit
+};
+
 struct NavState {
   bool active = false;
   std::string arrow = "none";  // none|left|right|straight|uturn
@@ -33,8 +41,7 @@ struct NavState {
 
 struct TpmsView {
   bool available = false;
-  // bar, per wheel FL FR RL RR when available
-  float pressures_bar[4] = {0, 0, 0, 0};
+  float pressures_bar[4] = {0, 0, 0, 0};  // FL FR RL RR when available
   bool alert = false;
   std::string alert_text;
 };
@@ -60,11 +67,12 @@ struct WarningView {
 
 struct DisplayState {
   std::uint64_t timestamp_ms = 0;
-  int ego_speed_kmh = -1;
-  std::optional<int> speed_limit_kmh;
+  int ego_speed_kmh = -1;  // -1 = unknown (GPS-derived; unit pending runtime proof)
+  std::optional<int> speed_limit_kmh;  // empty until TSR/fusion proven
   float speed_limit_confidence = 0.0f;
 
   LaneView lane;
+  LeadView lead;
   std::vector<DisplayObject> objects;
   WarningView warning;
   NavState navigation;
@@ -79,8 +87,8 @@ struct DisplayState {
   }
 };
 
-// Pure build step: AdasState (+ speed/gps/system inputs) -> DisplayState.
-// Keeps fusion/render-test on host without M4 hardware.
+// Pure build step: AdasState (+ speed/system inputs) -> DisplayState.
+// Host-testable without M4 hardware.
 inline DisplayState BuildFromAdas(const adas::AdasState& a, int ego_speed_kmh = -1,
                                   std::optional<int> fused_limit = std::nullopt,
                                   float fused_conf = 0.0f) {
@@ -91,6 +99,10 @@ inline DisplayState BuildFromAdas(const adas::AdasState& a, int ego_speed_kmh = 
   d.lane.visible = !a.stale;
   d.lane.deviate_state = a.lane.deviate_state;
   d.lane.ldw_active = a.ldw.active;
+  d.lead.present = a.lead.present;
+  d.lead.reason = a.lead.reason;
+  d.lead.long_dist = a.lead.long_dist;
+  d.lead.ttc = a.lead.ttc;
   for (const auto& v : a.vehicles) {
     DisplayObject o;
     o.id = v.id;

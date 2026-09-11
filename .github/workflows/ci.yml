@@ -1,0 +1,33 @@
+name: c2m-ci
+on:
+  push:
+  pull_request:
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: CTest
+        run: ctest --test-dir build --output-on-failure
+      - name: Standalone header checks
+        run: |
+          for h in $(find include -name '*.hpp'); do
+            echo "== $h"
+            g++ -std=c++17 -fsyntax-only -I include -x c++ "$h"
+          done
+      - name: Python tests
+        run: |
+          pip install msgpack websocket-client 2>/dev/null || pip3 install msgpack websocket-client
+          python3 tools/m4/test_protocol.py
+          python3 tools/m4/test_normalize_adas.py
+          python3 tools/m4/test_m4_policy.py
+          python3 tools/m4/make_fixture.py
+          python3 tools/m4/test_real_data_path.py
+          python3 tools/fw/stock_adas_schema_v2.py
+          python3 tools/fw/cardv_symdiff.py --help >/dev/null
+          python3 tools/road/osm_preprocess.py --out /tmp/roads_ci.sqlite
+          python3 tools/road/test_road.py

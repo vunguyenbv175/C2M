@@ -1,27 +1,23 @@
 #!/usr/bin/env python3
-"""EF-A02 L2 replay guard. Only harmless info-class messages may be replayed.
+"""EF-A02 L2 replay guard — projection of tools/m4/m4_policy.json (review F2).
 
-ALLOW (L2 harmless): DispBrightSet, StorageStatus, DisplayMode/ScreenModeSet, ClientConn
-DENY (needs L3+proof): vehicleWarning, vehicleMeasure, pedestrians, laneWarningRes,
-  AdasStatus, GPSSpeed/GPSLevel (semantic), RecordVoice
+Only harmless info-class messages may be planned/replayed at L2.
+L3 semantic injection is BLOCKED (Gate F): no encoder exists yet.
 """
 from __future__ import annotations
+import json
+from pathlib import Path
 
-ALLOW_UUIDS = {"DispBrightSet", "StorageStatus", "ScreenModeSet", "ClientConn"}
-DENY_UUIDS = {"AdasStatus", "HeavyCalibStatus", "GPSLevel", "GPSSpeed", "RecordVoice"}
-DENY_KEYS = {"vehicleWarning", "vehicleMeasure", "pedestrians", "laneWarningRes"}
+_POLICY = json.loads((Path(__file__).resolve().parent / "m4_policy.json").read_text())
+ALLOW_UUIDS = set(_POLICY["allow_l2_json_uuids"])
 
 
 def classify_json_uuid(uuid: str) -> str:
-    if uuid in ALLOW_UUIDS:
-        return "ALLOW-L2"
-    return "DENY"
+    return "ALLOW-L2" if uuid in ALLOW_UUIDS else "DENY"
 
 
 def classify_inner_key(key: str) -> str:
-    if key in DENY_UUIDS or key in DENY_KEYS:
-        return "DENY"
-    return "DENY"  # default-deny for unknown semantic keys
+    return "DENY"  # default-deny: all semantic keys need L3 proof
 
 
 def guard_replay(candidates: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -35,5 +31,6 @@ def guard_replay(candidates: list[dict]) -> tuple[list[dict], list[dict]]:
 
 
 if __name__ == "__main__":
-    demo = [{"uuid": "DispBrightSet"}, {"uuid": "AdasStatus"}, {"key": "vehicleWarning"}]
+    demo = [{"uuid": "DispBrightSet"}, {"uuid": "GPSSpeed"},
+            {"uuid": "AdasStatus"}, {"key": "vehicleWarning"}]
     print(guard_replay(demo))

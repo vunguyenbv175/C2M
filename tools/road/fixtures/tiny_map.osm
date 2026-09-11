@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal OSM fixture for host pipeline test (3 ways, Hanoi area). -->
+<osm version="0.6">
+  <node id="1" lat="21.0278" lon="105.8342"/>
+  <node id="2" lat="21.0288" lon="105.8352"/>
+  <node id="3" lat="21.0298" lon="105.8362"/>
+  <node id="4" lat="21.0278" lon="105.8392"/>
+  <node id="5" lat="21.0288" lon="105.8402"/>
+  <way id="101">
+    <nd ref="1"/><nd ref="2"/><nd ref="3"/>
+    <tag k="highway" v="trunk"/>
+    <tag k="maxspeed" v="60"/>
+    <tag k="name" v="QL1A-sample"/>
+    <tag k="oneway" v="no"/>
+  </way>
+  <way id="102">
+    <nd ref="4"/><nd ref="5"/>
+    <tag k="highway" v="primary"/>
+    <tag k="maxspeed" v="80"/>
+    <tag k="name" v="Vo Nguyen Giap-sample"/>
+    <tag k="oneway" v="yes"/>
+  </way>
+  <way id="103">
+    <nd ref="1"/><nd ref="4"/>
+    <tag k="highway" v="residential"/>
+    <tag k="name" v="Ngo-sample"/>
+  </way>
+</osm>

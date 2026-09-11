@@ -123,7 +123,20 @@ Fusion (trong provider) -> AdasState + stale detection + health A–F
 Timeout gợi ý V1: `stale_after_ms = 500`, `health` suy từ tuổi frame + socket state +
 `AdasStatus` (nếu có).
 
-## 5. Mapping stock -> AdasState (V1, conservative)
+## 5. Mapping stock -> AdasState (V2, schema-gated)
+
+Sole warning drivers per `docs/reverse/STOCK_ADAS_SCHEMA_V2.md`:
+
+```text
+fcw.active = (vehicleWarning.fcw != 0)          # warning_level NEVER drives FCW
+pcw.active = any(ped.is_danger)                 # is_key NEVER drives PCW
+ldw.active = (laneWarningRes.deviate_state != 0)
+lead       = crucial ? crucial : second_crucial ? second : NONE (no fallback)
+```
+
+Transport-decoder rule (mechanical, no semantics): stock `laneWarningRes` nests
+the flag as `data.ldw_info.deviate_state`; the decoder lifts it into the flat
+snapshot row before `NormalizeStock` (both C++ and Python paths).
 
 - `vehicle/vehicleMeasure[is_crucial] ` → `lead_distance_m = longitude_dist`, `ttc_s = ttc` của object crucial nhất. Không đổi unit; để float gốc, tầng display làm tròn.
 - `vehicle/vehicleWarning` → `fcw.active = (fcw!=0 || warning_level!=0)`, `headway` → `vehicles[id].headway`. Giữ nguyên int gốc trong `raw` để debug.

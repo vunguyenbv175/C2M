@@ -113,4 +113,5 @@ Mọi replay L2/L3 phải qua guard + stationary + owner approve.
 - L0: `discover_transport.py` chỉ ra interface + peer + socket owner khi M4 ON.
 - L1: `libflow_subscriber.py` + `decode_payload.py` decode 4 key stock không warning schema trên EN tốt.
 - L2: replay 1 JSON vô hại qua guard, M4 không đổi trạng thái bất thường, log đầy đủ.
-- L3: `M4Adapter::Render(DisplayState)` encode đúng schema stock, unit test C++/Python pass, demo trên mock transport.
+- L3: BLOCKED (Gate F) — không encoder, không injection cho tới khi L0/L1 proven
+  bằng capture thật. `allow_semantic_injection` đã gỡ bỏ để khỏi gây hiểu lầm.

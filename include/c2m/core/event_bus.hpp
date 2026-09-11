@@ -1,5 +1,6 @@
 #pragma once
 // EventBus — EF-A04. Tiny sync bus; enhancement-only, never in stock path.
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>

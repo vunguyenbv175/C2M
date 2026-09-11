@@ -1,8 +1,8 @@
 #pragma once
 // MockADASProvider — host-sim + Web V0 scenarios. No hardware needed.
+// Sole-driver semantics match NormalizeStock (Gate B).
 #include <cstdint>
 #include <string>
-#include <vector>
 #include "c2m/adas/i_adas_provider.hpp"
 
 namespace c2m {
@@ -17,13 +17,15 @@ class MockADASProvider : public IAdasProvider {
   explicit MockADASProvider(MockScenario sc = {}) : sc_(sc), tick_(0) {}
   void SetScenario(MockScenario sc) { sc_ = sc; }
   std::string Name() const override { return "MockADASProvider:" + sc_.name; }
-  AdasState Poll() override {
+  AdasState Poll() const override {
     AdasState s;
     s.timestamp_ms = ++tick_ * 100;
     s.frame_id = tick_;
     s.stale = false;
+    s.health.frame_seen = true;
+    s.health.libflow_reachable = true;
+    s.health.subscription_active = true;
     s.health.runtime_class = AdasRuntimeClass::Ok;
-    s.health.libflow_connected = true;
     if (sc_.name == "lead" || sc_.name == "fcw") {
       VehicleObject v;
       v.id = 1;
@@ -32,19 +34,21 @@ class MockADASProvider : public IAdasProvider {
       v.ttc = (sc_.name == "fcw") ? 1.1f : 3.4f;
       v.is_crucial = true;
       s.vehicles.push_back(v);
-      s.lead_distance_m = v.long_dist;
-      s.ttc_s = v.ttc;
+      s.lead = LeadInfo{true, "crucial", v.long_dist, v.ttc};
       if (sc_.name == "fcw") {
         s.fcw.active = true;
         s.fcw.level = 2;
         s.fcw.source = WarningSource::Stock;
+        s.fcw.evidence = Evidence::HighConfidence;
       }
     }
     if (sc_.name == "ldw") {
       s.lane.deviate_state = 1;
+      s.raw.deviate_state = 1;
       s.ldw.active = true;
       s.ldw.level = 1;
       s.ldw.source = WarningSource::Stock;
+      s.ldw.evidence = Evidence::HighConfidence;
     }
     if (sc_.name == "ped") {
       PedestrianObject p;
@@ -55,6 +59,7 @@ class MockADASProvider : public IAdasProvider {
       s.pedestrians.push_back(p);
       s.pcw.active = true;
       s.pcw.source = WarningSource::Stock;
+      s.pcw.evidence = Evidence::HighConfidence;
     }
     return s;
   }
@@ -62,7 +67,7 @@ class MockADASProvider : public IAdasProvider {
 
  private:
   MockScenario sc_;
-  std::uint64_t tick_;
+  mutable std::uint64_t tick_;
 };
 
 }  // namespace adas

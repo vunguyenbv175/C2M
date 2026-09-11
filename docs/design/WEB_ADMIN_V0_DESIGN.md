@@ -1,4 +1,8 @@
-# EF-A05 — Web Admin V0 (read-only)
+# EF-A05 — Web Admin V0 (HOST PROTOTYPE)
+
+**Status:** HOST PROTOTYPE — mock transport, localhost only. Not an integrated
+C2M Web Admin yet (review F8). JSON contract (`/status`, `/diagnostics`) is kept
+stable so the future device backend can reuse it unchanged.
 
 **Nguyên tắc:** stock app giữ nguyên. `c2m-web` là tiến trình riêng, crash không
 ảnh hưởng ghi hình. V0 chỉ GET, không settings-write, không update.
