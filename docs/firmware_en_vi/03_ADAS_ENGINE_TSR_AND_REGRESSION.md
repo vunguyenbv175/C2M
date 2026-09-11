@@ -85,27 +85,20 @@ This sharply narrows the regression search.
 
 ## Main ADAS binary has a large appended payload
 
-A strict ELF file-backed boundary analysis places the appended-payload start at:
+The canonical ELF file-backed boundary is:
 
 ```text
-0x1755e4
+0x172b1c
 ```
 
 Measured appended region:
 
 ```text
-EN overlay size: 10,106,692 bytes
-VI overlay size: 10,124,554 bytes
+EN overlay size: 10,117,644 bytes
+VI overlay size: 10,135,506 bytes
 ```
 
-Canonical hashes:
-
-```text
-EN 7c14be61f3f1618602dd020db4e5bf9960d7e34ffcb35547a2ac60c13ee62f2d
-VI 8f0841496c7d5f42ca5fd8e67dd3aeea985ebe0af031c1dcd1e3d15e5825a423
-```
-
-Both overlays have entropy around 7.9767 bits/byte. Their exact container/encoding is still unknown.
+The earlier `0x1755e4` value was wrong because `.bss`/`SHT_NOBITS` was counted as file-backed data.
 
 The final area contains plaintext default flags including:
 
@@ -146,45 +139,47 @@ This is **not** evidence of a malformed VI switch-file flag. Exact byte inspecti
 --switch_file=/customer/minieye/config/adas_de.flag
 ```
 
-The preceding `h` is simply byte `0x68` from the high-entropy payload with no NUL separator. Do not pursue this as a bug.
+The preceding `h` is simply byte `0x68` from the high-entropy payload with no NUL separator.
 
-## ABI/symbol stability and `SystemInit`
+## `m0` decoded: six embedded-model records
 
-A `readelf -Ws` comparison finds 3,875 symbols on each build, with all 3,875 symbol names common and zero EN-only/VI-only symbols. This makes same-name function matching especially useful.
-
-Only one function changes reported symbol size:
+`m0` is no longer an unknown checksum-like field. Static reverse proves:
 
 ```text
-SystemInit(unsigned int)
-EN: 124 bytes
-VI: 100 bytes
+cnn::CnnConfig::UpdateFromEnv()
+  -> consumes FLAGS_m0
+  -> splits it into twelve 16-byte AES blocks
+  -> DecryptNum()
+  -> six (offset,size) records
 ```
 
-`.text` shrinks by exactly 24 bytes. Thumb-2 disassembly plus PLT relocation mapping shows both builds retain the essential startup sequence:
+`vehicle::GetKey()` yields the AES-128 key used by `DecryptNum()`. The six records correspond, in stock `model.txt` order, to:
 
 ```text
-MI_SYS_Init
-MI_SCL_CreateDevice
-IPUCreateDevice
+d0
+v_a
+v_t
+p_r
+road
+tl
 ```
 
-The visible `SystemInit` delta is mainly the failure logging path: EN uses `google::LogMessage` and C++ stream insertion, while VI uses a shorter direct `fwrite` path. Therefore `SystemInit` itself is now a lower-probability explanation for complete ADAS failure.
+VI moves all six absolute model offsets, but each model size is unchanged and all six model blobs are byte-identical EN vs VI by SHA-256. VI `m0` correctly tracks the moved offsets.
 
-Raw per-function byte hashes over-report differences because the 24-byte code shrink moves later addresses and changes branch immediates/PC-relative references. A normalized ARM/Thumb semantic diff is required before ranking same-sized functions.
+Therefore these explanations are now low probability:
 
-## One meaningful default-tail delta: `m0`
+```text
+different CNN weights
+changed model sizes
+stale embedded-model offsets
+```
 
-The long `--m0=<hex>` value differs between EN and VI.
+The complete +17,862-byte VI file growth is instead located in seven interstitial non-model regions around the six models. See:
 
-This is **CONFIRMED**, but its meaning is **UNKNOWN**.
-
-Possibilities include:
-- integrity/key material,
-- embedded model/config hash,
-- license-related material,
-- build-specific cryptographic metadata.
-
-Trace references to the gflag/symbol rather than guessing.
+```text
+docs/reverse/ADAS_PACKAGE_LOADER_V1.md
+docs/reverse/ADAS_INTERSTITIAL_GAPS_V1.md
+```
 
 ## TSR is real implementation, not dead strings
 
@@ -243,7 +238,7 @@ If the same physical unit was flashed VI then EN without reprovisioning, the exa
 Therefore, given EN-good / VI-bad, pure config difference is less likely than:
 
 ```text
-new adas executable regression
+new adas package/validation regression
 or
 new cardv/kernel integration regression
 or
@@ -297,13 +292,14 @@ and `audios.txt` declares `tlr_green_on.wav`, though the referenced WAV is not p
 
 ## Highest-probability regression suspects
 
-### R1 — VI `adas` executable / appended payload
+### R1 — VI `adas` protected/interstitial package metadata or validation path
 **Priority: highest**
 
 Reasons:
-- known-good/known-bad behavior aligns with version change,
-- almost all model/libs/scripts are identical,
-- executable implementation and overlay changed.
+- all six embedded model blobs are identical,
+- VI `m0` correctly tracks model offsets,
+- all +17,862 bytes of growth are in seven non-model regions,
+- known-good/known-bad behavior still aligns with the self-contained `adas` package.
 
 ### R2 — VI `cardv` interaction
 **Priority: high**
@@ -333,20 +329,21 @@ Audio is clearly different, but audio alone should not normally prevent all visu
 
 ## Recommended binary-diff targets
 
-Prioritize same-name function diff on:
+Prioritize:
 
 ```text
+/proc/self/exe readers
+BitAnswer/license/check-SN
+package metadata validation
 main/init
-InitAPP
 VehicleAlgo::Init
 VehicleRun
 camera/ringbuffer acquisition
 MI_IPU initialization
-license/check_sn
 calibration loading
 ScreenService::Init
 TSR init
 error paths
 ```
 
-Use `docs/reverse/ADAS_STATIC_DIFF_V1.md` and `tools/fw/elf_*_diff.py` as the reproducible baseline.
+Because both ELF binaries retain many semantic C++ symbol names, same-name function matching remains productive.
