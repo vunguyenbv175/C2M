@@ -227,12 +227,13 @@ def main() -> int:
     check("attr.align8", attrs.get(24) == 1 and attrs.get(25) == 1,
           f"align8_needed={attrs.get(24)!r} align8_preserved={attrs.get(25)!r} (want 1/1)")
 
-    gnustack = e["sections"].get(".note.GNU-stack")
-    if gnustack is None:
-        check("stack.note", False, "missing .note.GNU-stack (link warns: executable stack?)")
+    gnustack = [p for p in e["phdrs"] if p[0] == 0x6474E551]
+    if not gnustack:
+        check("stack.note", False, "no PT_GNU_STACK segment (stack executability unknown)")
     else:
-        check("stack.note", not (gnustack[2] & 0x4),
-              f".note.GNU-stack flags={hex(gnustack[2])} (SHF_EXECINSTR must be clear)")
+        fl = gnustack[0][6]
+        check("stack.note", (fl & 0x7) == 0x6,
+              f"PT_GNU_STACK flags={hex(fl)} (want RW=0x6, X bit clear)")
 
     if args.object is not None:
         o = parse_elf(args.object)

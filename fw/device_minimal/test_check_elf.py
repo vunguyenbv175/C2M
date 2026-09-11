@@ -55,25 +55,32 @@ def encode_attr(rows: list[tuple[int, object]]) -> bytes:
     return b"A" + struct.pack("<I", len(rest) + 4) + rest
 
 
-def make_elf(etype: int, attr: bytes) -> bytes:
+def make_elf(etype: int, attr: bytes, stack_flags: int | None = None) -> bytes:
     # Sections: null, .ARM.attributes, .shstrtab, .note.GNU-stack (non-exec,
-    # like every real toolchain output — the gate requires its presence).
+    # like every real toolchain output). ET_EXEC finals additionally carry a
+    # PT_GNU_STACK program header (what the kernel enforces; the gate checks
+    # the SEGMENT, since linkers may drop the note section).
     shstr = b"\x00.ARM.attributes\x00.shstrtab\x00.note.GNU-stack\x00"
     ehsize, shentsize, shnum = 52, 40, 4
-    shoff = ehsize
+    phsize = 32 if (etype == 2 and stack_flags is not None) else 0
+    phoff = ehsize if phsize else 0
+    shoff = ehsize + phsize
     attr_off = shoff + shentsize * shnum
     str_off = attr_off + len(attr)
     note_off = str_off + len(shstr)
     hdr = (b"\x7fELF" + bytes([1, 1, 1, 0]) + b"\x00" * 8
-           + struct.pack("<HHIIIIIHHHHHH", etype, 0x28, 1, 0, 0, shoff,
-                         0x5000400, ehsize, 0, 0, shentsize, shnum, 2))
+           + struct.pack("<HHIIIIIHHHHHH", etype, 0x28, 1, 0, phoff, shoff,
+                         0x5000400, ehsize, 32 if phsize else 0,
+                         1 if phsize else 0, shentsize, shnum, 2))
+    phdr = (struct.pack("<IIIIIIII", 0x6474E551, 0, 0, 0, 0, 0, stack_flags, 4)
+            if phsize else b"")
     null = b"\x00" * 40
     s_attr = struct.pack("<IIIIIIIIII", 1, 0x70000003, 0, 0, attr_off,
                          len(attr), 0, 0, 1, 0)
     s_str = struct.pack("<IIIIIIIIII", 17, 3, 0, 0, str_off, len(shstr),
                         0, 0, 1, 0)
     s_note = struct.pack("<IIIIIIIIII", 27, 7, 0, 0, note_off, 0, 0, 0, 4, 0)
-    return hdr + null + s_attr + s_str + s_note + attr + shstr
+    return hdr + phdr + null + s_attr + s_str + s_note + attr + shstr
 
 
 def run_gate(*argv: str) -> tuple[int, str]:
@@ -104,9 +111,9 @@ def main() -> int:
         obj.write_bytes(make_elf(1, encode_attr(STOCK_ROWS)))
         simd_rows = STOCK_ROWS + [(12, 1)]  # inherited-tag shape (final link)
         linked = tmp / "final"
-        linked.write_bytes(make_elf(2, encode_attr(simd_rows)))
+        linked.write_bytes(make_elf(2, encode_attr(simd_rows), stack_flags=0x6))
         clean = tmp / "clean"
-        clean.write_bytes(make_elf(2, encode_attr(STOCK_ROWS)))
+        clean.write_bytes(make_elf(2, encode_attr(STOCK_ROWS), stack_flags=0x6))
 
         # 2. TU object parses; strict TU rows pass on it.
         rc, out = run_gate(str(clean), "--object", str(obj), "--allow-libc-simd")
@@ -123,14 +130,17 @@ def main() -> int:
         bad_obj.write_bytes(make_elf(1, encode_attr(simd_rows)))
         rc, out = run_gate(str(linked), "--object", str(bad_obj), "--allow-libc-simd")
         assert rc != 0 and "tu.no_simd" in out, out
-        # 5. an executable GNU-stack note must FAIL (hazard, not warning).
-        import struct as _st
-        raw = bytearray(make_elf(2, encode_attr(STOCK_ROWS)))
-        shoff = _st.unpack_from("<I", raw, 32)[0]
-        raw[shoff + 3 * 40 + 2:shoff + 3 * 40 + 6] = _st.pack("<I", 0x4)
+        # 5. an executable GNU_STACK segment must FAIL (hazard, not warning).
+        # (The gate checks the SEGMENT — what the kernel enforces — because
+        # linkers may legitimately drop the note section.)
         execstack = tmp / "execstack"
-        execstack.write_bytes(bytes(raw))
+        execstack.write_bytes(make_elf(2, encode_attr(STOCK_ROWS), stack_flags=0x7))
         rc, out = run_gate(str(execstack), "--object", str(obj), "--allow-libc-simd")
+        assert rc != 0 and "stack.note" in out, out
+        # 6. a missing GNU_STACK segment must also FAIL (unknown, not safe).
+        noseg = tmp / "noseg"
+        noseg.write_bytes(make_elf(2, encode_attr(STOCK_ROWS), stack_flags=None))
+        rc, out = run_gate(str(noseg), "--object", str(obj), "--allow-libc-simd")
         assert rc != 0 and "stack.note" in out, out
 
     print("check_elf unit: OK (stock attrs = v7-A/VFPv3-D16/VFP-args no-SIMD; "

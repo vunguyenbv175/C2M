@@ -17,4 +17,4 @@ set(C2M_USE_CUSTOM_START ON CACHE BOOL "use freestanding start.S")
 add_compile_options(-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16 -Os -Wall -Wextra
   -include ${CMAKE_CURRENT_LIST_DIR}/glibc_compat.h)
 add_link_options(-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16 -nostartfiles -no-pie
-  -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,--no-undefined)
+  -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,--no-undefined -Wl,-z,noexecstack)
