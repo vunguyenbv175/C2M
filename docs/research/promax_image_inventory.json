@@ -1,0 +1,1430 @@
+[
+  {
+    "image": "promax-work/firmware/firmware.bin",
+    "sha256": "790605eafeb0181dfc8ef8c532269ade763ad91bea91941246fe3a7ad87b1f4b",
+    "size": 4194304,
+    "chip": "ESP32",
+    "headers": [
+      {
+        "offset": "0x1000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x400805e4",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 6,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x40083764",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d0000",
+        "size_int": 3997696,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e0000",
+        "offset_int": 4063232,
+        "size": "0x10000",
+        "size_int": 65536,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3f0000",
+        "offset_int": 4128768,
+        "size": "0x10000",
+        "size_int": 65536,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.7 38eeba213a"
+    },
+    "sdk": {
+      "sdk": "v4.4.7 38eeba213a"
+    },
+    "notes": [
+      "manifest.json ESP32 4MB full-flash"
+    ]
+  },
+  {
+    "image": "promax-work/firmware/firmware_c.bin",
+    "sha256": "08f84ac28f3b8fc43ffc01b19ca72cd8b42c4ff0802db02610ec2e7495e8bf28",
+    "size": 4194304,
+    "chip": "ESP32-C3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x2f",
+        "flash_size_decoded": "4MB(C3-enc)",
+        "entry": "0x403cc710",
+        "chip_id": 5,
+        "chip_decoded": "ESP32-C3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x2f",
+        "flash_size_decoded": "4MB(C3-enc)",
+        "entry": "0x4038254c",
+        "chip_id": 5,
+        "chip_decoded": "ESP32-C3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3ce000",
+        "size_int": 3989504,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3de000",
+        "offset_int": 4055040,
+        "size": "0x19000",
+        "size_int": 102400,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3f7000",
+        "offset_int": 4157440,
+        "size": "0x9000",
+        "size_int": 36864,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "sdk": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "notes": [
+      "manifest.json ESP32-C3 4MB full-flash"
+    ]
+  },
+  {
+    "image": "promax-work/firmware/firmware_s.bin",
+    "sha256": "bfeec41b22137d64bac23c5e60c11606b6210ef943b2438d0b12ec24bb82ce82",
+    "size": 16777216,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x3f",
+        "flash_size_decoded": "16MB",
+        "entry": "0x403c98d4",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x3f",
+        "flash_size_decoded": "16MB",
+        "entry": "0x40377094",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d1000",
+        "size_int": 4001792,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e1000",
+        "offset_int": 4067328,
+        "size": "0x1e000",
+        "size_int": 122880,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3ff000",
+        "offset_int": 4190208,
+        "size": "0x1000",
+        "size_int": 4096,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "sdk": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "notes": [
+      "manifest.json ESP32-S3 16MB full-flash"
+    ]
+  },
+  {
+    "image": "promax-work/firmware/firmware_no_bl.bin",
+    "sha256": "5180a86c22476fab738334079ec64544a8aea1ac3d94f5df1c7c6859a2ebe705",
+    "size": 3796784,
+    "chip": "ESP32",
+    "headers": [
+      {
+        "offset": "0x1000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x400805e4",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 6,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x40083764",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d1000",
+        "size_int": 4001792,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e1000",
+        "offset_int": 4067328,
+        "size": "0x1e000",
+        "size_int": 122880,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3ff000",
+        "offset_int": 4190208,
+        "size": "0x1000",
+        "size_int": 4096,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.7 38eeba213a"
+    },
+    "sdk": {
+      "sdk": "v4.4.7 38eeba213a"
+    },
+    "notes": [
+      "manifest_no_bl.json v7.17 (name misleading, still has bootloader)"
+    ]
+  },
+  {
+    "image": "promax-work/firmware/firmware_adapter.bin",
+    "sha256": "7b7c0b8e6b35d148cd89df226622355f6a28798ab3400493aeec459114fdbd08",
+    "size": 4194304,
+    "chip": "ESP32",
+    "headers": [
+      {
+        "offset": "0x1000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x400805e4",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x40082b24",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d1000",
+        "size_int": 4001792,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e1000",
+        "offset_int": 4067328,
+        "size": "0x1e000",
+        "size_int": 122880,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3ff000",
+        "offset_int": 4190208,
+        "size": "0x1000",
+        "size_int": 4096,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.7 38eeba213a"
+    },
+    "sdk": {
+      "sdk": "v4.4.7 38eeba213a"
+    },
+    "notes": [
+      "adapter.json v7.15 OBD adapter, not HUD"
+    ]
+  },
+  {
+    "image": "promax-work/firmwarebeta/firmware.bin",
+    "sha256": "4b184a6f8f9fbee2b6581971dcf6e824f3211e44456243a0fb396309d4fb2cf0",
+    "size": 4194304,
+    "chip": "ESP32",
+    "headers": [
+      {
+        "offset": "0x1000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x400805e4",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 6,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x20",
+        "flash_size_decoded": "4MB",
+        "entry": "0x40083644",
+        "chip_id": 0,
+        "chip_decoded": "ESP32"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d1000",
+        "size_int": 4001792,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e1000",
+        "offset_int": 4067328,
+        "size": "0x1e000",
+        "size_int": 122880,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3ff000",
+        "offset_int": 4190208,
+        "size": "0x1000",
+        "size_int": 4096,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "sdk": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "notes": [
+      "manifestbeta.json beta channel"
+    ]
+  },
+  {
+    "image": "promax-work/firmwarebeta/firmware_c.bin",
+    "sha256": "62c92d50e97a756e63d98d1cbb0b2c28b87e0a18e418aedc8645304d18f7d832",
+    "size": 4194304,
+    "chip": "ESP32-C3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x2f",
+        "flash_size_decoded": "4MB(C3-enc)",
+        "entry": "0x403cc710",
+        "chip_id": 5,
+        "chip_decoded": "ESP32-C3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x2f",
+        "flash_size_decoded": "4MB(C3-enc)",
+        "entry": "0x4038254c",
+        "chip_id": 5,
+        "chip_decoded": "ESP32-C3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d1000",
+        "size_int": 4001792,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e1000",
+        "offset_int": 4067328,
+        "size": "0x1e000",
+        "size_int": 122880,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3ff000",
+        "offset_int": 4190208,
+        "size": "0x1000",
+        "size_int": 4096,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "sdk": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "notes": [
+      "manifestbeta.json beta channel"
+    ]
+  },
+  {
+    "image": "promax-work/firmwarebeta/firmware_s.bin",
+    "sha256": "7a32dbcaf88e8a03690d078edceea1097bf3d194bea05ffc3de48a5746478dcd",
+    "size": 16777216,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 3,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x3f",
+        "flash_size_decoded": "16MB",
+        "entry": "0x403c98d4",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x3f",
+        "flash_size_decoded": "16MB",
+        "entry": "0x40377094",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x0",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x3d1000",
+        "size_int": 4001792,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0x3e1000",
+        "offset_int": 4067328,
+        "size": "0x1e000",
+        "size_int": 122880,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0x3ff000",
+        "offset_int": 4190208,
+        "size": "0x1000",
+        "size_int": 4096,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "sdk": {
+      "sdk": "v4.4.4 e8bdaf9198"
+    },
+    "notes": [
+      "manifestbeta.json beta channel"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/firmware_guition_v1.bin",
+    "sha256": "1398d9c6381660ff8a5fc9c5ab21f5cdc966438a2b1b2ff5e4029a63e73422b5",
+    "size": 16711680,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 4,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x403c88ac",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e630",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x0",
+        "offset": "0xe000",
+        "offset_int": 57344,
+        "size": "0x2000",
+        "size_int": 8192,
+        "name": "otadata",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x10",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x11",
+        "offset": "0x650000",
+        "offset_int": 6619136,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app1",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0xc90000",
+        "offset_int": 13172736,
+        "size": "0x360000",
+        "size_int": 3538944,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 5,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0xff0000",
+        "offset_int": 16711680,
+        "size": "0x10000",
+        "size_int": 65536,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 6,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "manifest_guition_v1.json v2.30 full 16MB"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/firmware_guition_v2.bin",
+    "sha256": "e63cdc289c45a505a51e49b92a83bc9fe184af80dfda3cd9508ff39c645d61e8",
+    "size": 16711680,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 4,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x403c88ac",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e630",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x0",
+        "offset": "0xe000",
+        "offset_int": 57344,
+        "size": "0x2000",
+        "size_int": 8192,
+        "name": "otadata",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x10",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x11",
+        "offset": "0x650000",
+        "offset_int": 6619136,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app1",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0xc90000",
+        "offset_int": 13172736,
+        "size": "0x360000",
+        "size_int": 3538944,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 5,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0xff0000",
+        "offset_int": 16711680,
+        "size": "0x10000",
+        "size_int": 65536,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 6,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "manifest_guition_v2.json v2.30 full 16MB"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/firmware_waveshare_v1.bin",
+    "sha256": "81e1a47ef2dbe7110ec0b373537e467f2f3132c690818bf681885f1f4437628d",
+    "size": 16711680,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 4,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x403c88ac",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e648",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x0",
+        "offset": "0xe000",
+        "offset_int": 57344,
+        "size": "0x2000",
+        "size_int": 8192,
+        "name": "otadata",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x10",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x11",
+        "offset": "0x650000",
+        "offset_int": 6619136,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app1",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0xc90000",
+        "offset_int": 13172736,
+        "size": "0x360000",
+        "size_int": 3538944,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 5,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0xff0000",
+        "offset_int": 16711680,
+        "size": "0x10000",
+        "size_int": 65536,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 6,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "manifest_waveshare_v1.json full 16MB"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/firmware_waveshare_v2.bin",
+    "sha256": "50371233930f028f5a964553cdcd6c87f9f19e2dc986ec2aaa55752c5dfb1a7c",
+    "size": 16711680,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 4,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x403c88ac",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      },
+      {
+        "offset": "0x10000",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e648",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [
+      {
+        "index": 0,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x2",
+        "offset": "0x9000",
+        "offset_int": 36864,
+        "size": "0x5000",
+        "size_int": 20480,
+        "name": "nvs",
+        "flags": "0x0"
+      },
+      {
+        "index": 1,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x0",
+        "offset": "0xe000",
+        "offset_int": 57344,
+        "size": "0x2000",
+        "size_int": 8192,
+        "name": "otadata",
+        "flags": "0x0"
+      },
+      {
+        "index": 2,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x10",
+        "offset": "0x10000",
+        "offset_int": 65536,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app0",
+        "flags": "0x0"
+      },
+      {
+        "index": 3,
+        "valid": true,
+        "type": "0x0",
+        "subtype": "0x11",
+        "offset": "0x650000",
+        "offset_int": 6619136,
+        "size": "0x640000",
+        "size_int": 6553600,
+        "name": "app1",
+        "flags": "0x0"
+      },
+      {
+        "index": 4,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x82",
+        "offset": "0xc90000",
+        "offset_int": 13172736,
+        "size": "0x360000",
+        "size_int": 3538944,
+        "name": "spiffs",
+        "flags": "0x0"
+      },
+      {
+        "index": 5,
+        "valid": true,
+        "type": "0x1",
+        "subtype": "0x3",
+        "offset": "0xff0000",
+        "offset_int": 16711680,
+        "size": "0x10000",
+        "size_int": 65536,
+        "name": "coredump",
+        "flags": "0x0"
+      },
+      {
+        "index": 6,
+        "magic": "0xebeb",
+        "valid": false,
+        "raw": "ebebffffffffffffffffffffffffffff"
+      }
+    ],
+    "filesystem": {
+      "label": "spiffs (label; littlefs/fatfs only lib refs, content not carved)"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "manifest_waveshare_v2.json full 16MB"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/guition_ota_v1.bin",
+    "sha256": "4d0f62afbae38e59fda45aea8594bccd6203d9a7d19d1c62437c7d7e09033372",
+    "size": 5916912,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e630",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [],
+    "filesystem": {
+      "label": "UNKNOWN"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "ota_firmware app-only dump"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/guition_ota_v2.bin",
+    "sha256": "06da8d7010d726bb65d02ae4beb7c6d22cd12cf6adad7f1cf625655a10abe7ed",
+    "size": 5920208,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e630",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [],
+    "filesystem": {
+      "label": "UNKNOWN"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "ota_firmware app-only dump"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/waveshare_ota_v1.bin",
+    "sha256": "23c479510bffa7922679b9149c50b4d5f1b1566a03ef1a26e616f2f964ac9cc1",
+    "size": 5956880,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e648",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [],
+    "filesystem": {
+      "label": "UNKNOWN"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "ota_firmware app-only dump"
+    ]
+  },
+  {
+    "image": "promax-xl-work/firmware/waveshare_ota_v2.bin",
+    "sha256": "00ff8591f33102874e51dac9b42554a0551952fa59d369a8531ec035c6b0fb2d",
+    "size": 5962656,
+    "chip": "ESP32-S3",
+    "headers": [
+      {
+        "offset": "0x0",
+        "valid": true,
+        "magic": "0xe9",
+        "segments": 5,
+        "flash_mode": "0x2",
+        "flash_size_byte": "0x4f",
+        "flash_size_decoded": "16MB(S3-enc)",
+        "entry": "0x4037e648",
+        "chip_id": 9,
+        "chip_decoded": "ESP32-S3"
+      }
+    ],
+    "partitions": [],
+    "filesystem": {
+      "label": "UNKNOWN"
+    },
+    "toolchain": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "sdk": {
+      "sdk": "v5.3.2-282-gcfea4f7c98-dirty"
+    },
+    "notes": [
+      "ota_firmware app-only dump"
+    ]
+  }
+]
