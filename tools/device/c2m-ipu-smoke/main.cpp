@@ -23,12 +23,12 @@ static void usage() {
 //   -> GetOutputTensors -> Invoke once -> XOR/checksum+latency -> Put -> DestroyCHN/Device.
 // PASS needs: CreateDevice==0 CreateCHN==0 Invoke==0 valid-output clean-Destroy no-hang.
 int main(int argc, char** argv) {
-  bool probe_only = true, single_invoke = false;
+  bool probe_only = true;
   const char* model = nullptr, *image = nullptr, *firmware = "/config/dla/ipu_firmware.bin";
   unsigned channel = 0;
   for (int i = 1; i < argc; ++i) {
-    if (!std::strcmp(argv[i], "--probe-only")) { probe_only = true; single_invoke = false; }
-    else if (!std::strcmp(argv[i], "--single-invoke")) { single_invoke = true; probe_only = false; }
+    if (!std::strcmp(argv[i], "--probe-only")) { probe_only = true; }
+    else if (!std::strcmp(argv[i], "--single-invoke")) { probe_only = false; }
     else if (!std::strcmp(argv[i], "--model") && i + 1 < argc) { model = argv[++i]; }
     else if (!std::strcmp(argv[i], "--image") && i + 1 < argc) { image = argv[++i]; }
     else if (!std::strcmp(argv[i], "--firmware") && i + 1 < argc) { firmware = argv[++i]; }

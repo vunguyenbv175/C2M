@@ -151,6 +151,11 @@ for f in \
     echo "candidate_cardv_ws_port=8080"
 } >"$OUT/MANIFEST.txt"
 
+if has sha256sum; then
+    (cd "$(dirname "$OUT")" && find "$(basename "$OUT")" -type f ! -name 'SHA256SUMS.txt' -print | LC_ALL=C sort | while IFS= read -r f; do sha256sum "$f"; done >"$(basename "$OUT")/SHA256SUMS.txt" 2>/dev/null) || true
+    (cd "$(dirname "$OUT")" && find "$(basename "$OUT")" -type f -print | LC_ALL=C sort >"$(basename "$OUT")/FILELIST.txt" 2>/dev/null) || true
+fi
+
 if has tar; then
     BUNDLE="${OUT}.tar.gz"
     tar -czf "$BUNDLE" -C "$(dirname "$OUT")" "$(basename "$OUT")" 2>/dev/null || true

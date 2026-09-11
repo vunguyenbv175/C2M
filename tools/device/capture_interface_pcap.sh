@@ -44,7 +44,11 @@ if command -v ifconfig >/dev/null 2>&1; then
     ifconfig "$IFACE" >"$OUTDIR/ifconfig.txt" 2>&1 || true
 fi
 cat /proc/net/arp >"$OUTDIR/proc_net_arp.txt" 2>/dev/null || true
-netstat -anp >"$OUTDIR/netstat_before.txt" 2>&1 || true
+if command -v netstat >/dev/null 2>&1; then
+    netstat -anp >"$OUTDIR/netstat_before.txt" 2>&1 || true
+else
+    echo "UNKNOWN (netstat absent)" >"$OUTDIR/netstat_before.txt"
+fi
 
 echo "[c2m-pcap] passive capture on $IFACE for ${SECONDS}s -> $PCAP"
 
@@ -58,7 +62,11 @@ kill -INT "$PID" 2>/dev/null || true
 wait "$PID" 2>/dev/null || true
 trap - INT TERM HUP
 
-netstat -anp >"$OUTDIR/netstat_after.txt" 2>&1 || true
+if command -v netstat >/dev/null 2>&1; then
+    netstat -anp >"$OUTDIR/netstat_after.txt" 2>&1 || true
+else
+    echo "UNKNOWN (netstat absent)" >"$OUTDIR/netstat_after.txt"
+fi
 if command -v sha256sum >/dev/null 2>&1 && [ -f "$PCAP" ]; then
     sha256sum "$PCAP" >"$OUTDIR/pcap.sha256" 2>/dev/null || true
 fi

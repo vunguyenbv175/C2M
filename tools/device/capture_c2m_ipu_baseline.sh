@@ -80,6 +80,6 @@ done
   echo "mode=read-only-no-sysfs-writes"
   echo "missing=UNKNOWN (never SAME)"
 } >"$OUT/MANIFEST.txt"
-if command -v sha256sum >/dev/null 2>&1; then (cd "$(dirname "$OUT")" && find "$(basename "$OUT")" -type f | sort | xargs sha256sum >"$(basename "$OUT")/SHA256SUMS.txt" 2>/dev/null) || true; fi
+if command -v sha256sum >/dev/null 2>&1; then (cd "$(dirname "$OUT")" && find "$(basename "$OUT")" -type f ! -name 'SHA256SUMS.txt' -print | LC_ALL=C sort | while IFS= read -r f; do sha256sum "$f"; done >"$(basename "$OUT")/SHA256SUMS.txt" 2>/dev/null) || true; fi
 log "done: $OUT"
 echo "$OUT"
