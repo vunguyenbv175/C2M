@@ -1,0 +1,207 @@
+{
+  "schema": "EVIDENCE_KERNEL_COMP9_V1",
+  "scope": "ANALYSIS-ONLY (no firmware modified, no flash, no Candidate C)",
+  "verdicts": {
+    "comp9_identity": "CONFIRMED",
+    "comp9_label": "mz",
+    "comp9_algorithm": "raw-DEFLATE (zlib wbits=-15)",
+    "decompression": "PASS",
+    "kernel_diff": "NEAR-IDENTICAL",
+    "mmap_reserved": "MECHANISM_SUPPORTED",
+    "adas_impact": "NO_NEW_CAUSAL_EVIDENCE"
+  },
+  "inputs": {
+    "firmware_en_tar": {
+      "path": "firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar",
+      "sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c"
+    },
+    "firmware_vi_tar": {
+      "path": "firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar",
+      "sha256": "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa"
+    },
+    "uboot_en_uimage": {
+      "path": "build/carve_en/uboot.es.load0.off_00018000.size_48a44.bin",
+      "size": 297540,
+      "sha256": "7c64be8cb848af856a9f107139ee90765be4c3c3bdcd4eb49563839b57304490",
+      "header": {
+        "magic": "0x27051956",
+        "comp": 3,
+        "load": "0x23F00000",
+        "entry": "0x23E00000",
+        "name": "MVX4##M6##ga6898f3CM_UBT1501#XVM",
+        "header_crc_valid": true,
+        "data_crc_valid": true
+      }
+    },
+    "uboot_vi_uimage": {
+      "path": "build/vi_carve/uboot.es.load0.off_00018000.size_48a44.bin",
+      "size": 297540,
+      "sha256": "0e1e13409beaf77e680f5c9c5221ab21d796164dc926715e649ac52457102fd9",
+      "header": {
+        "magic": "0x27051956",
+        "comp": 3,
+        "load": "0x23F00000",
+        "entry": "0x23E00000",
+        "name": "MVX4##M6##ga6898f3CM_UBT1501#XVM",
+        "header_crc_valid": true,
+        "data_crc_valid": true
+      }
+    },
+    "uboot_en_decompressed": {
+      "size": 882768,
+      "sha256": "0149b185064261ecde5bf3a61528936a712bcca9b9c85c5e50059a1cf773aa2f",
+      "base": "0x23E00000",
+      "codec": "XZ (fd377a585a00)"
+    },
+    "uboot_vi_decompressed": {
+      "size": 882768,
+      "sha256": "db98e11801f73ecd11713af6da3b2c10b58f00d00ef6027115ff9ed4638a25c6",
+      "base": "0x23E00000",
+      "codec": "XZ (fd377a585a00)"
+    },
+    "kernel_en_uimage": {
+      "path": "build/carve_en/kernel.es.load0.off_00061000.size_22691f.bin",
+      "size": 2255135,
+      "sha256": "c1fa8f7363615f1dc7d91f3308608d336fee6d89f5dcfe48e826bf4a399f5030",
+      "header": {
+        "magic": "0x27051956",
+        "header_crc": "0x39BB95CA",
+        "header_crc_valid": true,
+        "payload_size": 2255071,
+        "load": "0x20008000",
+        "entry": "0x20008000",
+        "data_crc": "0xCEDBB786",
+        "data_crc_valid": true,
+        "os": 5,
+        "arch": 2,
+        "type": 2,
+        "comp": 9,
+        "name": "MVX4##M6##ge46e0aa7KL_LX409##[BR"
+      },
+      "payload_sha256": "4c9b8b1ad13cbe8520c7cb18819c1249d22e7733e967f2427e7a7ea87041b665"
+    },
+    "kernel_vi_uimage": {
+      "path": "build/vi_carve/kernel.es.load0.off_00061000.size_226921.bin",
+      "size": 2255137,
+      "sha256": "8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314",
+      "header": {
+        "magic": "0x27051956",
+        "header_crc": "0x4B55F442",
+        "header_crc_valid": true,
+        "payload_size": 2255073,
+        "load": "0x20008000",
+        "entry": "0x20008000",
+        "data_crc": "0x0984D022",
+        "data_crc_valid": true,
+        "os": 5,
+        "arch": 2,
+        "type": 2,
+        "comp": 9,
+        "name": "MVX4##M6##g7fcd0350KL_LX409##[BR"
+      },
+      "payload_sha256": "cf9f928dc53bd43dc9253634f86c0a159988907cdb7b537b4cfe16e12810b983"
+    }
+  },
+  "uboot_reverse": {
+    "arch": "ARM little-endian",
+    "version": "U-Boot 2015.01",
+    "dispatcher_va": "0x23E02220",
+    "jump_table_file_off": "0x2260",
+    "jump_table_entries": 11,
+    "comp_table": [
+      {"file_off": "0xA15A0", "id": 0, "sname": "none", "lname": "uncompressed", "target": "0x23E0228C", "confidence": "CONFIRMED"},
+      {"file_off": "0xA15AC", "id": 2, "sname": "bzip2", "lname": "bzip2 compressed", "target": "0x23E023C0", "note": "UNIMPLEMENTED", "confidence": "CONFIRMED"},
+      {"file_off": "0xA15B8", "id": 1, "sname": "gzip", "lname": "gzip compressed", "target": "0x23E022D0", "confidence": "CONFIRMED"},
+      {"file_off": "0xA15C4", "id": 3, "sname": "lzma", "lname": "lzma compressed", "target": "0x23E02308", "confidence": "CONFIRMED"},
+      {"file_off": "0xA15D0", "id": 4, "sname": "lzo", "lname": "lzo compressed", "target": "0x23E023C0", "note": "UNIMPLEMENTED", "confidence": "CONFIRMED"},
+      {"file_off": "0xA15DC", "id": 9, "sname": "mz", "lname": "mz compressed", "target": "0x23E02384", "algorithm": "raw-DEFLATE", "confidence": "CONFIRMED"},
+      {"file_off": "0xA15E8", "id": 10, "sname": "XIP", "lname": "XIP", "target": "0x23E0228C", "confidence": "CONFIRMED"}
+    ],
+    "mz_handler_va": "0x23E02384",
+    "mz_wrapper_va": "0x23E8D738",
+    "mz_inner_va": "0x23E8C340",
+    "mz_strings": {
+      "uncompressing": "0xAC2F2",
+      "mz_size": "0xAC3D5",
+      "mz_fail": "0xAC39D",
+      "unimplemented": "0xAC3F4"
+    },
+    "inflate_tables": {
+      "order_array_file_off": "0xB37C9",
+      "length_base_file_off": "0xA198E",
+      "dist_base_file_off": "0xA188E",
+      "windowbits_gzip_wrapper": "-15 (mvn r1,#0xE at VA 0x23E88A40)"
+    },
+    "en_vi_uboot_diff_bytes": 8,
+    "en_vi_uboot_diff_note": "version timestamp only (0xBBFD0); no code delta"
+  },
+  "decoder_trials": [
+    {"codec": "gzip wbits=31", "result": "FAIL", "detail": "incorrect header check"},
+    {"codec": "zlib wbits=15", "result": "FAIL", "detail": "incorrect header check"},
+    {"codec": "raw-deflate wbits=-15", "result": "SUCCESS", "detail": "3870720 B each, eof=True, unused=0"},
+    {"codec": "lzma-alone", "result": "FAIL", "detail": "Input format not supported"},
+    {"codec": "xz", "result": "FAIL", "detail": "Input format not supported"},
+    {"codec": "bzip2", "result": "FAIL", "detail": "Invalid data stream"},
+    {"codec": "zstd", "result": "FAIL", "detail": "Unknown frame descriptor"},
+    {"codec": "lzo1x (build/lzo_blockdec.exe)", "result": "FAIL", "detail": "rc=1 r=-6"},
+    {"codec": "lz4-frame", "result": "UNKNOWN", "detail": "module lz4 not installed (tool limit)"}
+  ],
+  "decompressed_kernels": {
+    "en": {"size": 3870720, "sha256": "188677bf94d8ac9a0aefaa58db96687574a1c2ee1cbb69b973ffacd64e0c2b7a"},
+    "vi": {"size": 3870720, "sha256": "13b25c76ba095ff60ae33560541de9999d58aceaa04314a77102cf9066d8849e"},
+    "linux_version": "4.9.227",
+    "en_version_string": "Linux version 4.9.227 (zac@minieye) (gcc version 9.1.0 (GCC) ) #5 SMP PREEMPT Mon Jul 31 20:08:11 CST 2023",
+    "vi_version_string": "Linux version 4.9.227 (zac@Zoe) (gcc version 9.1.0 (GCC) ) #27 SMP PREEMPT Wed Sep 20 16:38:08 CST 2023",
+    "fdt_valid": {"file_off": "0x389D20", "size": "0xC5E4", "version": 17, "sha256": "dcf1714b55eb1330c5e7a88aaea6b9d6eb9e82f8f4d80436c40e60d23a39b6c1", "identical_en_vi": true},
+    "ikconfig": "UNKNOWN (absent: IKCFG_ST/config.gz count 0)"
+  },
+  "kernel_diff": {
+    "verdict": "NEAR-IDENTICAL",
+    "total_bytes": 3870720,
+    "diff_bytes": 6392,
+    "diff_pct": 0.1651,
+    "runs": 1948,
+    "media_keyword_deltas": "none (all counts identical after version-substring exclusion)",
+    "dtb": "IDENTICAL",
+    "bootargs_in_kernel_dtb": "IDENTICAL"
+  },
+  "bootargs": {
+    "en_upgrade_script": "ubi.mtd=ubi0,2048 rootfstype=ramfs initrd=0x21000000,0xc00000 LX_MEM=0x3ffe0000 mma_heap=mma_heap_name0,miu=0,sz=0x1f000000 mma_memblock_remove=1 cma=2M@0x23800000 loglevel=3 $(mtdparts)",
+    "vi_upgrade_script": "ubi.mtd=ubi0,2048 rootfstype=ramfs initrd=0x21000000,0xc00000 LX_MEM=0x3ffe0000 mma_heap=mma_heap_name0,miu=0,sz=0x1f000000 mma_memblock_remove=1 cma=2M@0x23800000 mmap_reserved=fb,miu=0,sz=0x800000,max_start_off=0x3F000000,max_end_off=0x3F800000 loglevel=3 $(mtdparts)",
+    "vi_only": "mmap_reserved=fb,miu=0,sz=0x800000,max_start_off=0x3F000000,max_end_off=0x3F800000",
+    "dtb_chosen_bootargs": "console=ttyS0,115200n8r androidboot.console=ttyS0 user_debug=31 root=/dev/mtdblock0 init=/linuxrc LX_MEM=0xfee0000 mma_heap=mma_heap_name0,miu=0,sz=0x5000000,max_start_off=0x28000000 mma_memblock_remove=1 cma=2M"
+  },
+  "mmap_reserved_trace": {
+    "uboot_format_string_off": "0xA8337",
+    "uboot_substring_off": "0xA8326",
+    "uboot_parser_va": "0x23E0FA10-0x23E0FA7C",
+    "kernel_consumer_strings_off": "0x30E0E6-0x30E125",
+    "kernel_config_symbols": ["mmap_reserved_config", "mstar_driver_boot_mmap_reserved_buffer_num"],
+    "reservation": {"label": "fb", "miu": 0, "sz": "0x800000", "window": "0x3F000000-0x3F800000"}
+  },
+  "tool_limits": [
+    "no ARM objdump/readelf on Windows host; capstone 5.0.7 used",
+    "no JTAG/trace; stripped symbols (addresses used)",
+    "lz4 python module not installed (trial UNKNOWN)",
+    "no runtime logs (dmesg/proc) collected in static pass"
+  ],
+  "unknowns": [
+    "symbol names for 0x8C340/0x8D738/0x870A0",
+    "U-Boot DTB runtime patching (no fdt xrefs found)",
+    "whether fb reservation fragments raw_adas/IPU CMA at runtime",
+    "exact kernel function boundaries without symbols"
+  ],
+  "next_experiment": "Boot EN and VI with captured /proc/cmdline, /proc/meminfo, /proc/iomem and dmesg|grep -Ei 'mmap|reserved|cma|mma|ipu|alloc|fail' plus MI_SYS_Init/IPUCreateDevice return codes to test whether the VI-only 8 MiB fb pin at 0x3F000000 changes contiguous allocation ordering for raw_adas/IPU; static kernel delta is ruled out so runtime allocator evidence is the single highest-value next step.",
+  "reports": [
+    "docs/reverse/UBOOT_COMP9_REVERSE_V1.md",
+    "docs/reverse/KERNEL_DECOMPRESS_EN_VI_V1.md",
+    "docs/reverse/KERNEL_MEDIA_SEMANTIC_DIFF_V1.md",
+    "docs/reverse/KERNEL_RESERVED_MEMORY_ANALYSIS_V1.md",
+    "docs/reverse/EVIDENCE_KERNEL_COMP9.json"
+  ],
+  "tools": [
+    "tools/fw/decompress_c2m_kernel.py",
+    "tools/fw/parse_uboot_image_dispatch.py",
+    "tools/fw/extract_appended_dtb.py"
+  ]
+}
