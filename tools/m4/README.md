@@ -2,6 +2,40 @@
 
 These are passive-first helpers derived from the stock C2M binaries.
 
+## 0. Prove transport before assuming it
+
+First collect two read-only device baselines:
+
+```sh
+sh tools/device/collect_baseline.sh en_good_m4_off
+sh tools/device/collect_baseline.sh en_good_m4_on
+```
+
+Copy/extract both captures to a workstation and run:
+
+```sh
+python3 tools/m4/discover_transport.py \
+  c2m_capture_en_good_m4_off \
+  c2m_capture_en_good_m4_on \
+  -o m4_transport.json \
+  --markdown m4_transport.md
+```
+
+The analyzer ranks:
+
+```text
+new network interface
+new USB device / VID/PID
+new ARP peer
+new TCP/UDP socket
+socket owner from saved process FDs
+input-device delta
+new process
+interface carrier/operstate change
+```
+
+A new USB device + `usb0` + peer + socket owned by `adas`/`cardv` would be strong evidence for USB-network M4 transport. Absence of that combination means keep investigating other device-node/input/IPC paths.
+
 ## ADAS ScreenService / libflow
 
 Static C2M override:
