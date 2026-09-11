@@ -13,7 +13,7 @@ def main():
     ap=argparse.ArgumentParser(description='Map exact-byte anchor alignment between two appended payloads.')
     ap.add_argument('left',type=Path)
     ap.add_argument('right',type=Path)
-    ap.add_argument('--start',type=parse_int,required=True,help='file offset where payload starts, e.g. 0x1755e4')
+    ap.add_argument('--start',type=parse_int,required=True,help='file offset where payload starts, e.g. C2M ADAS 0x172b1c')
     ap.add_argument('--stride',type=parse_int,default=0x1000)
     ap.add_argument('--anchor',type=parse_int,default=64)
     ap.add_argument('--window',type=parse_int,default=0x20000,help='search radius around predicted location')
