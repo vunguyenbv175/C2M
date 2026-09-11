@@ -40,6 +40,7 @@ jobs:
           rm -rf /tmp/fw-vault ~/.ssh/fw_vault
       - name: Install toolchain (versions recorded below)
         run: |
+          mkdir -p work
           sudo apt-get update && sudo apt-get install -y \
             mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev
           mkfs.ubifs -h 2>&1 | head -3
