@@ -1,22 +1,22 @@
 # ADAS Appended Payload Structure V1
 
-## Confirmed boundary
+## Corrected boundary
 
 The file-backed ELF ends at:
 
 ```text
-0x1755e4
+0x172b1c
 ```
 
 Payload sizes:
 
 ```text
-EN 10,106,692 bytes
-VI 10,124,554 bytes
+EN 10,117,644 bytes
+VI 10,135,506 bytes
 VI - EN = +17,862 bytes = 0x45c6
 ```
 
-Both payloads have entropy ~7.9767 bits/byte.
+The earlier `0x1755e4` boundary was wrong because `.bss` / `SHT_NOBITS` was counted as file-backed data. `tools/fw/elf_overlay_report.py` now excludes memory-only sections.
 
 ## Exact-anchor mapping
 
@@ -29,7 +29,7 @@ total EN anchors:   309
 exactly matched:    306
 ```
 
-This is important: the payloads are **not completely unrelated encrypted blobs**. Large regions are byte-for-byte identical, separated by changed/inserted/deleted regions.
+Large regions are therefore byte-for-byte identical, separated by changed-size regions.
 
 Dominant EN->VI offset plateaus:
 
@@ -48,37 +48,17 @@ At the plaintext flag tail, VI is shifted by the full file-size delta:
 +0x45c6 = +17,862 bytes
 ```
 
-## Delta transitions
-
-The observed plateau transitions imply multiple independent size changes rather than one single inserted block.
-
-Representative cumulative-delta increments:
-
-```text
-0x0000 -> 0x0520 : +1,312
-0x0520 -> 0x16c2 : +4,514
-0x16c2 -> 0x3b48 : +9,350
-0x3b48 -> 0x3392 : -1,974
-0x3392 -> 0x37ce : +1,084
-0x37ce -> 0x3c92 : +1,220
-0x3c92 -> 0x45c6 : +2,356
-```
-
-This pattern is consistent with a concatenated resource/package layout where several component payloads changed size.
-
-Do **not** yet label the components as AI models, licenses, or encrypted resources without a parser/header proof.
-
 ## Plaintext tail
 
 Both builds expose exactly 121 default `--key=value` flags with identical key sets.
 
-Only one default value differs:
+Only one packaged default value differs:
 
 ```text
 m0
 ```
 
-All operational defaults relevant to the known ADAS pipeline remain identical, including:
+Operational defaults remain identical, including:
 
 ```text
 enable_vehicle=true
@@ -95,28 +75,85 @@ ringbuf_name=raw_adas
 protocol=1.4.0
 ```
 
-## `m0`
+## `m0` is now decoded
 
-`m0` is 192 bytes represented as 384 hex characters. EN/VI comparison shows an alternating 16-byte pattern:
+`m0` is no longer UNKNOWN.
+
+Static reverse shows:
 
 ```text
-changed 16 bytes
-same    16 bytes
-changed 16 bytes
-same    16 bytes
-... repeated six times
+vehicle::GetKey()
+  -> AES-128 key
+
+cnn::CnnConfig::UpdateFromEnv()
+  -> split m0 into 12 encrypted 16-byte blocks
+  -> DecryptNum()
+  -> six (offset,size) records
 ```
 
-Its role remains UNKNOWN.
+The records map, in `model.txt` order, to:
 
-## Next tasks
+```text
+d0
+v_a
+v_t
+p_r
+road
+tl
+```
 
-1. Detect exact common-region boundaries rather than sampled plateaus.
-2. Search executable code for readers/validators of the appended payload.
-3. Trace `FLAGS_m0` data references through GOT/literal pools.
-4. Identify chunk headers or length tables near each plateau transition.
-5. Correlate each changed chunk with runtime subsystems using controlled EN-base/VI-adas testing.
+VI changes all six absolute offsets because the interstitial regions change size, but all six model sizes remain unchanged.
+
+Most importantly, hashing each sliced model proves all six model blobs are **byte-identical EN vs VI**.
+
+See `docs/reverse/ADAS_PACKAGE_LOADER_V1.md` and `docs/reverse/EVIDENCE_ADAS_MODEL_DIRECTORY.json`.
+
+## Seven interstitial regions
+
+Once the six identical model blobs and the final 3602-byte flag tail are removed, seven non-model regions remain.
+
+Their size deltas are:
+
+```text
+before d0       +1,312
+before v_a      +4,514
+before v_t      +9,350
+before p_r      -1,974
+before road     +1,084
+before tl       +1,220
+before flags    +2,356
+----------------------
+total          +17,862 bytes
+```
+
+Thus the seven regions account for the entire VI file-size increase.
+
+`tools/fw/adas_gap_report.py` now analyzes these regions directly: SHA-256, entropy, ASCII/zero ratio, block repetition, aligned equal-byte ratio, common prefix/suffix and block-set similarity.
+
+See `docs/reverse/ADAS_INTERSTITIAL_GAPS_V1.md`.
 
 ## Regression implication
 
-Given the near-identical ADAS call graph and multiple changed payload chunks, the appended data package is now the highest-value static reverse target.
+Static evidence now argues against:
+
+```text
+different CNN weights
+changed model sizes
+stale m0 model offsets
+broad ADAS rewrite
+```
+
+Highest-value remaining static questions:
+
+1. What code reads or validates the seven interstitial regions?
+2. Are they BitAnswer/protection/license package data or another proprietary container layer?
+3. Does VI fail when its `adas` package is executed on the otherwise-working EN base?
+4. If VI `adas` works on EN, does VI `cardv` stop or change the `raw_adas` producer contract?
+
+## Confidence
+
+- **CONFIRMED:** true file-backed ELF boundary is `0x172b1c`.
+- **CONFIRMED:** `m0` is a six-record encrypted model directory.
+- **CONFIRMED:** all six model blobs are identical EN vs VI.
+- **CONFIRMED:** seven interstitial regions account for all +17,862 bytes.
+- **UNKNOWN:** exact proprietary format and runtime significance of those interstitial regions.
