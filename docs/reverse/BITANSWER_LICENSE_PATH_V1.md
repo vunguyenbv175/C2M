@@ -4,7 +4,7 @@
 
 Determine whether the EN-working / VI-bad ADAS regression is plausibly caused by a changed BitAnswer/license/package-validation path.
 
-This report corrects an earlier over-interpretation of the `/proc/self/exe` string.
+This report corrects an earlier over-interpretation of the `/proc/self/exe` string and now includes exact function-byte comparison of the deep BitAnswer entry points.
 
 ## High-level stock license path
 
@@ -93,7 +93,7 @@ EN 0x1164cc
 VI 0x1164b4
 ```
 
-That local helper is used in `Host` / `Port` processing and manipulates slash/colon/bracket-like host formatting. It belongs to a networking/address path, not proof of package-volume validation.
+That local helper appears in a `Host` / `Port` path and handles slash/colon/bracket-style host formatting. It is a networking/address helper, not evidence of package-volume validation.
 
 ## `BitAnswer::SetRootPath`
 
@@ -104,31 +104,66 @@ BitAnswer::SetRootPath(char const*)
   -> Bit_SetRootPath(...)
 ```
 
-`Bit_SetRootPath` is instruction-identical between EN and VI after the global `-0x18` layout shift.
+`Bit_SetRootPath` is byte-for-byte identical between EN and VI once the function is extracted at its own symbol boundary:
 
 ```text
 EN Bit_SetRootPath @ 0x1659ac, size 52
 VI Bit_SetRootPath @ 0x165994, size 52
+SHA-256(function bytes): identical
 ```
 
-Both execute the same internal dispatch sequence and use the same operation value `0x2a`.
+Both execute the same internal dispatch sequence and use operation value `0x2a`.
 
-This strongly lowers the probability that the VI regression is caused by a source-level change in the root-path wrapper itself.
+## Deep BitAnswer function comparison
 
-## `BitAnswer::Login`
+The deeper functions most relevant to login and feature gating were extracted by dynamic-symbol address/size and compared directly.
+
+All of the following are **byte-for-byte identical EN vs VI**:
+
+```text
+Bit_Login
+  size 140 bytes
+  EN @ 0x163e2c
+  VI @ 0x163e14
+
+Bit_ReadFeature
+  size 148 bytes
+  EN @ 0x1640ac
+  VI @ 0x164094
+
+Bit_CheckOutSn
+  size 274 bytes
+  EN @ 0x16542c
+  VI @ 0x165414
+
+Bit_CheckOutFeatures
+  size 292 bytes
+  EN @ 0x165654
+  VI @ 0x16563c
+
+bit_answer7b8cce65b03d11e5957f4c34888a5b28
+  size 180 bytes
+  EN @ 0x163d78
+  VI @ 0x163d60
+```
+
+The consistent address delta is the global `-0x18` layout shift caused by the earlier 24-byte `.text` shrink; the actual bytes in these functions are unchanged.
+
+This is much stronger than a call-graph-only match: the deep login/feature entry points themselves did not change implementation.
+
+## `BitAnswer::Login` wrapper
 
 Both builds retain the same wrapper shape:
 
 ```text
-if already logged in: increment/use existing login state
+if already logged in:
+  increment/use existing login state
 else:
   call Bit_Login(...)
   on success store login parameters/state
 ```
 
-Raw bytes differ because code and literal addresses shifted, but the visible call/control-flow shape is unchanged.
-
-The deeper obfuscated `Bit_Login` implementation still needs normalized semantic comparison before the whole license subsystem can be cleared.
+Its raw wrapper bytes contain shifted literal/code references, but its target `Bit_Login` implementation is exactly identical.
 
 ## Packaged-tail interaction
 
@@ -151,40 +186,47 @@ No second plaintext packaged-tail pointer/offset field has been found that refer
 - `/proc/self/exe` helper resolves the current executable path; it does not itself validate executable bytes.
 - executable-directory helper is byte-identical EN/VI.
 - `.bitanswer.volume` path builder exists in both builds with the same semantics.
-- `Bit_SetRootPath` implementation is instruction-identical EN/VI.
+- `Bit_SetRootPath`, `Bit_Login`, `Bit_ReadFeature`, `Bit_CheckOutSn`, `Bit_CheckOutFeatures`, and the tested internal dispatcher are byte-identical EN/VI.
 - package tail differs only in `m0`, whose meaning is already understood.
 
-### DOWNGRADED HYPOTHESIS
+### DOWNGRADED HYPOTHESES
+
+```text
+"VI changed the BitAnswer login/feature-check implementation and therefore ADAS died."
+```
+
+Static evidence now strongly argues against this.
 
 ```text
 "The seven changed high-entropy gaps are definitely BitAnswer integrity metadata and make VI fail."
 ```
 
-There is currently no direct static evidence for that statement.
+There is still no direct static reader/xref proving this.
 
 ### STILL OPEN
 
-- deeper `Bit_Login` / feature-check implementation differences;
-- device-specific license or custom-info behavior at runtime;
-- whether `.bitanswer.volume` is used on this SKU through indirect dispatch;
-- whether any opaque code path reads package interstitial bytes independently of the known model loader.
+- same BitAnswer code acting on different device-specific runtime license/custom-info state;
+- whether `.bitanswer.volume` is actually used on this SKU through indirect dispatch;
+- an as-yet-unidentified opaque reader of package interstitial bytes;
+- failures outside license: media/ringbuffer, kernel/IPU, startup ordering, calibration or output path.
 
 ## Regression-ranking impact
 
-The static evidence now shifts weight away from a proven package-validation failure and toward runtime integration:
+The static evidence now shifts the leading hypotheses toward runtime integration:
 
 ```text
-1. runtime frame/media/kernel/memory integration
-2. startup/config/calibration/license state on the physical unit
-3. deeper Bit_Login/feature-check behavior not yet normalized
-4. interstitial package metadata only if a reader/xref is proven
+1. kernel/media/memory/frame-path integration
+2. runtime startup/config/calibration state
+3. same license code receiving different runtime state/data
+4. package interstitial metadata only if a real reader/xref is proven
 5. deliberate raw_adas writer contract change — already low probability
-6. different CNN weights/models — effectively excluded
+6. changed BitAnswer login/feature implementation — strongly downgraded
+7. different CNN weights/models — effectively excluded
 ```
 
 ## Next work
 
-1. normalized semantic diff of `Bit_Login` and feature-check internals;
-2. runtime EN baseline collector: process, raw_adas IPC, IPU state, ScreenService;
-3. compare VI only with safe recovery or use reversible `EN base + VI adas` launch;
-4. investigate kernel/media/memory delta, especially the VI framebuffer reservation and upstream camera producer state.
+1. inspect kernel/media/memory delta, especially the VI framebuffer reservation and camera/IPU path;
+2. collect EN runtime baseline: `cardv`, `adas`, `raw_adas`, IPU, shared memory, ScreenService;
+3. compare VI only with safe recovery, or use reversible `EN base + VI adas` launch;
+4. continue searching for a proven reader of the interstitial package bytes before treating them as causal.
