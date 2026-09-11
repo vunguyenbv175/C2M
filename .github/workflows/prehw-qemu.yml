@@ -1,9 +1,6 @@
 name: prehw-qemu-stock-runtime
 
 on:
-  push:
-    paths:
-      - '.github/workflows/prehw-qemu.yml'
   workflow_dispatch:
 
 jobs:
@@ -49,14 +46,12 @@ jobs:
           src = Path(sys.argv[1]); out = Path(sys.argv[2])
           data = gzip.decompress(src.read_bytes())
           entries = list(iter_cpio_full(data))
-          # directories first
           for name, mode, blob in entries:
               p = out / name.lstrip('./')
               typ = stat.S_IFMT(mode)
               if typ == stat.S_IFDIR:
                   p.mkdir(parents=True, exist_ok=True)
                   os.chmod(p, stat.S_IMODE(mode))
-          # files/symlinks
           for name, mode, blob in entries:
               p = out / name.lstrip('./')
               typ = stat.S_IFMT(mode)
