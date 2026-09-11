@@ -7,9 +7,12 @@
 #pragma once
 // Safety: this header declares narrow probe-only wrappers; it never defines firmware behavior.
 #ifdef C2M_IPU_HAVE_VENDOR_HEADERS
-// Preferred path: include real vendor headers supplied privately (never committed).
-// #include "mi_ipu.h"
-// #include "mi_sys.h"
+// Vendor-backed build path: use the REAL headers from the private SDK dir supplied
+// via -I (never committed). Including them proves header/API compatibility at compile
+// time. The skeleton main.cpp still refuses --single-invoke (exit 4) until a real
+// MI_IPU_* Invoke implementation lands — headers alone do not execute inference.
+#include "mi_ipu.h"
+#include "mi_sys.h"
 #endif
 // UNVERIFIED assumed signatures (names CONFIRMED in libmi_ipu.so dynsym; arity from
 // official MI IPU API doc + local Thumb-2 disasm of IPUCreateDevice/SystemInit):

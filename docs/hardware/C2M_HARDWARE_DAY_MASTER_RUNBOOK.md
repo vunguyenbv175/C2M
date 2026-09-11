@@ -39,8 +39,8 @@
 | 9 | L2 `BENCH_ONLY` conditional | only 4 allowlisted messages | no proof → SKIP (BLOCKED) | n/a | 10 |
 | 10 | `sh tools/device/capture_c2m_ipu_baseline.sh [label]` `READ_ONLY` | baseline dir; absent=UNKNOWN | hang/panic → STOP | n/a | 11 |
 | 11 | `sh tools/device/capture_c2m_media_topology.sh [label]` `READ_ONLY` | topology dir; no channel change | instability → STOP | n/a | 12 |
-| 12 | `tools/device/c2m-ipu-smoke/` probe-only default `READ_ONLY`; single Invoke `BENCH_ONLY` per `RUNBOOK.md` | Create/CHN/Invoke/Destroy 0 + XOR + latency | non-zero/hang → STOP | reboot, confirm stock | 13 (only if SAFE PASS) |
-| 13 | Coexist single-shot `BENCH_ONLY` beside live stock | custom 0 + stock alive/health + <10% delta | timeout/degrade → STOP | kill custom only, reboot if needed | 14 |
+| 12 | `tools/device/c2m-ipu-smoke/` probe-only `READ_ONLY`; single Invoke `BENCH_ONLY` per `RUNBOOK.md` — pre-hardware `BLOCKED_TOOLCHAIN` (skeleton refuses `--single-invoke`, exit 4) | Create/CHN/Invoke/Destroy 0 + XOR + latency | non-zero/hang → STOP | reboot, confirm stock | 13 (only if SAFE PASS) |
+| 13 | Coexist single-shot `BENCH_ONLY` beside live stock — transitively `BLOCKED_TOOLCHAIN` until SAFE PASS exists | custom 0 + stock alive/health + <10% delta | timeout/degrade → STOP | kill custom only, reboot if needed | 14 |
 | 14 | Shadow prep plan only | notes in `12_summary/` | n/a | n/a | done |
 
 EN-base+VI-adas swap stays BLOCKED until class A–H assigned. `tools/device/c2m_hw_day.sh` orchestrates (shows next step, verifies files, runs read-only captures, hashes, records manual PASS/FAIL) but never flashes/kills/infers/injects automatically.
@@ -61,4 +61,4 @@ C2M_HW_<YYYYMMDD>/00_manifest/01_recovery/02_candidate_A/03_candidate_B/04_en_ru
 05_vi_runtime/06_adas_compare/07_m4/08_ipu_baseline/09_media_topology/10_ipu_safe/11_ipu_coexist/12_summary/
 ```
 
-Gates file: `docs/hardware/C2M_HARDWARE_DAY_GATES.json` (PASS/FAIL/PARTIAL/UNKNOWN/BLOCKED/NOT_RUN + evidence_path + timestamp + notes).
+Gates file: `docs/hardware/C2M_HARDWARE_DAY_GATES.json` — IMMUTABLE template. Hardware-day state lives in `C2M_HW_<YYYYMMDD>/00_manifest/GATES.current.json` (`GATES.start.json` preserves the initial snapshot); `tools/device/c2m_hw_day.sh status|next|record|stop` operates on the active copy and refuses the template. `next` is fail-closed: unsatisfied prerequisites and any `STOP_DAY` sentinel yield `STOP` (exit 1).
