@@ -33,6 +33,7 @@ jobs:
           python3 tools/road/test_road.py
           python3 tests/test_firmware_pipeline.py
           python3 fw/device_minimal/test_check_elf.py
+          python3 tests/test_candidate_b.py
   arm-minimal:
     # Reproducible cross-build of the MINIMAL idle binary (static analysis only).
     # Label: HOST-CROSS-BUILT, NOT device-tested. No firmware needed.
@@ -63,3 +64,25 @@ jobs:
             -c fw/device_minimal/c2m_idle.c -o build/arm-minimal/c2m_idle_check.o
           python3 fw/device_minimal/check_elf.py build/arm-minimal/c2m-idle \
             --object build/arm-minimal/c2m_idle_check.o --allow-libc-simd
+  arm-dyn:
+    # P0 preferred path: dynamic binary pinned to the stock glibc 2.30 ABI.
+    # No firmware needed: glibc_compat.h pins every reachable symbol version
+    # and check_elf.py --allow-dynamic independently proves max need <= 2.30.
+    # Label: HOST-CROSS-BUILT, NOT device-tested.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM toolchain + Ninja
+        run: |
+          sudo apt-get update && sudo apt-get install -y gcc-arm-linux-gnueabihf ninja-build
+          arm-linux-gnueabihf-gcc --version
+      - name: Build dynamic ARM binary (stock-loader compatible)
+        run: |
+          cmake -S "${{ github.workspace }}/fw/device_minimal" -B build/arm-dyn \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/arm-dyn --verbose
+          arm-linux-gnueabihf-gcc --version > build/arm-dyn/toolchain_version.txt
+      - name: ELF gate (dynamic, interp + NEEDED + GLIBC<=2.30 + VFPv3-D16, no SIMD)
+        run: python3 fw/device_minimal/check_elf.py build/arm-dyn/c2m-idle --allow-dynamic

@@ -1,0 +1,3769 @@
+{
+  "image": "build\\carve_en\\customer.es.load0.off_00c5d000.size_25e7000.bin",
+  "image_bytes": 39743488,
+  "node_count": 17174,
+  "entry_count": 227,
+  "entries": [
+    {
+      "path": "/config",
+      "inode": 291,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 160,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/gadget",
+      "inode": 217,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 304,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/gadget/udc-msdc.sh",
+      "inode": 219,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1481,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "1028dc2484af5d1805d5727f181d927126ff14b4fa0acdeb6b5a6c83a6317262",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/gadget/udc-uvc.sh",
+      "inode": 218,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2165,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b686b52d8b67829b1c62847481c58b7412b48bbbf5700c7324bd16f7724821d5",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/i2c_read_write",
+      "inode": 269,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 22260,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "7af160e56c70f11d55c24133ce24c1cf9fbc55131c1f45450b6d647f1529df85",
+      "compression": {
+        "1": 6
+      }
+    },
+    {
+      "path": "/minieye",
+      "inode": 65,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 800,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas",
+      "inode": 72,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2256,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/adas",
+      "inode": 136,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 11636008,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043",
+      "compression": {
+        "0": 1701,
+        "1": 1140
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_checkcalib.sh",
+      "inode": 107,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1145,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "518f22e98842eb8a6c315d0a29098c885f0d2c942c4690154ddc730034b3d8c4",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_checksize.sh",
+      "inode": 110,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 440,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d207d50e0d6fddf4090d657af06b5e74f62bb64d5b88dfa28b7afd2951a4dd5c",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_checksn.sh",
+      "inode": 106,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 494,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "3ef142725c439703df2c9f1041c18183484e963677a2cbc0dc3a1946601fd53e",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_checksum.sh",
+      "inode": 137,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 183,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "afb50731f7fb36328e8e405502fa3d485e3413d7a85b55b09c5b0027740e6200",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_guard.sh",
+      "inode": 118,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 556,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a800be6c2cbe7937a510fa9590a9ef3b6de51aa2a81d4ca1e747c849c21f87fb",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_license_restore.sh",
+      "inode": 109,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 654,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "bd2269b55884352c88a9d72c11f6356c9956e9fddb542ca82aaaec8802c466ce",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_service.sh",
+      "inode": 135,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1747,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "8c024952d1611b57f9849df5ac1b8a0fe90239383af04fdeeb49e830453414b5",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_upgrade.sh",
+      "inode": 133,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2160,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "87a43c0384123cc8e3671e9cf73ced4148e31c7702a4d0cd78b8f6eadddc5f35",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/adas_version",
+      "inode": 117,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 136,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "0a78d258e661fa796251e4a0e4a1d017f2b89dc0d4f8b615956fa18dd2b21136",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/audios",
+      "inode": 119,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 768,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/audios.txt",
+      "inode": 139,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 672,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "c3d20ca7bd871afd575a80379cc53b6ac7ab0296c9ffbd6fd82541a7abdd82c9",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/FCW.wav",
+      "inode": 121,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 98348,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a2df72f0ac7c1c29facb48f5977e760440abe536193f71f2966f6f9c20a43282",
+      "compression": {
+        "0": 24,
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/HMW.wav",
+      "inode": 122,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 42028,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "059319724c0a96bc8609078ca0a892e29fbc2346296c96c2e9070b1e2ea9f494",
+      "compression": {
+        "0": 7,
+        "1": 4
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/LDW.wav",
+      "inode": 127,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 95660,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "8048570d9a2f89640147366591dcfdb0ffdb20296af28d739b495b48edb0868b",
+      "compression": {
+        "0": 4,
+        "1": 12
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/PCW.wav",
+      "inode": 120,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 119852,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "5c74f80c150e8e8c323e46d2c9737b96636325c67186e668ffe854427a0a40ff",
+      "compression": {
+        "0": 7,
+        "1": 14
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/SAG.wav",
+      "inode": 126,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 119852,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "8506afee178ad65f1b64e905746eb2855a526ca6a6f44a88e1bdcb1b0cbb8c3b",
+      "compression": {
+        "0": 8,
+        "1": 13
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/VB.wav",
+      "inode": 123,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 122156,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "acb838c27b1fcef1bec636afb78088fabba8cd538ac28c520863f692a2d2be8f",
+      "compression": {
+        "0": 10,
+        "1": 12
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/adas_activated.wav",
+      "inode": 128,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 135982,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "207754679f881a6a2a3127c4cc7d8bdd55454c47c15ec8d442efed00b9e913ed",
+      "compression": {
+        "0": 9,
+        "1": 16
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/adas_fail.wav",
+      "inode": 125,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 216622,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a4aaf1e709ca05e9855033f8c076db4def2e370d2ea7a85a7aad3d05a7ec5322",
+      "compression": {
+        "0": 21,
+        "1": 24
+      }
+    },
+    {
+      "path": "/minieye/adas/audios/updating.wav",
+      "inode": 124,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 147044,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "244a22d6020902731dce74ec990cc4707c214c4ca93213ff2de9f2a26b5aad2d",
+      "compression": {
+        "0": 11,
+        "1": 25
+      }
+    },
+    {
+      "path": "/minieye/adas/filesize.txt",
+      "inode": 138,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3482,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "638a3942373602e36ea56a514d1f4cad139c4e151ecab58a0676dbccf1672361",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/git_commit",
+      "inode": 129,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 50,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "61a2483523f7b80c4c1fef21e96e830e3460c263e87e5fd499604c390473b5f7",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/ipu_firmware.bin",
+      "inode": 114,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 600208,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "61c4663ddef26bdfef16b1789f90d90bb6f2e9a36c10de7f6c365a9600842d55",
+      "compression": {
+        "1": 139
+      }
+    },
+    {
+      "path": "/minieye/adas/lane_release",
+      "inode": 99,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 296,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/lane_release/bin",
+      "inode": 101,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 392,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/lane_release/bin/calib_service",
+      "inode": 102,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 353188,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b533679dc2045bd560beb38dadf114b50fef7ff1564127522139b78487df5ef9",
+      "compression": {
+        "1": 87
+      }
+    },
+    {
+      "path": "/minieye/adas/lane_release/bin/lane_accelerator",
+      "inode": 104,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 176604,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "318b88b6a3a83634a0495db4e9ef5a9c223ead05eb43231b8bbeb541aec6353e",
+      "compression": {
+        "1": 44
+      }
+    },
+    {
+      "path": "/minieye/adas/lane_release/bin/lane_postprocess",
+      "inode": 103,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 476536,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "3d30a327901b9414b58ec9168f0e57d7f7a0e69396ba2bdbe3ece8909b19ba68",
+      "compression": {
+        "1": 117
+      }
+    },
+    {
+      "path": "/minieye/adas/lane_release/mutualism.txt",
+      "inode": 100,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 362,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "bb634d1466d5d54ed979ce7502f81ab0c636dda5bee17b04d023f574aba15761",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/lib",
+      "inode": 112,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 232,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/lib/libPedDetect.so",
+      "inode": 113,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 237140,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "8a02440caa6baa1ca7655f60cc2adcd98393f3a117fe41058338900273c54b79",
+      "compression": {
+        "1": 58
+      }
+    },
+    {
+      "path": "/minieye/adas/md5sum.txt",
+      "inode": 116,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 6884,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "93eeaa3cf3dfa798ca3d94945a7f979c7183cd38d2ca366c97f99971c1705151",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/minieye/adas/mutualism",
+      "inode": 141,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 9796,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f91418477e6923298781acc14f3930cfaf553a8817371d8b776a7697e66b382e",
+      "compression": {
+        "1": 3
+      }
+    },
+    {
+      "path": "/minieye/adas/mutualism.checksn.txt",
+      "inode": 140,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 33,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a00afdbdd22747b1ea1ed357195adcbc57d029654e1aa45266e1a80f1f544e8e",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/mutualism.restoresn.txt",
+      "inode": 105,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 35,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "2db06106244d1f299580ac3d318b9fe513d04575e11e9c1d15d4f3a478aca87c",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/mutualism.txt",
+      "inode": 111,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 379,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "07d0d8b6f43ebc3eaeb659853178b09be03bfde7091a01146b57dbe71458e085",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/params",
+      "inode": 130,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 304,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/params/model.img",
+      "inode": 132,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 507040,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "07ba919be12c40f5afcb6b39f849baab52925a080059e830721d7293af303695",
+      "compression": {
+        "0": 124
+      }
+    },
+    {
+      "path": "/minieye/adas/params/model.txt",
+      "inode": 131,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 96,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "523aae4ea877ecc2bc37b076508544ced6fa362818a6e2798e6a95a51138be29",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras",
+      "inode": 73,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 464,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/paras/calib_service",
+      "inode": 74,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 304,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/paras/calib_service/config.json",
+      "inode": 75,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1102,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "5b39a155f1b97fd4041fe81aab16135ace0186ec685c5e3613b7d3576d892227",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/calib_service/detect.flag",
+      "inode": 76,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1020,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "9178d1250ad014b5ec28d5d3dd6e7fb243788792323f6868c69987810c391f92",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_accelerator",
+      "inode": 96,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 304,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/paras/lane_accelerator/config.json",
+      "inode": 97,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 485,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "6389f9730f4c18f6d9d90d20faed8e7d958db5f1f839f6bbcbb2362836aa9c56",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_accelerator/detect.flag",
+      "inode": 98,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 649,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "3feec285975ab43ccb65b4b8d93c214ab98e0dd9b0b45f941576620cb37999fa",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para",
+      "inode": 77,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1232,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/can_protocol.xml",
+      "inode": 81,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 7577,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "403be0d56c07a26bbf2d271dbdffa733301d9b4132a715ad60a81b2ee471999a",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/collision_config.json",
+      "inode": 91,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 366,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "480f84742ce8a5fc5aca69f250dac6d5b97d3766f40e327bef973bc4bec11598",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/debug.json",
+      "inode": 82,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1477,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "fcfc7bee264f732ba882f2841130ad6ca738584bd7584731465d3a6a96a97320",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/drive_state_config.json",
+      "inode": 83,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 141,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "863b57b32226978e23609e2cfff44d28f8874bbc062164cfd81689f60e8b8e73",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/eval.xml",
+      "inode": 79,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 614196,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "19550c9879415cf3373c4cc07a00b506eed9863f8f975ab2782c9395e6ff0c3f",
+      "compression": {
+        "1": 150
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/harsh_warning_config.json",
+      "inode": 85,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 141,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "c8b6004acfa075aa6292b8f8ce0864b4b5c5fb6715d2400cc1262b82f7e9596b",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/high.xml",
+      "inode": 80,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1369,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "e4f4518ff0f31e10d37225f23aa1e9bd90a5c9ba51aa84ebbc58af9366d12a82",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/ldw_active.json",
+      "inode": 89,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 361,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a62639c521dc6d1b89f4ee861be5fe37813dbca5ef6c74f6435a6f0773c9c435",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/ldw_algo_suppress.json",
+      "inode": 87,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 483,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d995dcd18e8298119498226566bafbfcc2d4a7f85ebacd6336cb4bde4aa0ad3c",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/ldw_device_suppress.json",
+      "inode": 90,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1816,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "4412362114bf15345eb9a39a9b08a9aa4455747452bc6e634ad505db58afc773",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/ldw_suppress.json",
+      "inode": 84,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 893,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "3422302594464cfb4e24f0a1eced445b46221d9901420bcd529c96bcdeea96b8",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/low.xml",
+      "inode": 86,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1375,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "33c935eeda1452cdd9849d26444e3d48853b1beb558cf9e6faaa956ddc6bdb4e",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/middle.xml",
+      "inode": 88,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1368,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "bc861346cbc1d3a5c234a936723bc854ad9cf16a04a8eb384df23e2725a7dbac",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_para/ultra-high.xml",
+      "inode": 78,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1368,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "9ef21bb42ec1666e5d20fda76df42cb4b2cabe30c7344dbf4c1db15fabcfb639",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_postprocess",
+      "inode": 92,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 376,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/paras/lane_postprocess/config.json",
+      "inode": 94,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1318,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "3cc38126d4d5edb97567e81d20c645666b26b5c0d4b2d583080ad5f078e09610",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_postprocess/detect.flag",
+      "inode": 95,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1667,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f6f9475fe588cbe37499580012033f5c70d4ed0af51f0f54a92beb6075c92c1c",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/paras/lane_postprocess/odo.json",
+      "inode": 93,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 248,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f6f4ab847c0190aa383b034b01ab49a5f1a64225c045bf6ced8b7a2747fe06b4",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/protocol_version",
+      "inode": 134,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 17,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "77bdc117991cfc38bc21c33a65e8eb16fdd6556b8bbd258362c17cbde68307e8",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/run.sh",
+      "inode": 195,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1584,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "796e555a276d849737b8034021e1464a8241ed291a332ef5a61b767d9ab860e4",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib",
+      "inode": 142,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 4240,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/adas/third_lib/libEgoMotion.so",
+      "inode": 181,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 59440,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f1895175dd18049f66198c4e63261ec4b2a75b27a18f425b8076a9a43b147304",
+      "compression": {
+        "1": 15
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libHarshwarning.so",
+      "inode": 157,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 100980,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "4b267fa9ae46c3f0b4912bf60340a740b24a52b33d70c2e5a8fcbc9291ef2d1a",
+      "compression": {
+        "1": 25
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libImuAttEstimate.so",
+      "inode": 176,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 59512,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "4e5dcc714e9bc4a093ce5135fc84d57273602b5f0acd9e1f1dc35e85a5299129",
+      "compression": {
+        "1": 15
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libImuDriveState.so",
+      "inode": 162,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 59588,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "e7d4ae92139471d2f0ee1a348effcd094576f8f046b1fc2b31f982104869c617",
+      "compression": {
+        "1": 15
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libImuMock.so",
+      "inode": 155,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 34580,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "922f2467d91458487bb4cb21513ddeb3eecd655226e0fb3446e355dc3a866829",
+      "compression": {
+        "1": 9
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libImuReader.so",
+      "inode": 186,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 133792,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "be5897e473fa2ca62ab22cff73a699fc5a3397d21af2a72204538d4cfb3bfc5b",
+      "compression": {
+        "1": 33
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libImuTrans.so",
+      "inode": 169,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 80224,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "096502880333867aa75496c2966209856256ce99fed02bed90d8d95368df052a",
+      "compression": {
+        "1": 20
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLaneEvalVP.so",
+      "inode": 143,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 100800,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "135c41e3a3139a2e54b1c05f547f4441ed8c06eeb22eb1250a343058b43fed47",
+      "compression": {
+        "1": 25
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLaneLineDetect.so",
+      "inode": 193,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 311960,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b7b152338d157ae3d05f1505c611a066c21ead865b15648c00641a0e49264ceb",
+      "compression": {
+        "1": 77
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLanePrediction.so",
+      "inode": 188,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 55272,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "5d8b39c3aa92ade76c57968fa7a2a0b2eae0a0d10742833beb55cdcd4f6cddb0",
+      "compression": {
+        "1": 14
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLaneSide.so",
+      "inode": 145,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 117484,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "9fe781d69c3e1718a9840f420f77d79f4688eae83fe0355952e00017bd18448d",
+      "compression": {
+        "1": 29
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLaneTrack.so",
+      "inode": 179,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 84264,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "4975ee121c78238a409e9f977946e06a931bc430dece52a10e3e0bc38aece61e",
+      "compression": {
+        "1": 21
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLaneWarning.so",
+      "inode": 184,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 246028,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "ad99feb0df98246f5660ed26534365bebbcd5976fc2f58504222497f8842b44b",
+      "compression": {
+        "1": 61
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libLanelineFitting.so",
+      "inode": 150,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 281780,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "41c4bf9ff1fb65e05e62817e5b974e1701d86fc45ef9f44bbdcc31065b8023b2",
+      "compression": {
+        "1": 69
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libMotionEst.so",
+      "inode": 171,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 145876,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "863418335bfefb62510498514a5a107e03b177f693fc972abd22558b4c41accb",
+      "compression": {
+        "1": 36
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libanl.so.1",
+      "inode": 168,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 14120,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d0b9e6d791cb923114a52d1ee9fa41adbbcb94fac7cc83fcb0aa2c742c1f8675",
+      "compression": {
+        "1": 4
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libceres.so.1",
+      "inode": 147,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 894984,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "5043c8a32bd41058085c69dd8560166ac29efade2e4d6c635b60dc875a8df901",
+      "compression": {
+        "0": 1,
+        "1": 218
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libcommon.so",
+      "inode": 161,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 208304,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a1b9b24c05be69f68db97bb55692d33ff693b6174317000404ac5bb09fa962a8",
+      "compression": {
+        "1": 51
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libdata_proto.so",
+      "inode": 153,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 797256,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "452d6d542079fd7587b7a91e89f263e25ce06407732e412490b3c29813a9e188",
+      "compression": {
+        "0": 2,
+        "1": 193
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libdds.so",
+      "inode": 185,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 686308,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f009f6770f445ef489e0f211a1ef121fa18bcb9a3e23a54cac94ba97b5a26a9b",
+      "compression": {
+        "1": 168
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libdds_api.so",
+      "inode": 166,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 13940,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "272c2a49dbf005c14a9ba6ac732e5af0fba15008300d7732e204e734edb45e0f",
+      "compression": {
+        "1": 4
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libflow.so",
+      "inode": 189,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 646300,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a6bfcbf6be07d08d39c74a924b232da76c355d0d753089212bdc10b027dc8d42",
+      "compression": {
+        "0": 2,
+        "1": 156
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libgflags.so.2",
+      "inode": 152,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 96316,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "9fc73648e0893a1614fec8b4a89ec2a36a4edf279389bf8364276338827a5534",
+      "compression": {
+        "1": 24
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libgflags_nothreads.so",
+      "inode": 180,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 96316,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "6ceeddd204b9ce94234646ac741c485b91e01e3742541e24d89a4fdbd3e42613",
+      "compression": {
+        "1": 24
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libglog.so.0.3.5",
+      "inode": 144,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 88428,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d1363ca46fab987f5b812a0fe731e6ff067216d9501fbd0e93eb9c4266adcc3a",
+      "compression": {
+        "1": 22
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libgomp.so.1",
+      "inode": 156,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 145732,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "16c546c776aa0b97a6279d88580f17b5a19b3bdd2f8a1e3289acfac019261293",
+      "compression": {
+        "1": 36
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/liblane_common.so",
+      "inode": 183,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 141820,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "003592a21a9dd4ec0d21da4cfa945c2450ee4765f7f607e980e3abf65f50e7a2",
+      "compression": {
+        "1": 35
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/liblane_dds.so",
+      "inode": 146,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 14008,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d0e0882e476755a4fcd7fb7c774ca2d4d5a95d92c992f852cfb65a5ec7a89fa9",
+      "compression": {
+        "1": 4
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/liblane_road_model.so",
+      "inode": 158,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 422336,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "9d9ca3792e9e7dab6168b3b0aa1e6a0d6d8361c5a51f628ae569e73760187d55",
+      "compression": {
+        "1": 104
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libmi_ive.so",
+      "inode": 160,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 754524,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "2140be1fd319ad56796365090d5cf594e87fe7c7e4ad020a94f31a06eb014d4f",
+      "compression": {
+        "1": 185
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libnanomsg.so.5",
+      "inode": 163,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 237560,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f3b609c612a3802745549de6ffd869d6af44149701eff47f0425f2844a80d079",
+      "compression": {
+        "1": 58
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_calib3d.so.4.1",
+      "inode": 159,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1148384,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "afade8f7b4a275fa9bde1f54eb185a6262b476bef369a614b595a3cb4f2e783b",
+      "compression": {
+        "1": 281
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_core.so.4.1",
+      "inode": 154,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2382956,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "38077c8222b0b4e7482a2725ba5c18919948c4bbb0622e017380d18058245457",
+      "compression": {
+        "0": 2,
+        "1": 580
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_dnn.so.4.1",
+      "inode": 192,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2721124,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "eaf2f29580067da4532611ce56be8954bac38e9f9a0bea37b8d8d4be6cf80552",
+      "compression": {
+        "1": 665
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_features2d.so.4.1",
+      "inode": 194,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 497136,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "1b248ab5ca7071b5391a2ecc4c7e5bca21a8a25b70db04313d2032d72fda817e",
+      "compression": {
+        "1": 122
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_flann.so.4.1",
+      "inode": 173,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 234964,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "888343c948486a9b073fdb45c5863107e734802d151d8a8ef95e24c1433286fc",
+      "compression": {
+        "1": 58
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_gapi.so.4.1",
+      "inode": 190,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1182408,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "8b5f308295b5a618b7da3a4cb2e3fc8eaae8f232cecfa2f822230f711e8f7b3c",
+      "compression": {
+        "1": 289
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_highgui.so.4.1",
+      "inode": 177,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 30116,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "6cb824655ae5fcf04cb2c8a45996c03a03cd97e90d7acd87d6dded696648c6e2",
+      "compression": {
+        "1": 8
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_imgcodecs.so.4.1",
+      "inode": 164,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1284164,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "e85328284688ed49595f4e130c0832a4adc6a3d1bd6f55a10ecf5282bde79b15",
+      "compression": {
+        "0": 1,
+        "1": 313
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_imgproc.so.4.1",
+      "inode": 165,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2436472,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "6884a18c7b692f41420d50d266090e8981219ad57aec43b23d3cfb2d20564689",
+      "compression": {
+        "0": 4,
+        "1": 591
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_ml.so.4.1",
+      "inode": 151,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 484768,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d067bc37d671de20c24f103875632b773ed459e555526412247789b3ca2cbb80",
+      "compression": {
+        "1": 119
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_objdetect.so.4.1",
+      "inode": 167,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 300488,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "82e16d0448243f76667633a0c6e396efe04a82f191559804949064861b44354a",
+      "compression": {
+        "0": 5,
+        "1": 69
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_photo.so.4.1",
+      "inode": 191,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 521664,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "34345d66409ffd731307badbe2a2b0621269f8e003a811e2b6f6430591167863",
+      "compression": {
+        "1": 128
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_stitching.so.4.1",
+      "inode": 174,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 480716,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "dad9e38feebfeb9c3038b2404f2ea3da0bafd66de9f5d6a5689202954dccf374",
+      "compression": {
+        "1": 118
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_video.so.4.1",
+      "inode": 182,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 312840,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b3ac2f9ec58f5ed4e9ac9107a2d32ac15cf0f4f4053ed971e64bf89ba6065ea4",
+      "compression": {
+        "1": 77
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libopencv_videoio.so.4.1",
+      "inode": 178,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 193976,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "31f094b77f379f0f0cd94939c301c3b337514c721cfa795517a79d770871b8e2",
+      "compression": {
+        "1": 48
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libpitch_estimate.so",
+      "inode": 187,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 360480,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "e91fc4dc5de3a2f1c60d2b9c48bba142569cbbdf4b8d9b61ea60051e56393940",
+      "compression": {
+        "0": 1,
+        "1": 88
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libprotobuf-lite.so.3.13.0.0",
+      "inode": 149,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 863600,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "87b054000b5e64c3724c3a283253fc22c0b4f7dbcbfce6eb0646f4a6a4fd3761",
+      "compression": {
+        "0": 2,
+        "1": 209
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libprotobuf.so.3.13.0.0",
+      "inode": 170,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 5901968,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "316ec64920bd595ad88cd7df5d17918b1c71e6a8b85004b9b9d24769d09379de",
+      "compression": {
+        "0": 25,
+        "1": 1416
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libprotoc.so.3.13.0.0",
+      "inode": 175,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3956008,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "ca20022f2358ef7949ed8ba461ca9741a2e93b824bd863f81b8daae223b27f3d",
+      "compression": {
+        "0": 12,
+        "1": 954
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libringbuf.so",
+      "inode": 148,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 46852,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b23e0624ab5e3b560a6a14dc54d6694680a91c29223341a838ab4c3ee0f70a7b",
+      "compression": {
+        "1": 12
+      }
+    },
+    {
+      "path": "/minieye/adas/third_lib/libshared_env.so",
+      "inode": 172,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 26256,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "01e511b565283844f970b7f1abe745ea0c594fbaa84cb24c31ee7c8f46bb38be",
+      "compression": {
+        "1": 7
+      }
+    },
+    {
+      "path": "/minieye/adas/version",
+      "inode": 115,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 138,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "0c45244309d90f2b37f2cb5dd5a58694d92dacc17e7aad107cc996e13c19a08e",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas/version_base64",
+      "inode": 108,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 187,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "385fce5fe24ffa375257a9f6f02480406fa9dbe63a3bc706ffdd6e9507736465",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/adas_upgrade.sh",
+      "inode": 71,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2064,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b94e4406db2286496d465b900cb38d01cc46fd8d14072dc9a99192bf937f302e",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/adas_v.txt",
+      "inode": 69,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 33,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "37f71e82d648da807b5bd1c2dc6caf40e0a2f3734443e6665fbebeac361c45af",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/config",
+      "inode": 196,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 232,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/minieye/config/.gitkeep",
+      "inode": 197,
+      "type": "reg",
+      "mode": 436,
+      "mode_oct": "0o664",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 0,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compression": {}
+    },
+    {
+      "path": "/minieye/config_upgrade.sh",
+      "inode": 68,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1128,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "5d7f0fd79fa93f20321f8f8f4676aa10957fb50b37cc09994e55a85d24d748b7",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/deletelog.sh",
+      "inode": 66,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 81,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "db51120c1982b03ca45bdca543c13bfa1702c10da280b0ea099d321b0d318017",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/minieye/getlog.sh",
+      "inode": 70,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2137,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "fa8660ac5d1260ab2f1033f7d0b314017c3dbcd7033593d80e303267623fe1b1",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/minieye_daemon.sh",
+      "inode": 198,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3060,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b1963f0c93ec3c777291d3404d5489fafa78db9c1e1c4d95e1c7d5504eb53ef4",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/minieye/passwd",
+      "inode": 67,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 56,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "134e12cc88880e155892620d2e402f9508102f3576505467a43dba8854d135f1",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/modules",
+      "inode": 200,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 224,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661
+    },
+    {
+      "path": "/modules/4.9.227",
+      "inode": 201,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1208,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661
+    },
+    {
+      "path": "/modules/4.9.227/cdc_ether.ko",
+      "inode": 208,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 10252,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "1e198de7c31943552f4bfd72e5b91af1a4a5fbee4803188b8be74f614bd8a79e",
+      "compression": {
+        "1": 3
+      }
+    },
+    {
+      "path": "/modules/4.9.227/cfg80211.ko",
+      "inode": 215,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 193040,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "26e642d29d416c6b486e741d56046d0dd308fec909dd373a32853182ffc2694d",
+      "compression": {
+        "1": 48
+      }
+    },
+    {
+      "path": "/modules/4.9.227/ehci-hcd.ko",
+      "inode": 205,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 44132,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "6324e5f62cd314de958b20897bf6f7d0e7b4af3ca275c55aa941b004d1fd5733",
+      "compression": {
+        "1": 11
+      }
+    },
+    {
+      "path": "/modules/4.9.227/fat.ko",
+      "inode": 213,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 55440,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "4249edc820d0f2d604e0d36b091ab6ce01e0093aec95c80fed5401c9842c961e",
+      "compression": {
+        "1": 14
+      }
+    },
+    {
+      "path": "/modules/4.9.227/kdrv_sdmmc.ko",
+      "inode": 210,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 50136,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "e866476e4ee0dc555c95a3303c946bc67b1469881f650e571aef067359403c85",
+      "compression": {
+        "1": 13
+      }
+    },
+    {
+      "path": "/modules/4.9.227/mii.ko",
+      "inode": 211,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 5144,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "e5aaf2b6ee12bb9e6127726ccbe0d3e5a322b13151432dcd21f27bc71f35db05",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/modules/4.9.227/mmc_block.ko",
+      "inode": 204,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 29980,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "3743c0d342d5788859a52ccdfdb6208e26d7e27872d746228971415f04403187",
+      "compression": {
+        "1": 8
+      }
+    },
+    {
+      "path": "/modules/4.9.227/mmc_core.ko",
+      "inode": 212,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 98840,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "34e566717262bd2204f876df8e3e1ed91020b594c31288e8e0744371f759ac6a",
+      "compression": {
+        "1": 25
+      }
+    },
+    {
+      "path": "/modules/4.9.227/nls_utf8.ko",
+      "inode": 209,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3784,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "3089c8b23e401aee2ead5ef8b44ab9886264f190cc6d10b0571051d3060dded1",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/modules/4.9.227/ntfs.ko",
+      "inode": 203,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 89736,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "b5c1ac6877cad52a604e025a9fc758b076cd12d29ab89a585936209cf1c102e2",
+      "compression": {
+        "1": 22
+      }
+    },
+    {
+      "path": "/modules/4.9.227/rndis_host.ko",
+      "inode": 202,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 9316,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "3438786f8772fbdcb2a7053561c3fbac6f83d97b4d8d8c477c32d3e8538f4715",
+      "compression": {
+        "1": 3
+      }
+    },
+    {
+      "path": "/modules/4.9.227/usb-common.ko",
+      "inode": 216,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 5856,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "32eff9fdb019340d08135fea69303aa3f33a6a75a0fd4f8a0cc78994d7bd096f",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/modules/4.9.227/usbcore.ko",
+      "inode": 214,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 150540,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "c7ae185c49e58aa31c03908bb736c6b3fea11c948010b36bd824411e4d33df2b",
+      "compression": {
+        "1": 37
+      }
+    },
+    {
+      "path": "/modules/4.9.227/usbnet.ko",
+      "inode": 206,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 23532,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "5791a016165b9521cefb445588b990f41260ef9c02e5ddb1df010d96cc221fbd",
+      "compression": {
+        "1": 6
+      }
+    },
+    {
+      "path": "/modules/4.9.227/vfat.ko",
+      "inode": 207,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 11980,
+      "mtime": 1691062661,
+      "ctime_info": 1691062661,
+      "atime_info": 1691062661,
+      "sha256": "b6feeac4ae3a8a0c9b64e4d92287a6ab8ccae659966d4d86dbaaa28bb5f6006e",
+      "compression": {
+        "1": 3
+      }
+    },
+    {
+      "path": "/riux32_r",
+      "inode": 199,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 5612,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "15016388aa96a37b2973cca16807f460ef56e89263feee3c9f6b636391189eef",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/riux32_w",
+      "inode": 290,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 5612,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "15016388aa96a37b2973cca16807f460ef56e89263feee3c9f6b636391189eef",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/ssh",
+      "inode": 270,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 352,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/ssh/etc",
+      "inode": 283,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 608,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/ssh/etc/moduli",
+      "inode": 289,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 125811,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "1c19eb605280ac13c556cc5b5960c10ca28a86e056c5dc10bae3e549de60c5e4",
+      "compression": {
+        "1": 31
+      }
+    },
+    {
+      "path": "/ssh/etc/ssh_config",
+      "inode": 284,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1555,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b2dea6a2dd83469f188cf03a70dbfdee947eb038004033727fcb165b47339d95",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/ssh/etc/ssh_host_dsa_key",
+      "inode": 287,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 668,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "ca3b9e70068688565f6edfdfd805fbfc2d09bd50b43e27738500acf2c16e221a",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/ssh/etc/ssh_host_ecdsa_key",
+      "inode": 285,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 227,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "57e000ea23e942d4a057f21eefda87974284d91cfc3a296c1d98f191376e4ce2",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/ssh/etc/ssh_host_rsa_key",
+      "inode": 286,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1679,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "e84afa23f65dfd63881b784881dd040075d993d92d4a18f42c7f3ee0abcc7dc0",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/ssh/etc/sshd_config",
+      "inode": 288,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3192,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "b236fac22f24cbac4521fe1f081cb80787f7c6c45bd507d3021b5b6cc5375412",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/ssh/lib",
+      "inode": 273,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 816,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/ssh/lib/libcrypt.so",
+      "inode": 276,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 189416,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "78816bf53fbf3940d4c32f82908da00eb5ddb22416c0a181687b6c1ed50216fc",
+      "compression": {
+        "1": 47
+      }
+    },
+    {
+      "path": "/ssh/lib/libcrypt.so.1",
+      "inode": 279,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 189416,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "78816bf53fbf3940d4c32f82908da00eb5ddb22416c0a181687b6c1ed50216fc",
+      "compression": {
+        "1": 47
+      }
+    },
+    {
+      "path": "/ssh/lib/libnss_compat.so.2",
+      "inode": 280,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 175652,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "d412900877c8c953b526dd250cdfe5805147ec309485468c668680e8e7d0efd4",
+      "compression": {
+        "1": 43
+      }
+    },
+    {
+      "path": "/ssh/lib/libnss_files.so.2",
+      "inode": 275,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 361400,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd",
+      "compression": {
+        "1": 89
+      }
+    },
+    {
+      "path": "/ssh/lib/libresolv.so.2",
+      "inode": 277,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 411396,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "cfd0fd3c17d8421f8a04eec2b063da0f159e24cafd6312bf8a6b097119b0f409",
+      "compression": {
+        "1": 101
+      }
+    },
+    {
+      "path": "/ssh/lib/libutil.so",
+      "inode": 281,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 40824,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a7cc5755e8c429186770a7fd23fe52380482d10f0c5746b02e1298a0a004849f",
+      "compression": {
+        "1": 10
+      }
+    },
+    {
+      "path": "/ssh/lib/libutil.so.1",
+      "inode": 278,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 40824,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "a7cc5755e8c429186770a7fd23fe52380482d10f0c5746b02e1298a0a004849f",
+      "compression": {
+        "1": 10
+      }
+    },
+    {
+      "path": "/ssh/lib/libz.so",
+      "inode": 282,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 98324,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f0f45a0d2e2d510aa6248a80f24463800d91921bfa4ec8b6f16035d3c0f611ec",
+      "compression": {
+        "0": 2,
+        "1": 23
+      }
+    },
+    {
+      "path": "/ssh/lib/libz.so.1",
+      "inode": 274,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 98324,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "f0f45a0d2e2d510aa6248a80f24463800d91921bfa4ec8b6f16035d3c0f611ec",
+      "compression": {
+        "0": 2,
+        "1": 23
+      }
+    },
+    {
+      "path": "/ssh/sbin",
+      "inode": 271,
+      "type": "dir",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 224,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660
+    },
+    {
+      "path": "/ssh/sbin/sshd",
+      "inode": 272,
+      "type": "reg",
+      "mode": 509,
+      "mode_oct": "0o775",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3099588,
+      "mtime": 1691062660,
+      "ctime_info": 1691062660,
+      "atime_info": 1691062660,
+      "sha256": "11bf6ef80b630ce22c95e92fd06f9c4ef6d76d82f2889f6919c95c944747f49b",
+      "compression": {
+        "0": 2,
+        "1": 755
+      }
+    },
+    {
+      "path": "/wifi",
+      "inode": 220,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2304,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/wifi/GPS_Player.txt",
+      "inode": 222,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 70,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "5172b01c9738a66d0cc94c4d9bcbf4c43e857e1bf0d507ef3198315f93a3f03f",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/wifi/ap.sh",
+      "inode": 227,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 4768,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "4f0857082f05bef605c72e0ab45b30bd3b4ce065685fbfe8e2a178b4bd51a552",
+      "compression": {
+        "1": 2
+      }
+    },
+    {
+      "path": "/wifi/apsta_switch.sh",
+      "inode": 265,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 348,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "19570b0aa5f72f93401d4ec16af4a3277d72e0f393f097bf5c539d49a66f90c3",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/cgi_config.bin",
+      "inode": 262,
+      "type": "symlink",
+      "mode": 511,
+      "mode_oct": "0o777",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 22,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "target": "/config/cgi_config.bin"
+    },
+    {
+      "path": "/wifi/close_wifi.sh",
+      "inode": 242,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 305,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "4608fcce1bae0a894614d2a66708f739401565d24e45056a4ed20affe7c3850c",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/close_wifi_play_voice.sh",
+      "inode": 268,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 209,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "304cda5bcf25cc226a7de26a853922832ce922f89c712c8b528ab97aeb7e6598",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/goahead",
+      "inode": 238,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 9788,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "0da72c707b9a065b5910c05301f713cd667d4a16caaade45973fc5bf76c37d59",
+      "compression": {
+        "1": 3
+      }
+    },
+    {
+      "path": "/wifi/hostapd",
+      "inode": 244,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 831296,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "753d50e1e7cb5d09845043271912baf8c5189589ae6a8cfc1fcb2a7a3b4a6cb4",
+      "compression": {
+        "1": 203
+      }
+    },
+    {
+      "path": "/wifi/hostapd.2G.conf",
+      "inode": 241,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 344,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "b3880c11fe317a16a3f223a02e93b50cc3149ee7ba999a76139dcb0b1b1afadc",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/hostapd.conf",
+      "inode": 223,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 287,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "216e2e09f2506eb466a4a7a722ce158d0d4ef574f914b3774cba285c932bff58",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/hostapd_ap6256.conf",
+      "inode": 221,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 345,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "53d9a2b65ac12638d8ee2fd51bb8face63ee30da518d548cf3308abcde590303",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/init_ota.sh",
+      "inode": 245,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 808,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "6167f7718e68239454f227852973384c49dde46c7ae999380be2031dca41a253",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/iperf3",
+      "inode": 246,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 121356,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "ab179bb7c24cc8186c634fdba098f4f0205f7d88776e3c0c5f5991bbcfd4cf44",
+      "compression": {
+        "1": 30
+      }
+    },
+    {
+      "path": "/wifi/iw",
+      "inode": 264,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 237836,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "d45320cb3a80c6100cc722a09372b8f302478cd875ced90667cb9e40f31a259c",
+      "compression": {
+        "1": 59
+      }
+    },
+    {
+      "path": "/wifi/lib",
+      "inode": 228,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 456,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/wifi/lib/8821cs.ko",
+      "inode": 229,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 2899872,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "81323242c6fa1e60296921395063a2124ed2a8af330ac5568cfa5e20d80734cc",
+      "compression": {
+        "1": 695
+      }
+    },
+    {
+      "path": "/wifi/lib/libgo.so",
+      "inode": 232,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 115256,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "2cfb73d4ec9b0e6e841454b429c1997278edabe774d5704ae9c3070b988d8444",
+      "compression": {
+        "1": 29
+      }
+    },
+    {
+      "path": "/wifi/lib/libnl-3.so.200",
+      "inode": 230,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 96632,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "8928c531f4c355e0edc5cc35bedcd4f60062ae73d83d28e7ee72651d419e4e1b",
+      "compression": {
+        "1": 24
+      }
+    },
+    {
+      "path": "/wifi/lib/libnl-genl-3.so.200",
+      "inode": 231,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 18548,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "76ee8443f7a09f38077f146a913a2f2e7c2a80a0b09e752d73fd1d9a1320a7af",
+      "compression": {
+        "1": 5
+      }
+    },
+    {
+      "path": "/wifi/net_config.bin",
+      "inode": 224,
+      "type": "symlink",
+      "mode": 511,
+      "mode_oct": "0o777",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 22,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "target": "/config/net_config.bin"
+    },
+    {
+      "path": "/wifi/net_toggle.sh",
+      "inode": 243,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 540,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "3f30994a3dead107edc6479503e332670cfedbc5e49d7b07ec78c1be67eea6b3",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/nvconf",
+      "inode": 237,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 13888,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "619abae3776c0192e3cb828efac72a59626cad039ee367765db3c668324e9ddb",
+      "compression": {
+        "1": 4
+      }
+    },
+    {
+      "path": "/wifi/only_close_wifi.sh",
+      "inode": 263,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 46,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "8c0663de60e0261141f50a51c16d54a60677faf36874c1c6098ca0f6d91c0e5c",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/wifi/open_wifi.sh",
+      "inode": 235,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 284,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "eca9337ff827949f2691335df6b9a45d9470220a9fedf2f7a40f819e39b9f6d5",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/open_wifi_play_voice.sh",
+      "inode": 236,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 185,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "7f2fc7a322575e5ac4e9527c64757ae492b846c0a396a123d1450ad3771bf824",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/rcInsDriver.sh",
+      "inode": 225,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 933,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "855705c99513b2e6948e81da511c0a0c3756e2c836a74773892f32540384ce28",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/rebootsystem.sh",
+      "inode": 234,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 70,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "7ffb31dcf9af36c9bedc6b1b3f6f6d752f84d41795308ae628a6e909d31cbaaa",
+      "compression": {
+        "0": 1
+      }
+    },
+    {
+      "path": "/wifi/resetdefault.sh",
+      "inode": 239,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 405,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "9a11da8b500d824f2c5f05f8d091c2948a045f63ec179c0670e78c3aa7fdef37",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/run_goahead.sh",
+      "inode": 233,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 723,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "c897a925f588b21d18494e68f34b398a9e7717f3711f9b7495d1f9d14a5a2ea1",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/run_ota.sh",
+      "inode": 226,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 244,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "d3678d1005ef45824acd669e7f07c0b69413cd83d56313c2217b3d73d7150042",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/sta.sh",
+      "inode": 266,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1599,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "77db2e4da807eb4215f475a692d6efa9ae893a899c15a9e7b3b79d69831c79d0",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/udhcpd-ap.conf",
+      "inode": 240,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 398,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "a88e4b873b8b30f00b0440fc56d66f93731664371663da89674e1423dacf10de",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver",
+      "inode": 247,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 288,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/wifi/webserver/conf",
+      "inode": 248,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 448,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/wifi/webserver/conf/auth.txt",
+      "inode": 251,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 444,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "11d2e3e394e5b89f7d7f3218eb090b52a98743cbdffe6608212fb69c39858bfb",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/conf/route.txt",
+      "inode": 250,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1924,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "471bee12a9a5fea1c5bde75333c3742e670ef0677e117516cf5ab3ba464055ed",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/conf/self.crt",
+      "inode": 249,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1444,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "553cc62c4f0cd4554ae02b9b7ca89b93f4ae6cc634ad3686059ff83fe4a36890",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/conf/self.key",
+      "inode": 252,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1679,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "4486fbaf8881883098c511ae1c3310e1112ac947e3b1dd7a59f572d7f9ca2c6f",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/www",
+      "inode": 253,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 440,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/wifi/webserver/www/CGI_PROCESS.sh",
+      "inode": 261,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 42253,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "b43a404b6ec6e0c772e9b4e74cb23a431e293cb9c9809580d6aed8d6537f39c2",
+      "compression": {
+        "1": 11
+      }
+    },
+    {
+      "path": "/wifi/webserver/www/cammenu.xml",
+      "inode": 259,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1713,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "d3145a6740cd6a5d76147adaa3f41dd99c8ce6dac22c00541c4a6bc1809c682a",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/www/cgi-bin",
+      "inode": 254,
+      "type": "dir",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 448,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662
+    },
+    {
+      "path": "/wifi/webserver/www/cgi-bin/CGI_COMMAND.txt",
+      "inode": 257,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 13812,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "9c9a7dc7b05e6b30df1a89c32bc43203dcbaa9aeede71330d6272a2b39ef8f2e",
+      "compression": {
+        "1": 4
+      }
+    },
+    {
+      "path": "/wifi/webserver/www/cgi-bin/Config.cgi",
+      "inode": 256,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 71680,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "57795c7e1554bccafd8867abaae5e9a300cf839c53610566df920b2c9aa5074f",
+      "compression": {
+        "1": 18
+      }
+    },
+    {
+      "path": "/wifi/webserver/www/cgi-bin/cgi_config.bin",
+      "inode": 258,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 3421,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "2bd5e6a99f395bc1a83ea62fdcdf4ec8cd7d2a103067ab1797de0548438606cb",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/www/cgi-bin/net_config.bin",
+      "inode": 255,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 1188,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "ca854f5c4a5cdc6480a6658010f816a24208e2027407914ee56e2cd3d43d4c80",
+      "compression": {
+        "1": 1
+      }
+    },
+    {
+      "path": "/wifi/webserver/www/data.txt",
+      "inode": 260,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 0,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "compression": {}
+    },
+    {
+      "path": "/wifi/wpa_supplicant.conf",
+      "inode": 267,
+      "type": "reg",
+      "mode": 493,
+      "mode_oct": "0o755",
+      "uid": 1001,
+      "gid": 1001,
+      "size": 146,
+      "mtime": 1691062662,
+      "ctime_info": 1691062662,
+      "atime_info": 1691062662,
+      "sha256": "e16e244945633070a22583b556e4f4c44d1188d06e8d50cda983c3b9d751e192",
+      "compression": {
+        "1": 1
+      }
+    }
+  ]
+}

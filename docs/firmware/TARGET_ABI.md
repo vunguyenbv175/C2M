@@ -44,9 +44,26 @@ Consequences (binding on our build flags):
 ## 3. Reproducible cross-build contract
 
 - Source: `fw/device_minimal/c2m_idle.c` (C99, only `<stdio.h>/<unistd.h>`).
-- Toolchain file: `fw/device_minimal/toolchain-armhf.cmake`
-  (`arm-linux-gnueabihf-gcc`, `-march=armv7-a -mfloat-abi=hard
-  -mfpu=vfpv3-d16`, `-Os`, `-static`).
+- Two build variants (both `-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16`,
+  NO neon, `-Os`):
+  - **dynamic / stock-ABI (P0 preferred, Sprint 2 proven):**
+    `toolchain-armhf-dyn.cmake` + `start.S` + `glibc_compat.h`. The runner
+    toolchain's default `crt1.o` would bind `__libc_start_main@GLIBC_2.34`
+    (unversioned reference binds the default node; no TU-local `.symver`
+    can rebind another object's reference), so the build uses `-nostartfiles`
+    with our own 12-line `_start` (argc/argv/envp from the initial stack,
+    init/fini/NULL, rtld_fini NULL — correct for ET_EXEC, stack_end saved)
+    referencing the pinned `GLIBC_2.4` node. CI `arm-dyn` job proves per
+    build: ET_EXEC, interp `/lib/ld-linux-armhf.so.3`, NEEDED exactly
+    `[libc.so.6]`, max GLIBC need `GLIBC_2.4` (cap 2.30), attrs
+    v7-A/VFPv3-D16/VFP-args with NO Advanced_SIMD tag (dynamic links bake in
+    no libc objects, so there is no inherited tag at all — the cleanest
+    attribute story). This binary is the Candidate-B payload.
+  - **static (bring-up fallback, Sprint 1):** `toolchain-armhf.cmake`
+    (`-static`). Removes the loader/glibc question entirely but merges
+    Ubuntu libc.a attributes (`Advanced_SIMD_arch=1`); allowed only with a
+    passing TU proof (`--object` + `--allow-libc-simd`). Residual risk
+    recorded, not hidden.
 - **Static link (deliberate):** removes the target glibc/loader version
   dependency entirely — no `PT_INTERP`, no `DT_NEEDED`, no `GLIBC_*` version
   needs (all three absences are asserted by `check_elf.py`, not assumed).

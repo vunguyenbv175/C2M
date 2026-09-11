@@ -1,0 +1,33 @@
+{
+  "min_io_size": 2048,
+  "leb_size": 126976,
+  "leb_cnt": 313,
+  "max_leb_cnt": 638,
+  "max_bud_bytes": 8388608,
+  "log_lebs": 5,
+  "lpt_lebs": 2,
+  "orph_lebs": 1,
+  "jhead_cnt": 1,
+  "fanout": 8,
+  "lsave_cnt": 256,
+  "fmt_version": 4,
+  "default_compr": 1,
+  "default_compr_name": "lzo",
+  "image_bytes": 39743488,
+  "leb_cnt_times_leb_size": 39743488,
+  "mkfs_ubifs_args": [
+    "mkfs.ubifs",
+    "-m",
+    "2048",
+    "-e",
+    "126976",
+    "-c",
+    "638",
+    "-x",
+    "lzo",
+    "-r",
+    "<tree>",
+    "-o",
+    "<out.ubifs>"
+  ]
+}

@@ -29,6 +29,24 @@ def iter_cpio(data: bytes):
         off = dataoff + filesize + pad4(dataoff + filesize)
 
 
+def iter_cpio_full(data: bytes):
+    """Yield (name, mode, blob); S_ISLNK blobs are link-target strings."""
+    off = 0
+    while off + 110 <= len(data):
+        if data[off:off + 6] != b"070701":
+            raise ValueError(f"bad cpio magic at {hex(off)}")
+        h = data[off:off + 110].decode("ascii")
+        mode = int(h[14:22], 16)
+        filesize = int(h[54:62], 16)
+        namesize = int(h[94:102], 16)
+        name = data[off + 110:off + 110 + namesize].split(b"\0")[0].decode("utf-8", "replace")
+        dataoff = off + 110 + namesize + pad4(off + 110 + namesize)
+        if name == "TRAILER!!!":
+            return
+        yield name, mode, data[dataoff:dataoff + filesize]
+        off = dataoff + filesize + pad4(dataoff + filesize)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("inner", type=Path)

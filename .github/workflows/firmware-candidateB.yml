@@ -1,0 +1,94 @@
+name: firmware-candidateB
+# MANUAL ONLY. Full Candidate-B chain on Linux (needs mtd-utils + the
+# original vendor TARs placed on the runner — same pattern as
+# firmware-evidence.yml). No firmware is committed; uploaded artifacts are
+# manifests/contracts/reports/hashes ONLY (never *.tar / *.bin).
+# All gates are fail-closed: any nonzero step stops the job RED.
+on:
+  workflow_dispatch:
+jobs:
+  candidate-b:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original TARs (missing -> RED with message)
+        run: |
+          test -f firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar || \
+            { echo "place the original EN TAR under firmware/original/ first"; exit 1; }
+          sha256sum firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
+      - name: Install toolchain (versions recorded below)
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev
+          mkfs.ubifs -h 2>&1 | head -3
+          arm-linux-gnueabihf-gcc --version
+          dpkg-query -W mtd-utils gcc-arm-linux-gnueabihf libc6-dev-armhf-cross liblzo2-dev \
+            > work/tool_versions.txt || true
+      - name: Inspect EN package + geometry + manifest
+        run: |
+          mkdir -p work
+          python3 tools/fw/carve_upgrade.py \
+            firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar -o work/carve
+          CUST=$(ls work/carve/customer.es.load0.*.bin)
+          echo "CUST=$CUST" >> $GITHUB_ENV
+          python3 tools/fw/ubifs_geometry.py "$CUST" -o work/customer_geometry.json
+          python3 tools/fw/ubifs_manifest.py "$CUST" -o work/customer_manifest.json
+      - name: P1 no-op rebuild (GATE)
+        run: |
+          python3 tools/fw/ubifs_extract_tree.py "$CUST" work/tree \
+            --manifest work/customer_manifest.json --report work/tree_report.json
+          sudo bash tools/fw/rebuild_customer.sh --mode noop \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --out work/customer_noop.es --report work/rebuild_noop.json
+      - name: P0 dynamic idle binary (stock-ABI path)
+        run: |
+          cmake -S "${{ github.workspace }}/fw/device_minimal" -B build/arm-dyn-b \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/arm-dyn-b --verbose
+          python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
+          sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
+      - name: P2 mutate + P1 mutated rebuild (GATE)
+        run: |
+          python3 tools/fw/mutate_customer.py --tree work/tree \
+            --manifest work/customer_manifest.json \
+            --idle-bin build/arm-dyn-b/c2m-idle \
+            --out-manifest work/mutation.json
+          sudo bash tools/fw/rebuild_customer.sh --mode mutated \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --mut-manifest work/mutation.json \
+            --out work/customer_B.es --report work/rebuild_B.json
+      - name: P3 assemble + validate Candidate B (GATE)
+        run: |
+          python3 tools/fw/build_candidates.py \
+            --en-tar firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar \
+            --workdir work/candidates --customer-b work/customer_B.es
+          sha256sum work/candidates/EN_ENHANCE_IDLE.tar work/candidates/EN_REPACK_GOLDEN.tar \
+            > work/candidate_hashes.txt
+      - name: Upload evidence (manifests/reports/hashes ONLY)
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidateB-evidence
+          path: |
+            work/customer_geometry.json
+            work/customer_manifest.json
+            work/rebuild_noop.json
+            work/*compare.txt
+            work/mutation.json
+            work/rebuild_B.json
+            work/*bmanifest.json
+            work/candidates/EN_PACKAGE_CONTRACT_B.md
+            work/candidates/EN_PACKAGE_CONTRACT_B.json
+            work/candidates/validate_A_deep.json
+            work/candidates/validate_B_deep.json
+            work/candidates/validate_B_deep.md
+            work/candidates/candidate_B_diff.json
+            work/candidates/repack_A.json
+            work/candidate_hashes.txt
+            work/c2m_idle.sha256
+            work/tool_versions.txt

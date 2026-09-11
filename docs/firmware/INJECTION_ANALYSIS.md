@@ -59,12 +59,15 @@ insmod SoC stack (lines 6-35) -> `source /oneed_cust/sensor_insmod.sh` (:39) ->
 ## 5. Conclusion (binding)
 
 - Safest layer: **customer / UBI layer** (`ubi0:customer`): new standalone files
-  under `/customer/c2m/` (static daemon binary, no extra libs) + one appended hook line at H1.
+  under `/customer/c2m/` (dynamic stock-ABI daemon binary preferred, static
+  fallback; no extra libs) + one appended hook line at H1.
   No stock binary replaced, no rootfs/kernel/bootloader change, no calibration
   touched, no M4 transmit, no camera access.
 - Daemon constraints (binding on any B/C build): run as background `&`,
   never block `demo.sh`, only `/tmp/` writes + stdout logging, idle priority.
-- Image-build status: **BLOCKED at the UBIFS-write step** — the repo has a
-  read-only UBIFS extractor, no UBIFS writer; fabricating a `customer.es`
-  image without one would be speculation. Candidate B/C therefore ship as
-  RECIPES ONLY (see `FLASH_CANDIDATES.md`), not as `.tar` images.
+- Image-build status (Sprint 2): full chain implemented
+  (`rebuild_customer.sh` + `mutate_customer.py` + `build_candidates.py` +
+  `candidate_diff.py` + manual workflow `firmware-candidateB.yml`); execution
+  of `mkfs.ubifs` needs Linux (absent on the dev box) — one command away, not
+  fabricated. Hook line: exactly `/customer/c2m/c2m-idle &` appended at EOF
+  of `/customer/wifi/rcInsDriver.sh` (see `FLASH_CANDIDATES.md`).

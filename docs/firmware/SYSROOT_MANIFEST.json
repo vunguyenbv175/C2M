@@ -1,0 +1,33 @@
+{
+  "method": "tools/fw/build_sysroot.py from the original EN TAR (local-only)",
+  "loader": "lib/ld-linux-armhf.so.3",
+  "glibc_baseline": "2.30 (stock cardv max need GLIBC_2.29, see TARGET_ABI.md)",
+  "libs": {
+    "lib/ld-linux-armhf.so.3": {
+      "symlink_to": "ld-2.30.so",
+      "target_size": 105792,
+      "target_sha256": "dd2f57c2363db9abce352fcaf07b943e59fbd5dcca898bb39a2709350fbadb4c"
+    },
+    "lib/libc.so.6": {
+      "symlink_to": "libc-2.30.so",
+      "target_size": 926636,
+      "target_sha256": "3b2cc951503e0bc40e45ebc6e8f39b92b937ab7a3b7c009377708d2473756657"
+    },
+    "lib/libm.so.6": {
+      "symlink_to": "libm-2.30.so",
+      "target_size": 353752,
+      "target_sha256": "8025a30fd4b7b118ebd35fc1b71e9898473136dc83edaa24358f57ba69d04084"
+    },
+    "lib/libgcc_s.so.1": {
+      "size": 112280,
+      "sha256": "5def4c502c9fe114903eef41dfdbd5b2b6b7abf89015dac444dbafde4de441f0"
+    },
+    "lib/libpthread.so.0": {
+      "symlink_to": "libpthread-2.30.so",
+      "target_size": 76096,
+      "target_sha256": "bb6cf33d1c580d39b4f27370e1f96aa6e731b72c4a928f69902b92930e018155"
+    }
+  },
+  "crt_or_headers_in_firmware": [],
+  "conclusion": "crt/headers ABSENT from firmware: a literal --sysroot link against stock objects is impossible; the stock-ABI dynamic binary is therefore built with the runner cross toolchain + glibc_compat.h version pins, and check_elf.py --allow-dynamic proves interp/NEEDED/GLIBC<=2.30 per build. "
+}

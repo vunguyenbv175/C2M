@@ -1,8 +1,9 @@
-# Flash candidates / build recipes (Sprint 1 — FLASH-READY, NOT FLASH-PROVEN)
+# Flash candidates (Sprint 2 — FLASH-READY, NOT FLASH-PROVEN)
 
-No image here is claimed booted, flashed, or hardware-compatible. The only
-built artifact is candidate A (bit-exact rebuild). B/C are RECIPES because
-the UBIFS-write step is statically BLOCKED (see INJECTION_ANALYSIS §5).
+No image here is claimed booted, flashed, or hardware-compatible. Candidate A
+is a bit-exact rebuild. Candidate B's full tooling chain is implemented and
+proven up to (not including) the `mkfs.ubifs` execution, which needs Linux;
+C stays a recipe behind B. See INJECTION_ANALYSIS §5.
 
 ## A. EN_REPACK_GOLDEN — BUILT (bit-exact)
 
@@ -19,12 +20,22 @@ the UBIFS-write step is statically BLOCKED (see INJECTION_ANALYSIS §5).
   → `VALID` (33 checks incl. cardv `344b4a3f…` + adas `0dcc6982…` re-extracted).
 - Purpose: proves the packaging path on hardware later (flash + boot + compare).
 
-## B. EN_ENHANCE_IDLE — RECIPE ONLY (not built)
+## B. EN_ENHANCE_IDLE — TOOLING READY, image execution pending Linux (Sprint 2)
+
+Status: every step is implemented, fail-closed, and proven EXCEPT the
+`mkfs.ubifs` execution, which needs Linux (absent on the dev box: no
+WSL/Docker/mtd-utils) — run one command or dispatch
+`firmware-candidateB.yml` (manual workflow) on a Linux box with the TARs.
+
+Proven locally (no mkfs needed):
+`compute_b_layout` cascade on real EN data (fake-enlarged customer):
+inner reassembly + TAR + B-contract + `--deep` VALID (cardv/adas PASS) +
+`candidate_diff` ALLOWLIST-OK with exactly fatload lines [8,9,10] changed.
 
 1. Take candidate A inner bytes; carve `customer.es` (offset/size per contract).
-2. (BLOCKED STEP) UBIFS-write: add `/c2m/c2m-idle` (from
-   `fw/device_minimal`, cross-built ARM) + append one hook line to
-   `/wifi/rcInsDriver.sh` (image path; = `/customer/wifi/rcInsDriver.sh`
+2. (LINUX STEP) UBIFS-write: add `/c2m/c2m-idle` (product-CI `arm-dyn`
+   binary: ET_EXEC, stock loader, GLIBC max 2.4, no SIMD tag) + append one
+   hook line to `/wifi/rcInsDriver.sh` (image path; = `/customer/wifi/rcInsDriver.sh`
    on device): `/customer/c2m/c2m-idle &`.
 3. Recompute NOTHING else: all other `customer.es` bytes, all other inner
    payloads, outer members except the rebuilt `customer.es` + regenerated
@@ -34,8 +45,8 @@ the UBIFS-write step is statically BLOCKED (see INJECTION_ANALYSIS §5).
 4. Re-run `validate_firmware.py --deep` — expected verdict after a correct
    B build: package-layer rows PASS for changed members against a NEW
    B-contract, protected cardv/adas rows still PASS (untouched).
-5. BLOCKED ON: a UBIFS writer (repo has read-only extractor only) + hardware
-   boot-timing confirmation. Do NOT hand-assemble UBIFS bytes.
+5. EXECUTION BLOCKED ON: Linux + mtd-utils (`rebuild_customer.sh`
+   fail-closed driver ready). Do NOT hand-assemble UBIFS bytes.
 
 ## C. EN_ENHANCE_READONLY — RECIPE ONLY (conditional on B)
 

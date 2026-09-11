@@ -143,6 +143,20 @@ def path_index(dentries: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def latest_inodes(nodes: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    # Vendor INO layout (SigmaStar 4.9 kernel), mapped EMPIRICALLY against EN
+    # customer.es (3+ inodes incl. 11 MB adas: size/mode exact):
+    #   ch[24] key[8]@24 creat-ish@32[8] creat@40[8] size@48[8]
+    #   t56[8] t64[8] mtime@72[8] (all factory-Aug-2023; kernel-order analogy:
+    #   atime@56 ctime@64 mtime@72; only mtime is rebuild-meaningful, ctime/
+    #   atime are INFO because a fresh UBIFS can never preserve them)
+    #   nsec-ish@76,80,84,88[4] nlink@92 uid@96 gid@100 mode@104 flags@108
+    # NOTE this is +8 vs mainline ubifs-media.h (size@40/mode@96 there):
+    # the vendor tree carries 8 extra bytes before size. Verified:
+    #   /wifi/rcInsDriver.sh -> size 933, mode 0o100755
+    #   /minieye             -> size 800, mode 0o040755 (dir)
+    #   /minieye/adas/adas   -> size 11636008, mode 0o100775
+    # (A prior revision read size@48/mode@100(=flags) — size was right by
+    # luck of contiguous blocks, mode was wrong. Now both are proven.)
     best: dict[int, dict[str, Any]] = {}
     for rec in nodes:
         node = rec["data"]
@@ -151,7 +165,14 @@ def latest_inodes(nodes: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
         ino = struct.unpack_from("<I", node, 24)[0]
         row = {
             "size": struct.unpack_from("<Q", node, 48)[0],
-            "mode": struct.unpack_from("<I", node, 100)[0],
+            "mode": struct.unpack_from("<I", node, 104)[0],
+            "uid": struct.unpack_from("<I", node, 96)[0],
+            "gid": struct.unpack_from("<I", node, 100)[0],
+            "nlink": struct.unpack_from("<I", node, 92)[0],
+            "flags": struct.unpack_from("<I", node, 108)[0],
+            "atime": struct.unpack_from("<Q", node, 56)[0],
+            "ctime": struct.unpack_from("<Q", node, 64)[0],
+            "mtime": struct.unpack_from("<Q", node, 72)[0],
             "sqnum": rec["sqnum"],
             "offset": rec["offset"],
         }
