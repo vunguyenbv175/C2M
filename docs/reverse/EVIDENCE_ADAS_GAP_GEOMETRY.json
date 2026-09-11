@@ -1,0 +1,47 @@
+{
+  "source": "static reverse of EN/VI C2M ADAS package",
+  "elf_end": 1518364,
+  "elf_end_hex": "0x172b1c",
+  "tail_size": 3602,
+  "en": {
+    "file_size": 11636008,
+    "tail_start": 11632406,
+    "tail_start_hex": "0xb17f16",
+    "gaps": [
+      {"name":"before_d0","start":1518364,"start_hex":"0x172b1c","end":1525758,"end_hex":"0x1747fe","size":7394,"size_hex":"0x1ce2"},
+      {"name":"before_v_a","start":4380670,"start_hex":"0x42d7fe","end":4397460,"end_hex":"0x431994","size":16790,"size_hex":"0x4196"},
+      {"name":"before_v_t","start":6404500,"start_hex":"0x61b994","end":6412124,"end_hex":"0x61d75c","size":7624,"size_hex":"0x1dc8"},
+      {"name":"before_p_r","start":6674268,"start_hex":"0x65d75c","end":6691652,"end_hex":"0x661b44","size":17384,"size_hex":"0x43e8"},
+      {"name":"before_road","start":8301380,"start_hex":"0x7eab44","end":8315912,"end_hex":"0x7ee408","size":14532,"size_hex":"0x38c4"},
+      {"name":"before_tl","start":11453448,"start_hex":"0xaec408","end":11474108,"end_hex":"0xaf14bc","size":20660,"size_hex":"0x50b4"},
+      {"name":"before_flags","start":11625660,"start_hex":"0xb164bc","end":11632406,"end_hex":"0xb17f16","size":6746,"size_hex":"0x1a5a"}
+    ]
+  },
+  "vi": {
+    "file_size": 11653870,
+    "tail_start": 11650268,
+    "tail_start_hex": "0xb1c4dc",
+    "gaps": [
+      {"name":"before_d0","start":1518364,"start_hex":"0x172b1c","end":1527070,"end_hex":"0x174d1e","size":8706,"size_hex":"0x2202"},
+      {"name":"before_v_a","start":4381982,"start_hex":"0x42dd1e","end":4403286,"end_hex":"0x433056","size":21304,"size_hex":"0x5338"},
+      {"name":"before_v_t","start":6410326,"start_hex":"0x61d056","end":6427300,"end_hex":"0x6212a4","size":16974,"size_hex":"0x424e"},
+      {"name":"before_p_r","start":6689444,"start_hex":"0x6612a4","end":6704854,"end_hex":"0x664ed6","size":15410,"size_hex":"0x3c32"},
+      {"name":"before_road","start":8314582,"start_hex":"0x7eded6","end":8330198,"end_hex":"0x7f1bd6","size":15616,"size_hex":"0x3d00"},
+      {"name":"before_tl","start":11467734,"start_hex":"0xaefbd6","end":11489614,"end_hex":"0xaf514e","size":21880,"size_hex":"0x5578"},
+      {"name":"before_flags","start":11641166,"start_hex":"0xb1a14e","end":11650268,"end_hex":"0xb1c4dc","size":9102,"size_hex":"0x238e"}
+    ]
+  },
+  "comparison": {
+    "file_size_delta": 17862,
+    "gap_total_delta": 17862,
+    "gaps": [
+      {"name":"before_d0","en_size":7394,"vi_size":8706,"delta":1312,"delta_hex":"+0x520"},
+      {"name":"before_v_a","en_size":16790,"vi_size":21304,"delta":4514,"delta_hex":"+0x11a2"},
+      {"name":"before_v_t","en_size":7624,"vi_size":16974,"delta":9350,"delta_hex":"+0x2486"},
+      {"name":"before_p_r","en_size":17384,"vi_size":15410,"delta":-1974,"delta_hex":"-0x7b6"},
+      {"name":"before_road","en_size":14532,"vi_size":15616,"delta":1084,"delta_hex":"+0x43c"},
+      {"name":"before_tl","en_size":20660,"vi_size":21880,"delta":1220,"delta_hex":"+0x4c4"},
+      {"name":"before_flags","en_size":6746,"vi_size":9102,"delta":2356,"delta_hex":"+0x934"}
+    ]
+  }
+}
