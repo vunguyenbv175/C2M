@@ -1,0 +1,1 @@
+{"avg":0,"avgL":0,"can":["speed","limit","turn","street","eta","avgzone","alerts"],"fw":"1.0.0","name":"Promax","proto":[1],"transport":"ble","v":1,"want":{"fields":["nav","spd","lim","trn","dst","exit","st","eta","rmin","rkm","avg","avgL","alrs","lan"],"rate":4},"t":"dev"}
