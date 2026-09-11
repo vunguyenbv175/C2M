@@ -8,11 +8,18 @@ ORIGINAL firmware artifacts extracted in build/ :
   build/{en,vi}_customer_inventory.json (UBIFS file inventory, no decompression)
   build/adas_plain_en.json              (adas uncompressed-block scan)
 
-Verdict scale: CONFIRMED | HIGH-CONFIDENCE | RAW-ONLY | UNKNOWN
+Verdict scale (product rule): CONFIRMED | HIGH-CONFIDENCE | RAW-ONLY | UNKNOWN
 Only CONFIRMED/HIGH-CONFIDENCE *driver* fields may feed normalized warnings;
 RAW-ONLY fields are preserved, never promoted; UNKNOWN stays empty.
+
+Evidence tiers (review: never collapse presence/routing/runtime into one label):
+  presence: token/artifact proven in the stated binary (CONFIRMED) or not
+  routing:  producer->serializer->topic path proven (needs current-ELF xref or
+            capture to be CONFIRMED; prior callsite disassembly = HIGH-CONFIDENCE)
+  runtime:  live behavior on hardware proven (UNKNOWN until device capture)
 """
 from __future__ import annotations
+import argparse
 import hashlib
 import json
 import sys
@@ -21,8 +28,11 @@ from pathlib import Path
 sys.path.insert(0, "tools/fw")
 from extract_rootfs_cpio import iter_cpio
 
-BUILD = Path("build")
-OUT = Path("docs/reverse/EVIDENCE_STOCK_ADAS_SCHEMA.json")
+
+def need(path: Path, what: str) -> Path:
+    if not path.is_file():
+        raise SystemExit(f"missing required input {what}: {path}")
+    return path
 
 
 def first_offsets(data: bytes, needle: bytes, cap: int = 4) -> list[str]:
@@ -37,6 +47,23 @@ def first_offsets(data: bytes, needle: bytes, cap: int = 4) -> list[str]:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--build-dir", type=Path, default=Path("build"))
+    ap.add_argument("--adas-strings", type=Path,
+                    default=Path("docs/reverse/EVIDENCE_ADAS_STRINGS.json"))
+    ap.add_argument("-o", "--output", type=Path,
+                    default=Path("docs/reverse/EVIDENCE_STOCK_ADAS_SCHEMA.json"))
+    args = ap.parse_args()
+    BUILD = args.build_dir
+    OUT = args.output
+    need(BUILD / "fw_bin_en" / "cardv", "EN cardv (extract from rootfs first)")
+    need(BUILD / "fw_bin_vi" / "cardv", "VI cardv")
+    need(BUILD / "rootfs_en_inner.bin", "EN rootfs inner")
+    need(BUILD / "rootfs_vi_inner.bin", "VI rootfs inner")
+    need(BUILD / "en_customer_inventory.json", "EN customer inventory (ubifs_ls)")
+    need(BUILD / "vi_customer_inventory.json", "VI customer inventory")
+    need(BUILD / "adas_plain_en.json", "EN adas plain-block scan")
+    need(args.adas_strings, "adas string evidence (adas_string_evidence.py)")
     en_cardv = (BUILD / "fw_bin_en" / "cardv").read_bytes()
     vi_cardv = (BUILD / "fw_bin_vi" / "cardv").read_bytes()
     en_blobs = dict(iter_cpio((BUILD / "rootfs_en_inner.bin").read_bytes()))
@@ -66,8 +93,13 @@ def main() -> int:
 
     F = []  # fields
 
-    def add(name, group, verdict, drives, evidence, note):
+    def add(name, group, verdict, drives, evidence, note,
+            presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+            product_use=""):
         F.append({"field": name, "group": group, "verdict": verdict,
+                  "tiers": {"presence": presence, "routing": routing, "runtime": runtime},
+                  "product_use": product_use or ("normalized warning driver" if drives
+                                                 else "see verdict/note"),
                   "drives_normalized_warning": drives, "evidence": evidence, "note": note})
 
     def adas_direct(*toks: str) -> dict:
@@ -85,7 +117,9 @@ def main() -> int:
     for key in ("vehicleWarning", "vehicleMeasure", "pedestrians", "laneWarningRes"):
         add(key, "adas.key", "CONFIRMED", False,
             {"basis": ADAS_SIDE, "direct": adas_direct(key)},
-            "topic/key routing proven present in both adas binaries + prior callsite")
+            "topic/key presence proven in both adas binaries; routing via prior callsite",
+            presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+            product_use="routing only (envelope demux); field semantics per rows below")
 
     for f, note in (
         ("vehicleWarning.vehicle_id", "join key Warning<->Measure"),
@@ -111,26 +145,38 @@ def main() -> int:
     ):
         tok = f.split(".", 1)[1]
         add(f, "adas.field", "RAW-ONLY", False,
-            {"basis": ADAS_SIDE, "direct": adas_direct(tok)}, note)
+            {"basis": ADAS_SIDE, "direct": adas_direct(tok)}, note,
+            presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+            product_use="raw preserve only; never promotes to warnings")
 
     add("vehicleWarning.fcw", "adas.field", "HIGH-CONFIDENCE", True,
         {"basis": ADAS_SIDE + " Explicit field name (vs generic warning_level); "
                   "FCW.wav asset proves the FCW class exists in stock audio.",
          "audio_asset": "customer:/minieye/adas/audios/FCW.wav (identical EN/VI)"},
-        "SOLE driver of fcw.active: active=(fcw!=0). warning_level never drives FCW.")
+        "SOLE driver of fcw.active: active=(fcw!=0). warning_level never drives FCW.",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="sole fcw driver (conservative explicit-field rule)")
     add("vehicleMeasure.is_crucial", "adas.field", "HIGH-CONFIDENCE", True,
-        {"basis": ADAS_SIDE}, "SOLE lead-vehicle signal. No min-distance fallback (F11).")
+        {"basis": ADAS_SIDE}, "SOLE lead-vehicle signal. No min-distance fallback (F11).",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="sole lead signal")
     add("vehicleMeasure.is_second_crucial", "adas.field", "RAW-ONLY", False,
         {"basis": ADAS_SIDE, "direct": adas_direct("is_second_crucial")},
-        "Metadata only (R2). Never creates lead; counted in raw.second_crucial_count.")
+        "Metadata only (R2). Never creates lead; counted in raw.second_crucial_count.",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="metadata only")
     add("pedestrians.is_danger", "adas.field", "HIGH-CONFIDENCE", True,
         {"basis": ADAS_SIDE + " PCW.wav asset proves the PCW class exists.",
          "audio_asset": "customer:/minieye/adas/audios/PCW.wav (VI re-recorded)"},
-        "SOLE driver of pcw.active.")
+        "SOLE driver of pcw.active.",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="sole pcw driver (conservative explicit-field rule)")
     add("laneWarningRes.deviate_state", "adas.field", "HIGH-CONFIDENCE", True,
         {"basis": ADAS_SIDE + " LDW.wav asset proves the LDW class exists.",
          "audio_asset": "customer:/minieye/adas/audios/LDW.wav (VI re-recorded)"},
-        "SOLE driver of ldw.active. Enum values UNKNOWN.")
+        "SOLE driver of ldw.active. Enum values UNKNOWN.",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="sole ldw driver (enum values UNKNOWN)")
 
     add("camera.TSR_limit", "adas.tsr", "UNKNOWN", False,
         {"direct": adas_direct("TsrProcess", "ReadTsr", "TsrWarning", "TsrTraceRes",
@@ -138,19 +184,27 @@ def main() -> int:
          "basis": "TSR code-name presence is CONFIRMED in both adas binaries, but "
                   "presence does NOT prove TSR is enabled/outputting on this unit; "
                   "needs runtime config/output proof"},
-        "No normalized speed-limit from camera until proven. detected_speed_limit stays empty.")
+        "No normalized speed-limit from camera until proven. detected_speed_limit stays empty.",
+        presence="CONFIRMED", routing="UNKNOWN", runtime="UNKNOWN",
+        product_use="none (code presence only)")
     add("adas.screen.ScreenAudioMsg", "adas.screen", "HIGH-CONFIDENCE", False,
         {"direct": adas_direct("ScreenAudioMsg"),
          "basis": "symbol present 2x in both adas binaries; audio routing still UNKNOWN"},
-        "Existence proven; routing semantics need runtime.")
+        "Existence proven; routing semantics need runtime.",
+        presence="CONFIRMED", routing="UNKNOWN", runtime="UNKNOWN",
+        product_use="none yet")
     add("adas.ped.pedWarning_path", "adas.field", "HIGH-CONFIDENCE", False,
         {"direct": adas_direct("pedWarning", "ped_on", "pcw_on"),
          "basis": "separate ped-warning tokens present; do not conflate with pedestrians array"},
-        "Supports keeping is_danger as sole PCW driver.")
+        "Supports keeping is_danger as sole PCW driver.",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="supporting evidence only")
     add("ScreenWarningRes", "adas.screen", "HIGH-CONFIDENCE", False,
         {"direct": adas_direct("ScreenWarningRes"),
          "basis": "serializer SendScreenMsg<sdk::ScreenWarningRes> in M4_STATIC_PROTOCOL_V1 §6 + "
-                  "direct string proof"}, "laneWarningRes carrier type.")
+                  "direct string proof"}, "laneWarningRes carrier type.",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="type context only")
 
     # cardv JSON — CONFIRMED with ELF offsets
     ce = cardv_ev("GPSLevel", "GPSSpeed", "DispBrightSet", "StorageStatus", "ClientConn",
@@ -173,19 +227,29 @@ def main() -> int:
              "elf_offsets": ce[uuid],
              "template": tpl, "source_file": "src/module_websocket.cpp"},
             "Byte-exact template in .rodata. Info-class (brightness/storage/mode/conn) "
-            "harmless; AdasStatus/Calib/GPSSpeed/RecordVoice semantic-DENY at M4 L2.")
+            "harmless; AdasStatus/Calib/GPSSpeed/RecordVoice semantic-DENY at M4 L2.",
+            presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+            product_use="info-class only at L2; semantic uuids DENY")
     add("cardv.ringbuf.raw_adas", "cardv.ringbuf", "CONFIRMED", False,
         {"binary": "bootconfig/bin/cardv", "elf_offsets": ce["raw_adas"],
-         "companion": ce["fortest"]}, '"raw_adas"+"fortest" adjacent .rodata; writer proved stable (RAW_ADAS_CONTRACT_V1).')
+         "companion": ce["fortest"]}, '"raw_adas"+"fortest" adjacent .rodata; writer proved stable (RAW_ADAS_CONTRACT_V1).',
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="input-contract context; runtime frames need capture")
     add("cardv.ws.minieye-websocket", "cardv.ws", "CONFIRMED", False,
         {"binary": "bootconfig/bin/cardv", "elf_offsets": ce["minieye-websocket"]},
-        "subprotocol; server port 8080 HIGH-CONFIDENCE (prior lws disassembly; ASCII port absent as expected).")
+        "subprotocol; server port 8080 HIGH-CONFIDENCE (prior lws disassembly; ASCII port absent as expected).",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="protocol name only; transport needs capture")
     for fn in ("SendADASInfoToScreen", "SendGPSInfoToScreen", "WSGetConnectStatus"):
         add(f"cardv.screen.{fn}", "cardv.screen", "CONFIRMED", False,
-            {"binary": "bootconfig/bin/cardv", "elf_offsets": ce[fn]}, "screen sender path (symbol string).")
+            {"binary": "bootconfig/bin/cardv", "elf_offsets": ce[fn]}, "screen sender path (symbol string).",
+            presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+            product_use="sender-path context")
     add("cardv.screen.SendGPSSpeedToScreen", "cardv.screen", "CONFIRMED", False,
         {"binary": "VI cardv only", "elf_offsets": ce["SendGPSSpeedToScreen"]},
-        "VI-ONLY function string; GPS template itself exists in EN too (function-level delta, not template delta).")
+        "VI-ONLY function string; GPS template itself exists in EN too (function-level delta, not template delta).",
+        presence="CONFIRMED", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="delta marker")
 
     le = lf_ev("subscribe", "unsubscribe", "DoSubscribe", "OnRecvWSBinaryFrame", "OutMsg",
                "RealClientInfo", "24012", "127.0.0.1", "websocket", "Upgrade")
@@ -195,12 +259,16 @@ def main() -> int:
          "symbols": le, "basis": "generic-lib defaults 127.0.0.1:24012 + subscribe/unsubscribe/DoSubscribe/"
                     "OnRecvWSBinaryFrame/OutMsg/RealClientInfo symbols; outer shape + subscribe frame per "
                     "LIBFLOW_WIRE_PROTOCOL_V1 disassembly; wire proof needs pcap"},
-        "Transport envelope for ScreenService; C2M override port 26012 HIGH-CONFIDENCE (adas-side).")
+        "Transport envelope for ScreenService; C2M override port 26012 HIGH-CONFIDENCE (adas-side).",
+        presence="HIGH-CONFIDENCE", routing="HIGH-CONFIDENCE", runtime="UNKNOWN",
+        product_use="envelope shape for passive decoder")
     add("transport.physical_interface", "transport", "UNKNOWN", False,
         {"basis": "no image evidence; needs OFF-vs-ON runtime capture"},
-        "Never assume usb0.")
+        "Never assume usb0.",
+        presence="UNKNOWN", routing="UNKNOWN", runtime="UNKNOWN", product_use="none")
     add("transport.ws_path_and_source", "transport", "UNKNOWN", False,
-        {"basis": "needs live handshake capture"}, "URL path + AdasScreenService source string.")
+        {"basis": "needs live handshake capture"}, "URL path + AdasScreenService source string.",
+        presence="UNKNOWN", routing="UNKNOWN", runtime="UNKNOWN", product_use="none")
 
     doc = {
         "method": "field table generated by tools/fw/stock_adas_schema_v2.py from original EN/VI "

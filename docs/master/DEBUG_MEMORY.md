@@ -493,6 +493,10 @@ key routing upgraded to CONFIRMED; schema regenerated (53 fields). Producer/
 consumer xref depth and TSR-enablement/wire-units remain open — see the new
 delta report. Gate A status change needs owner confirmation.
 
+Update (second delta review R3-new, applied): rows now carry separate
+`tiers:{presence,routing,runtime}` — presence CONFIRMED does not imply routing
+CONFIRMED (needs current-ELF xref or capture) nor runtime (needs device).
+
 Therefore Gate A is currently:
 
 ```text
@@ -725,6 +729,21 @@ Populate it from a planner result or remove it until meaningful.
 
 Resolution 2026-09-11 (unreviewed): populated from `IDisplayPlanner::Plan`
 size in every `Tick`; asserted in smoke test.
+
+## R9+ — second delta review findings (2026-09-11 review, fixed same delta, unreviewed)
+
+```text
+docs/reviews/2026-09-11_DELTA_R1_R9_OWNER_REVIEW.md
+```
+
+1. firmware-evidence workflow false-green → `tools/ci/verify_evidence.py`
+   fail-closed + `test_evidence_gate.py` (5 induced failures RED, happy path GREEN);
+   `firmware-evidence.yml` rewritten without `|| echo`.
+2. transmit-boundary bypass → `M4Adapter::Transmit` re-validates every message
+   (channel allowlist + uuid policy + key-shape allowlist + denied sweep);
+   `TransmitStatus::BlockedPolicy`; 5 C++ bypass negatives + Python parity.
+3. routing verdicts overstated → `tiers:{presence,routing,runtime}` on all 53
+   schema rows; presence CONFIRMED no longer implies routing/runtime.
 
 ---
 

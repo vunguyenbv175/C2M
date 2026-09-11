@@ -75,13 +75,19 @@ oracle `0x1a` → ELF). Both oracles passed during LZO bring-up; kept for histor
 
 ## 5. Normalized-field verdicts (binding on StockADASProvider)
 
-SOLE warning drivers (HIGH-CONFIDENCE): `fcw` field -> fcw.active;
-`is_danger` -> pcw.active; `deviate_state` -> ldw.active; `is_crucial` -> lead.
-Everything else RAW-ONLY (preserved, never promotes): `warning_level`,
-`headway/is_key/label/type/poly/units`, `headway_warning/vb_warning/sag_warning`
-(class existence CONFIRMED via WAV assets, trigger mapping UNKNOWN).
-UNKNOWN (stay empty): camera TSR limit, `ScreenAudioMsg`, physical transport,
-WS path/source, all units/enums. No min-distance lead fallback (F11).
+Three tiers per row (`tiers:{presence,routing,runtime}` in the JSON; review R3-new):
+
+```text
+presence: CONFIRMED where direct hash-verified string proof exists (both binaries)
+routing:  HIGH-CONFIDENCE via prior callsite/serializer disassembly;
+          CONFIRMED only after current-ELF xref reproduction or runtime capture
+runtime:  UNKNOWN everywhere until device capture (TSR enablement, units, wire)
+```
+
+SOLE warning drivers (routing HIGH-CONFIDENCE, conservative explicit-field rule):
+`fcw` field -> fcw.active; `is_danger` -> pcw.active; `deviate_state` -> ldw.active;
+`is_crucial` -> lead. Everything else RAW-ONLY (preserved, never promotes).
+UNKNOWN (stay empty): camera TSR limit, physical transport, WS path/source.
 
 ## 6. What changed vs V1 reports
 

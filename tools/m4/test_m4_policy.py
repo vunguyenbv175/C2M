@@ -39,4 +39,18 @@ for uuid in policy["deny_json_uuids"]:
 assert classify_json_uuid("GPSSpeed") == "DENY", "F2 regression: GPSSpeed must be DENY at L2"
 assert classify_json_uuid("GPSLevel") == "DENY", "F2 regression: GPSLevel must be DENY at L2"
 assert classify_json_uuid("NopeUnknown") == "DENY", "default-deny broken"
+
+# R2-new parity: shape validation matches C++ AllowedForTransmit.
+from replay_guard import guard_replay, payload_shape_ok
+
+assert payload_shape_ok("DispBrightSet", '{"type":1100,"uuid":"DispBrightSet","brightness":7}')
+assert not payload_shape_ok("DispBrightSet", '{"uuid":"DispBrightSet","brightness":7,"fcw":1}')
+assert not payload_shape_ok("GPSSpeed", '{"type":1601,"uuid":"GPSSpeed","speed":52}')
+assert not payload_shape_ok("NopeUnknown", '{"uuid":"NopeUnknown","x":1}')
+ok, blocked = guard_replay([
+    {"uuid": "DispBrightSet", "payload": '{"type":1100,"uuid":"DispBrightSet","brightness":7}'},
+    {"uuid": "DispBrightSet", "payload": '{"uuid":"DispBrightSet","brightness":7,"fcw":1}'},
+    {"uuid": "GPSSpeed", "payload": '{"type":1601,"uuid":"GPSSpeed","speed":52}'},
+])
+assert len(ok) == 1 and len(blocked) == 2, (ok, blocked)
 print("m4_policy parity: OK")

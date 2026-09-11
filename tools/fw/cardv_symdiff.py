@@ -15,8 +15,11 @@ ROW = re.compile(r"^\s*\d+:\s+([0-9a-fA-F]+)\s+(\d+)\s+(\S+)\s+(\S+)\s+\S+\s+\S+
 
 
 def dynsym(path: Path) -> dict[str, dict]:
-    out = subprocess.run(["readelf", "--dyn-syms", "-W", str(path)],
-                         capture_output=True, text=True, check=True).stdout
+    try:
+        out = subprocess.run(["readelf", "--dyn-syms", "-W", str(path)],
+                             capture_output=True, text=True, check=True).stdout
+    except FileNotFoundError as e:
+        raise SystemExit("readelf not found on PATH (install binutils/WinLibs)") from e
     syms: dict[str, dict] = {}
     for line in out.splitlines():
         m = ROW.match(line)

@@ -16,6 +16,12 @@
       "field": "vehicleWarning",
       "group": "adas.key",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "routing only (envelope demux); field semantics per rows below",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -32,12 +38,18 @@
           }
         }
       },
-      "note": "topic/key routing proven present in both adas binaries + prior callsite"
+      "note": "topic/key presence proven in both adas binaries; routing via prior callsite"
     },
     {
       "field": "vehicleMeasure",
       "group": "adas.key",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "routing only (envelope demux); field semantics per rows below",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -54,12 +66,18 @@
           }
         }
       },
-      "note": "topic/key routing proven present in both adas binaries + prior callsite"
+      "note": "topic/key presence proven in both adas binaries; routing via prior callsite"
     },
     {
       "field": "pedestrians",
       "group": "adas.key",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "routing only (envelope demux); field semantics per rows below",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -76,12 +94,18 @@
           }
         }
       },
-      "note": "topic/key routing proven present in both adas binaries + prior callsite"
+      "note": "topic/key presence proven in both adas binaries; routing via prior callsite"
     },
     {
       "field": "laneWarningRes",
       "group": "adas.key",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "routing only (envelope demux); field semantics per rows below",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -98,12 +122,18 @@
           }
         }
       },
-      "note": "topic/key routing proven present in both adas binaries + prior callsite"
+      "note": "topic/key presence proven in both adas binaries; routing via prior callsite"
     },
     {
       "field": "vehicleWarning.vehicle_id",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -126,6 +156,12 @@
       "field": "vehicleWarning.headway",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -152,6 +188,12 @@
       "field": "vehicleWarning.warning_level",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -178,6 +220,12 @@
       "field": "vehicleWarning.headway_warning",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -204,6 +252,12 @@
       "field": "vehicleWarning.vb_warning",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -230,6 +284,12 @@
       "field": "vehicleWarning.sag_warning",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -256,6 +316,12 @@
       "field": "vehicleMeasure.vehicle_class",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -282,6 +348,12 @@
       "field": "vehicleMeasure.vehicle_width",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -308,6 +380,12 @@
       "field": "vehicleMeasure.longitude_dist",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -330,6 +408,12 @@
       "field": "vehicleMeasure.lateral_dist",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -356,6 +440,12 @@
       "field": "vehicleMeasure.ttc",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -382,6 +472,12 @@
       "field": "pedestrians.id",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -393,6 +489,12 @@
       "field": "pedestrians.world_x",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -415,6 +517,12 @@
       "field": "pedestrians.world_y",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -437,6 +545,12 @@
       "field": "pedestrians.ttc_m",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -459,6 +573,12 @@
       "field": "pedestrians.ttc",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -485,6 +605,12 @@
       "field": "pedestrians.have_bike",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -507,6 +633,12 @@
       "field": "pedestrians.is_key",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -529,6 +661,12 @@
       "field": "laneWarningRes.lanelines",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -551,6 +689,12 @@
       "field": "laneWarningRes.bird_view_poly_coeff",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -573,6 +717,12 @@
       "field": "laneWarningRes.label",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -584,6 +734,12 @@
       "field": "laneWarningRes.type",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -595,6 +751,12 @@
       "field": "laneWarningRes.turn_radius",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -617,6 +779,12 @@
       "field": "laneWarningRes.turn_frequently",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "raw preserve only; never promotes to warnings",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -639,6 +807,12 @@
       "field": "vehicleWarning.fcw",
       "group": "adas.field",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sole fcw driver (conservative explicit-field rule)",
       "drives_normalized_warning": true,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer. Explicit field name (vs generic warning_level); FCW.wav asset proves the FCW class exists in stock audio.",
@@ -650,6 +824,12 @@
       "field": "vehicleMeasure.is_crucial",
       "group": "adas.field",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sole lead signal",
       "drives_normalized_warning": true,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer."
@@ -660,6 +840,12 @@
       "field": "vehicleMeasure.is_second_crucial",
       "group": "adas.field",
       "verdict": "RAW-ONLY",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "metadata only",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer.",
@@ -682,6 +868,12 @@
       "field": "pedestrians.is_danger",
       "group": "adas.field",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sole pcw driver (conservative explicit-field rule)",
       "drives_normalized_warning": true,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer. PCW.wav asset proves the PCW class exists.",
@@ -693,6 +885,12 @@
       "field": "laneWarningRes.deviate_state",
       "group": "adas.field",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sole ldw driver (enum values UNKNOWN)",
       "drives_normalized_warning": true,
       "evidence": {
         "basis": "DIRECT string proof in hash-verified adas ELFs (EVIDENCE_ADAS_STRINGS.json; EN 0dcc6982\u2026 / VI 997b71c2\u2026). Presence is CONFIRMED; field semantics stay RAW-ONLY/HIGH-CONFIDENCE per below. History: these rows were HIGH-CONFIDENCE via prior callsite disassembly before LZO extraction closed the string layer. LDW.wav asset proves the LDW class exists.",
@@ -704,6 +902,12 @@
       "field": "camera.TSR_limit",
       "group": "adas.tsr",
       "verdict": "UNKNOWN",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "UNKNOWN",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "none (code presence only)",
       "drives_normalized_warning": false,
       "evidence": {
         "direct": {
@@ -798,6 +1002,12 @@
       "field": "adas.screen.ScreenAudioMsg",
       "group": "adas.screen",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "UNKNOWN",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "none yet",
       "drives_normalized_warning": false,
       "evidence": {
         "direct": {
@@ -822,6 +1032,12 @@
       "field": "adas.ped.pedWarning_path",
       "group": "adas.field",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "supporting evidence only",
       "drives_normalized_warning": false,
       "evidence": {
         "direct": {
@@ -868,6 +1084,12 @@
       "field": "ScreenWarningRes",
       "group": "adas.screen",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "type context only",
       "drives_normalized_warning": false,
       "evidence": {
         "direct": {
@@ -890,6 +1112,12 @@
       "field": "cardv.json.GPSLevel",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -914,6 +1142,12 @@
       "field": "cardv.json.GPSSpeed",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -937,6 +1171,12 @@
       "field": "cardv.json.DispBrightSet",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -957,6 +1197,12 @@
       "field": "cardv.json.AdasStatus",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -977,6 +1223,12 @@
       "field": "cardv.json.HeavyCalibStatus",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -997,6 +1249,12 @@
       "field": "cardv.json.ScreenModeSet",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -1017,6 +1275,12 @@
       "field": "cardv.json.RecordVoice",
       "group": "cardv.json",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "info-class only at L2; semantic uuids DENY",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv (EN+VI, sha-verified)",
@@ -1037,6 +1301,12 @@
       "field": "cardv.ringbuf.raw_adas",
       "group": "cardv.ringbuf",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "input-contract context; runtime frames need capture",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv",
@@ -1063,6 +1333,12 @@
       "field": "cardv.ws.minieye-websocket",
       "group": "cardv.ws",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "protocol name only; transport needs capture",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv",
@@ -1081,6 +1357,12 @@
       "field": "cardv.screen.SendADASInfoToScreen",
       "group": "cardv.screen",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sender-path context",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv",
@@ -1099,6 +1381,12 @@
       "field": "cardv.screen.SendGPSInfoToScreen",
       "group": "cardv.screen",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sender-path context",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv",
@@ -1117,6 +1405,12 @@
       "field": "cardv.screen.WSGetConnectStatus",
       "group": "cardv.screen",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "sender-path context",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "bootconfig/bin/cardv",
@@ -1135,6 +1429,12 @@
       "field": "cardv.screen.SendGPSSpeedToScreen",
       "group": "cardv.screen",
       "verdict": "CONFIRMED",
+      "tiers": {
+        "presence": "CONFIRMED",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "delta marker",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "VI cardv only",
@@ -1151,6 +1451,12 @@
       "field": "libflow.outer.{time,source,topic,data}",
       "group": "transport",
       "verdict": "HIGH-CONFIDENCE",
+      "tiers": {
+        "presence": "HIGH-CONFIDENCE",
+        "routing": "HIGH-CONFIDENCE",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "envelope shape for passive decoder",
       "drives_normalized_warning": false,
       "evidence": {
         "binary": "lib/libflow.so (identical EN/VI, a6bfcbf6be07d08d\u2026)",
@@ -1204,6 +1510,12 @@
       "field": "transport.physical_interface",
       "group": "transport",
       "verdict": "UNKNOWN",
+      "tiers": {
+        "presence": "UNKNOWN",
+        "routing": "UNKNOWN",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "none",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "no image evidence; needs OFF-vs-ON runtime capture"
@@ -1214,6 +1526,12 @@
       "field": "transport.ws_path_and_source",
       "group": "transport",
       "verdict": "UNKNOWN",
+      "tiers": {
+        "presence": "UNKNOWN",
+        "routing": "UNKNOWN",
+        "runtime": "UNKNOWN"
+      },
+      "product_use": "none",
       "drives_normalized_warning": false,
       "evidence": {
         "basis": "needs live handshake capture"

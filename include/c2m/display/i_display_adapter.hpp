@@ -29,7 +29,8 @@ enum class TransmitStatus : std::uint8_t {
   BlockedReadOnly = 1,  // no capability presented
   BlockedL3 = 2,         // semantic content while L3 is BLOCKED (Gate F)
   SendOk = 3,
-  SendFailed = 4
+  SendFailed = 4,
+  BlockedPolicy = 5  // final-boundary policy rejection (R2): never reaches sender
 };
 
 class IDisplayPlanner {
