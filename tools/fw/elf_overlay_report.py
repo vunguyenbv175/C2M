@@ -3,7 +3,8 @@
 
 Supports ELF32/ELF64 and either byte order using only the Python standard library.
 The overlay start is the maximum of section-header-table end, program-header-table
-end, and all file-backed section/segment ends.
+end, and all *file-backed* section/segment ends. SHT_NOBITS (for example .bss)
+is explicitly excluded because it occupies memory but no bytes in the file.
 """
 from __future__ import annotations
 import argparse, hashlib, json, math, struct
@@ -39,7 +40,7 @@ def report(path: Path):
         ph_fmt = endian + "IIIIIIII"
         sh_fmt = endian + "IIIIIIIIII"
         ph_offset_i, ph_filesz_i = 1, 4
-        sh_offset_i, sh_size_i = 4, 5
+        sh_type_i, sh_offset_i, sh_size_i = 1, 4, 5
     else:
         e_phoff = unpack(endian + "Q", d, 32)[0]
         e_shoff = unpack(endian + "Q", d, 40)[0]
@@ -50,7 +51,7 @@ def report(path: Path):
         ph_fmt = endian + "IIQQQQQQ"
         sh_fmt = endian + "IIQQQQIIQQ"
         ph_offset_i, ph_filesz_i = 2, 5
-        sh_offset_i, sh_size_i = 4, 5
+        sh_type_i, sh_offset_i, sh_size_i = 1, 4, 5
 
     candidates = [0]
     if e_phoff and e_phentsize and e_phnum:
@@ -66,7 +67,10 @@ def report(path: Path):
         off = e_shoff + i * e_shentsize
         if off + struct.calcsize(sh_fmt) <= len(d):
             vals = unpack(sh_fmt, d, off)
-            candidates.append(vals[sh_offset_i] + vals[sh_size_i])
+            # SHT_NOBITS == 8: memory-only; sh_offset + sh_size is not a
+            # meaningful file-backed end (this is typically .bss).
+            if vals[sh_type_i] != 8:
+                candidates.append(vals[sh_offset_i] + vals[sh_size_i])
 
     start = max(x for x in candidates if x <= len(d))
     ov = d[start:]
