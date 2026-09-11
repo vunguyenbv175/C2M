@@ -31,3 +31,23 @@ jobs:
           python3 tools/m4/test_real_data_path.py
           python3 tools/road/osm_preprocess.py --out /tmp/roads_ci.sqlite
           python3 tools/road/test_road.py
+          python3 tests/test_firmware_pipeline.py
+  arm-minimal:
+    # Reproducible cross-build of the MINIMAL idle binary (static analysis only).
+    # Label: HOST-CROSS-BUILT, NOT device-tested. No firmware needed.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM toolchain (pinned runner image provides version; logged below)
+        run: |
+          sudo apt-get update && sudo apt-get install -y gcc-arm-linux-gnueabihf cmake
+          arm-linux-gnueabihf-gcc --version
+      - name: Build minimal ARM binary
+        run: |
+          cmake -S fw/device_minimal -B build/arm-minimal \
+            -DCMAKE_TOOLCHAIN_FILE=fw/device_minimal/toolchain-armhf.cmake \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/arm-minimal --verbose
+          arm-linux-gnueabihf-gcc --version > build/arm-minimal/toolchain_version.txt
+      - name: ELF gate (32-bit LE ARM EXEC)
+        run: python3 fw/device_minimal/check_elf.py build/arm-minimal/c2m-idle

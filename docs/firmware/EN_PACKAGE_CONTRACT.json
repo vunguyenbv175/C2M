@@ -1,0 +1,455 @@
+{
+  "method": "tools/fw/package_contract.py re-derives the EN package from the original TAR bytes; no field is inferred \u2014 see UNKNOWN markers.",
+  "source_tar_sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c",
+  "source_tar_size": 58368000,
+  "outer_members": [
+    {
+      "order": 0,
+      "name": "SigmastarUpgradeSD_SSC8838G.bin",
+      "size": 58359832,
+      "mode_oct": "0o664",
+      "mode": 436,
+      "uid": 1001,
+      "gid": 1001,
+      "mtime": 1691062673,
+      "typeflag": "0",
+      "magic": "b'ustar  \\x00'",
+      "uname": "zac",
+      "gname": "zac",
+      "header_offset": 0,
+      "header_offset_hex": "0x0",
+      "data_offset": 512,
+      "data_offset_hex": "0x200",
+      "header_sha256": "7e936608daa4081244cdb8175368e3a10d3219e41ada4ccee3eb0ac5cb621d5f",
+      "sha256": "e3f2443294f71588297821ee99ebccb54559ce3660c61fde338c210903639517"
+    },
+    {
+      "order": 1,
+      "name": "sysVer.txt",
+      "size": 26,
+      "mode_oct": "0o664",
+      "mode": 436,
+      "uid": 1001,
+      "gid": 1001,
+      "mtime": 1691062670,
+      "typeflag": "0",
+      "magic": "b'ustar  \\x00'",
+      "uname": "zac",
+      "gname": "zac",
+      "header_offset": 58360832,
+      "header_offset_hex": "0x37a8400",
+      "data_offset": 58361344,
+      "data_offset_hex": "0x37a8600",
+      "header_sha256": "e14c0381adb78de845e483f67cb3f78bfa4bf1c778467cbb2e94cc681295d6b4",
+      "sha256": "7cc0796927d1a85e919e322bf745f764580e9f7d481fe00ea1f7cb772358d82e"
+    },
+    {
+      "order": 2,
+      "name": "minieye_firmware.md5",
+      "size": 66,
+      "mode_oct": "0o664",
+      "mode": 436,
+      "uid": 1001,
+      "gid": 1001,
+      "mtime": 1691062674,
+      "typeflag": "0",
+      "magic": "b'ustar  \\x00'",
+      "uname": "zac",
+      "gname": "zac",
+      "header_offset": 58361856,
+      "header_offset_hex": "0x37a8800",
+      "data_offset": 58362368,
+      "data_offset_hex": "0x37a8a00",
+      "header_sha256": "e9180e8ce7f3661881a1f63146e9d8007788c09029e0016923ff412c08b478bf",
+      "sha256": "fca994b683f6f2d934ce2ca5154a914754109e3bd6e56b54e165e7aade640831"
+    },
+    {
+      "order": 3,
+      "name": "adas_upgrade.sh",
+      "size": 2972,
+      "mode_oct": "0o775",
+      "mode": 509,
+      "uid": 1001,
+      "gid": 1001,
+      "mtime": 1691062673,
+      "typeflag": "0",
+      "magic": "b'ustar  \\x00'",
+      "uname": "zac",
+      "gname": "zac",
+      "header_offset": 58362880,
+      "header_offset_hex": "0x37a8c00",
+      "data_offset": 58363392,
+      "data_offset_hex": "0x37a8e00",
+      "header_sha256": "3458416115e4ebee1f6f251768e476e1456a12ced91cb87f7bab82a05096e5c5",
+      "sha256": "0e18c91fd95f2a2cdf64637448d8540e946ae5bb2e37627d8bbd6bef7f7da05b"
+    }
+  ],
+  "outer_order": [
+    "SigmastarUpgradeSD_SSC8838G.bin",
+    "sysVer.txt",
+    "minieye_firmware.md5",
+    "adas_upgrade.sh"
+  ],
+  "outer_trailing_zero_bytes": 1536,
+  "sysVer_txt": "sysVer 20230803193750\nend\n",
+  "sysVer_sha256": "7cc0796927d1a85e919e322bf745f764580e9f7d481fe00ea1f7cb772358d82e",
+  "minieye_firmware_md5_file": "8e69fe4511366ed86b892bf413916187  SigmastarUpgradeSD_SSC8838G.bin\n",
+  "minieye_firmware_md5_relation": "EXACT-MATCH: minieye_firmware.md5 lists 8e69fe4511366ed86b892bf413916187; md5(inner .bin) = 8e69fe4511366ed86b892bf413916187; match=True",
+  "inner_md5": "8e69fe4511366ed86b892bf413916187",
+  "inner_sha256": "e3f2443294f71588297821ee99ebccb54559ce3660c61fde338c210903639517",
+  "inner_size": 58359832,
+  "adas_upgrade_sh_sha256": "0e18c91fd95f2a2cdf64637448d8540e946ae5bb2e37627d8bbd6bef7f7da05b",
+  "adas_upgrade_sh_size": 2972,
+  "adas_upgrade_sh_role": "Second-stage SD-card script run on-device AFTER U-Boot flash (md5-checks inner .bin, extracts image.tar, backs up customer configs, triggers reboot). NOT the U-Boot script at inner offset 0.",
+  "upgrade_script_text": "\n# File Partition: cis.es\nsysVer 20230803193750\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5c00 0x4000\nfatload mmc 0 0x21800000 $(SdUpgradeImage) 0x200 0xa000\nwritecis 0x21000000 0x21800000 0 0 0 5\n\n# File Partition: set_partition.es\nmtdparts del CIS\nsetenv mtdparts $(mtdparts),0x20000(KEY_CUST),0x500000(MISC),0x20000(ADAS_CUST),-(ubi0)\nsaveenv\n\n# File Partition: ipl.es\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x6180 0xb000\nnand erase.part IPL0\nnand write.e 0x21000000 IPL0 0x6180\n\n# File Partition: ipl_cust.es\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5eb0 0x12000\nnand erase.part IPL_CUST0\nnand write.e 0x21000000 IPL_CUST0 0x5EB0\nnand erase.part IPL_CUST1\nnand write.e 0x21000000 IPL_CUST1 0x5EB0\n\n# File Partition: uboot.es\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x48a44 0x18000\nnand erase.part UBOOT0\nnand write.e 0x21000000 UBOOT0 0x48A44\nnand erase.part UBOOT1\nnand write.e 0x21000000 UBOOT1 0x48A44\n\n# File Partition: kernel.es\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x22691f 0x61000\nnand erase.part KERNEL\nnand write.e 0x21000000 KERNEL 0x22691F\nnand erase.part RECOVERY\nnand write.e 0x21000000 RECOVERY 0x22691F\n\n# File Partition: rootfs.es\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x841d6b 0x288000\nnand erase.part rootfs\nnand write.e 0x21000000 rootfs 0x841D6B\nsetenv initrd_high 0x21000000\nsetenv initrd_size ${filesize}\nsetenv initrd_block 110\n\n# File Partition: ubi0.es\nnand erase.part ubi0\n\n# File Partition: miservice.es\nubi part ubi0\nubi create miservice 0x500000\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x193000 0xaca000\nubi write 0x21000000 miservice 0x193000\n\n# File Partition: customer.es\nubi part ubi0\nubi create customer 0x5000000\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x25e7000 0xc5d000\nubi write 0x21000000 customer 0x25E7000\n\n# File Partition: misc.es\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x200000 0x3244000\nnand erase.part MISC\nnand write.e 0x21000000 MISC 0x200000\n\n# File Partition: oneed_cust.es\nubi part ubi0\nubi create oneed_cust 0x600000\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x364000 0x3444000\nubi write 0x21000000 oneed_cust 0x364000\n\n# File Partition: set_config\nsetenv bootargs ubi.mtd=ubi0,2048 rootfstype=ramfs initrd=0x21000000,0xc00000 LX_MEM=0x3ffe0000 mma_heap=mma_heap_name0,miu=0,sz=0x1f000000 mma_memblock_remove=1 cma=2M@0x23800000 loglevel=3 $(mtdparts)\nsetenv bootcmd ' bootlogo 0 0 0 0; nand read.e 0x22000000 KERNEL 0x300000; nand read.e 0x21000000 rootfs 0xc00000; bootm 0x22000000;nand read.e 0x22000000 RECOVERY 0x300000; nand read.e 0x21000000 rootfs 0xc00000; bootm 0x22000000\nsaveenv\nreset\n% <- this is end of script symbol",
+  "upgrade_script_end": 2622,
+  "upgrade_script_sha256": "a9cd0599228fc864f7d484000b31c14ccb91f410df304d9524c3453baa31abf2",
+  "script_trailer_newline": true,
+  "loads": [
+    {
+      "section": "cis.es",
+      "load_index": 0,
+      "offset": 16384,
+      "offset_hex": "0x4000",
+      "size": 23552,
+      "size_hex": "0x5c00",
+      "end": 39936,
+      "end_hex": "0x9c00",
+      "within_image": true,
+      "script_body": "sysVer 20230803193750\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5c00 0x4000\nfatload mmc 0 0x21800000 $(SdUpgradeImage) 0x200 0xa000\nwritecis 0x21000000 0x21800000 0 0 0 5",
+      "sha256": "70a587437182018af328c50fdb7d94663311857bbc14e849cb21c08913584e70",
+      "md5": "4d892402c864f64f39257b7c05644687"
+    },
+    {
+      "section": "cis.es",
+      "load_index": 1,
+      "offset": 40960,
+      "offset_hex": "0xa000",
+      "size": 512,
+      "size_hex": "0x200",
+      "end": 41472,
+      "end_hex": "0xa200",
+      "within_image": true,
+      "script_body": "sysVer 20230803193750\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5c00 0x4000\nfatload mmc 0 0x21800000 $(SdUpgradeImage) 0x200 0xa000\nwritecis 0x21000000 0x21800000 0 0 0 5",
+      "sha256": "5fedff9f36704ec2f51771adc4d5b6ff5d244a24afcfd34548d658579f129be4",
+      "md5": "e9ba118d11968e959534c5a78303bc7a"
+    },
+    {
+      "section": "ipl.es",
+      "load_index": 0,
+      "offset": 45056,
+      "offset_hex": "0xb000",
+      "size": 24960,
+      "size_hex": "0x6180",
+      "end": 70016,
+      "end_hex": "0x11180",
+      "within_image": true,
+      "script_body": "fatload mmc 0 0x21000000 $(SdUpgradeImage) 0x6180 0xb000\nnand erase.part IPL0\nnand write.e 0x21000000 IPL0 0x6180",
+      "sha256": "78d4ba339b4ba5f892e9a3d5ade44a9125932188acd5e73d093fadba365a2e2e",
+      "md5": "7373bc180f98f332349aa1387b175991"
+    },
+    {
+      "section": "ipl_cust.es",
+      "load_index": 0,
+      "offset": 73728,
+      "offset_hex": "0x12000",
+      "size": 24240,
+      "size_hex": "0x5eb0",
+      "end": 97968,
+      "end_hex": "0x17eb0",
+      "within_image": true,
+      "script_body": "fatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5eb0 0x12000\nnand erase.part IPL_CUST0\nnand write.e 0x21000000 IPL_CUST0 0x5EB0\nnand erase.part IPL_CUST1\nnand write.e 0x21000000 IPL_CUST1 0x5EB0",
+      "sha256": "6f892733ff63d4493b8465bfe6a044043ebde25d8f79ba2af1d4aceb5ffb8a6e",
+      "md5": "ee04139cee6b63f94de3f6c3d80b7f16"
+    },
+    {
+      "section": "uboot.es",
+      "load_index": 0,
+      "offset": 98304,
+      "offset_hex": "0x18000",
+      "size": 297540,
+      "size_hex": "0x48a44",
+      "end": 395844,
+      "end_hex": "0x60a44",
+      "within_image": true,
+      "script_body": "fatload mmc 0 0x21000000 $(SdUpgradeImage) 0x48a44 0x18000\nnand erase.part UBOOT0\nnand write.e 0x21000000 UBOOT0 0x48A44\nnand erase.part UBOOT1\nnand write.e 0x21000000 UBOOT1 0x48A44",
+      "sha256": "7c64be8cb848af856a9f107139ee90765be4c3c3bdcd4eb49563839b57304490",
+      "md5": "789843c030522df0dd65017616ec3932"
+    },
+    {
+      "section": "kernel.es",
+      "load_index": 0,
+      "offset": 397312,
+      "offset_hex": "0x61000",
+      "size": 2255135,
+      "size_hex": "0x22691f",
+      "end": 2652447,
+      "end_hex": "0x28791f",
+      "within_image": true,
+      "script_body": "fatload mmc 0 0x21000000 $(SdUpgradeImage) 0x22691f 0x61000\nnand erase.part KERNEL\nnand write.e 0x21000000 KERNEL 0x22691F\nnand erase.part RECOVERY\nnand write.e 0x21000000 RECOVERY 0x22691F",
+      "sha256": "c1fa8f7363615f1dc7d91f3308608d336fee6d89f5dcfe48e826bf4a399f5030",
+      "md5": "0eddc2a9cdacd19c3ae738331c4f1ad4"
+    },
+    {
+      "section": "rootfs.es",
+      "load_index": 0,
+      "offset": 2654208,
+      "offset_hex": "0x288000",
+      "size": 8658283,
+      "size_hex": "0x841d6b",
+      "end": 11312491,
+      "end_hex": "0xac9d6b",
+      "within_image": true,
+      "script_body": "fatload mmc 0 0x21000000 $(SdUpgradeImage) 0x841d6b 0x288000\nnand erase.part rootfs\nnand write.e 0x21000000 rootfs 0x841D6B\nsetenv initrd_high 0x21000000\nsetenv initrd_size ${filesize}\nsetenv initrd_block 110",
+      "sha256": "1dcc3e954910661af2bb36ae6bc53433e378e9b496eaa20717bb7479b4bd3f2b",
+      "md5": "ef6489a339149beec66e0530d72ca7eb"
+    },
+    {
+      "section": "miservice.es",
+      "load_index": 0,
+      "offset": 11313152,
+      "offset_hex": "0xaca000",
+      "size": 1650688,
+      "size_hex": "0x193000",
+      "end": 12963840,
+      "end_hex": "0xc5d000",
+      "within_image": true,
+      "script_body": "ubi part ubi0\nubi create miservice 0x500000\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x193000 0xaca000\nubi write 0x21000000 miservice 0x193000",
+      "sha256": "358c01a9e9455a8d0b43587eff8eea754b4df3a538d2974cf8ff714191a16db7",
+      "md5": "00ce08444949646cd3b0e634ba15097a"
+    },
+    {
+      "section": "customer.es",
+      "load_index": 0,
+      "offset": 12963840,
+      "offset_hex": "0xc5d000",
+      "size": 39743488,
+      "size_hex": "0x25e7000",
+      "end": 52707328,
+      "end_hex": "0x3244000",
+      "within_image": true,
+      "script_body": "ubi part ubi0\nubi create customer 0x5000000\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x25e7000 0xc5d000\nubi write 0x21000000 customer 0x25E7000",
+      "sha256": "b4dabc4d789c758d94313208d57dbec279d394c4d91b6935542242a8b515dd8f",
+      "md5": "b715bbdb6a9841c478de43232b7b883e"
+    },
+    {
+      "section": "misc.es",
+      "load_index": 0,
+      "offset": 52707328,
+      "offset_hex": "0x3244000",
+      "size": 2097152,
+      "size_hex": "0x200000",
+      "end": 54804480,
+      "end_hex": "0x3444000",
+      "within_image": true,
+      "script_body": "fatload mmc 0 0x21000000 $(SdUpgradeImage) 0x200000 0x3244000\nnand erase.part MISC\nnand write.e 0x21000000 MISC 0x200000",
+      "sha256": "c9bbb3850500aae6312bd9bb79bed093d2ded7b9019c76ef2910434e2d6914f8",
+      "md5": "8a57d896fd07a9cf13fdb489857720b4"
+    },
+    {
+      "section": "oneed_cust.es",
+      "load_index": 0,
+      "offset": 54804480,
+      "offset_hex": "0x3444000",
+      "size": 3555328,
+      "size_hex": "0x364000",
+      "end": 58359808,
+      "end_hex": "0x37a8000",
+      "within_image": true,
+      "script_body": "ubi part ubi0\nubi create oneed_cust 0x600000\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x364000 0x3444000\nubi write 0x21000000 oneed_cust 0x364000",
+      "sha256": "f982f15e2d18dc2549ee53617a45c44ea1764c5b84debee634bb75b8edd92a87",
+      "md5": "91bdeff90281a08ed5fb39d9a5865ded"
+    }
+  ],
+  "head_pad_is_ff": true,
+  "inter_payload_gaps": [
+    {
+      "range": [
+        2623,
+        16384
+      ],
+      "range_hex": [
+        "0xa3f",
+        "0x4000"
+      ],
+      "len": 13761,
+      "fill": "0xFF",
+      "sha256": "c7998f24574af6f2d3e9cdccc47ff9aa4ede57c3e87c1f830fd98e8e635f818d"
+    },
+    {
+      "range": [
+        39936,
+        40960
+      ],
+      "range_hex": [
+        "0x9c00",
+        "0xa000"
+      ],
+      "len": 1024,
+      "fill": "0xFF",
+      "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+    },
+    {
+      "range": [
+        41472,
+        45056
+      ],
+      "range_hex": [
+        "0xa200",
+        "0xb000"
+      ],
+      "len": 3584,
+      "fill": "0xFF",
+      "sha256": "92feb2e31d43ffb2ce5935a4a58559c35aa422cf7e6f829ddaa5aef1a69190c9"
+    },
+    {
+      "range": [
+        70016,
+        73728
+      ],
+      "range_hex": [
+        "0x11180",
+        "0x12000"
+      ],
+      "len": 3712,
+      "fill": "0xFF",
+      "sha256": "5ec7fe539bf64eb0fb9ede0d805101cd0437efc370dc9e68966c08fc32b51d8f"
+    },
+    {
+      "range": [
+        97968,
+        98304
+      ],
+      "range_hex": [
+        "0x17eb0",
+        "0x18000"
+      ],
+      "len": 336,
+      "fill": "0xFF",
+      "sha256": "77071fc978963dce5058c795643c95c195d0d2506c5f02ff38c09e4c8d6ec517"
+    },
+    {
+      "range": [
+        395844,
+        397312
+      ],
+      "range_hex": [
+        "0x60a44",
+        "0x61000"
+      ],
+      "len": 1468,
+      "fill": "0xFF",
+      "sha256": "bfe2c2ebf2fd4dd4de74f9423e8b21ee757ed3b69d92dec6d531da7440859b85"
+    },
+    {
+      "range": [
+        2652447,
+        2654208
+      ],
+      "range_hex": [
+        "0x28791f",
+        "0x288000"
+      ],
+      "len": 1761,
+      "fill": "0xFF",
+      "sha256": "c7b9379778eee062193f9c03ed13b242c2833675bc51a29eff8b7473ae26c284"
+    },
+    {
+      "range": [
+        11312491,
+        11313152
+      ],
+      "range_hex": [
+        "0xac9d6b",
+        "0xaca000"
+      ],
+      "len": 661,
+      "fill": "0xFF",
+      "sha256": "8cd1847c33be56f791c11c3fb446c60dd571c13af46a583b1412c6b6d4a68f1b"
+    }
+  ],
+  "tail_unknown": {
+    "offset": 58359808,
+    "offset_hex": "0x37a8000",
+    "len": 24,
+    "hex": "31323334353637380a232046696c6520506172746974696f",
+    "ascii": "12345678\n# File Partitio",
+    "interpretation": "UNKNOWN: 24 bytes past last payload (oneed_cust end); identical shape in EN and VI ('12345678\\n# File Partitio'); possibly image-builder trailer fragment; NEVER assumed to be padding (not 0xFF).",
+    "sha256": "a9dcb2a25782a4d7898a0fa7727ab02592e1f3bac2e9f1c14dc8244f3fac94b9"
+  },
+  "accounting": {
+    "script_bytes": 2623,
+    "payload_bytes": 58330878,
+    "ff_pad_bytes": 26307,
+    "unknown_tail_bytes": 24,
+    "total": 58359832,
+    "check": true
+  },
+  "partition_map": [
+    {
+      "partition": "CIS",
+      "source": "cis.es loads (0x4000/0xA000)",
+      "uboot_cmd": "writecis"
+    },
+    {
+      "partition": "KEY_CUST/MISC/ADAS_CUST/ubi0",
+      "source": "set_partition.es (no fatload)",
+      "uboot_cmd": "mtdparts + saveenv"
+    },
+    {
+      "partition": "IPL0",
+      "source": "ipl.es",
+      "uboot_cmd": "nand erase.part + nand write.e"
+    },
+    {
+      "partition": "IPL_CUST0/IPL_CUST1",
+      "source": "ipl_cust.es",
+      "uboot_cmd": "nand erase.part + nand write.e x2"
+    },
+    {
+      "partition": "UBOOT0/UBOOT1",
+      "source": "uboot.es",
+      "uboot_cmd": "nand erase.part + nand write.e x2"
+    },
+    {
+      "partition": "KERNEL/RECOVERY",
+      "source": "kernel.es",
+      "uboot_cmd": "nand erase.part + nand write.e x2"
+    },
+    {
+      "partition": "rootfs",
+      "source": "rootfs.es",
+      "uboot_cmd": "nand erase.part + nand write.e"
+    },
+    {
+      "partition": "ubi0 (erase)",
+      "source": "ubi0.es section (no fatload)",
+      "uboot_cmd": "nand erase.part ubi0"
+    },
+    {
+      "partition": "ubi0:miservice",
+      "source": "miservice.es",
+      "uboot_cmd": "ubi create + ubi write"
+    },
+    {
+      "partition": "ubi0:customer",
+      "source": "customer.es",
+      "uboot_cmd": "ubi create + ubi write"
+    },
+    {
+      "partition": "MISC",
+      "source": "misc.es",
+      "uboot_cmd": "nand erase.part + nand write.e"
+    },
+    {
+      "partition": "ubi0:oneed_cust",
+      "source": "oneed_cust.es",
+      "uboot_cmd": "ubi create + ubi write"
+    }
+  ],
+  "unknowns": [
+    "tail 24 bytes past oneed_cust end (see tail_unknown)",
+    "outer TAR header magic/version encoding ('ustar  ' vs python USTAR) \u2014 payload-irrelevant, documented in repack report",
+    "whether U-Boot validates inner MD5 before executing script (script itself does not md5-check payloads; adas_upgrade.sh checks the whole .bin only)"
+  ]
+}
