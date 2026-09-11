@@ -1,0 +1,107 @@
+name: prehw-qemu-stock-runtime
+
+on:
+  push:
+    paths:
+      - '.github/workflows/prehw-qemu.yml'
+  workflow_dispatch:
+
+jobs:
+  qemu-stock-runtime:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch golden EN firmware from private vault
+        env:
+          FIRMWARE_VAULT_KEY: ${{ secrets.FIRMWARE_VAULT_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$FIRMWARE_VAULT_KEY"
+          mkdir -p ~/.ssh firmware/original
+          printf '%s\n' "$FIRMWARE_VAULT_KEY" > ~/.ssh/fw_vault
+          chmod 600 ~/.ssh/fw_vault
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/fw-vault
+          cp /tmp/fw-vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar firmware/original/
+          echo "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c  firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar" | sha256sum -c -
+          rm -rf /tmp/fw-vault ~/.ssh/fw_vault
+
+      - name: Install QEMU + ARM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user gcc-arm-linux-gnueabihf ninja-build
+          qemu-arm --version
+          arm-linux-gnueabihf-gcc --version
+
+      - name: Extract exact stock EN rootfs
+        run: |
+          set -euo pipefail
+          mkdir -p work/carve work/sysroot
+          python3 tools/fw/carve_upgrade.py firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar -o work/carve >/tmp/carve.json
+          ROOTFS=$(ls work/carve/rootfs.es.load0.*.bin)
+          python3 - "$ROOTFS" work/sysroot <<'PY'
+          import gzip, os, stat, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/fw')
+          from extract_rootfs_cpio import iter_cpio_full
+          src = Path(sys.argv[1]); out = Path(sys.argv[2])
+          data = gzip.decompress(src.read_bytes())
+          entries = list(iter_cpio_full(data))
+          # directories first
+          for name, mode, blob in entries:
+              p = out / name.lstrip('./')
+              typ = stat.S_IFMT(mode)
+              if typ == stat.S_IFDIR:
+                  p.mkdir(parents=True, exist_ok=True)
+                  os.chmod(p, stat.S_IMODE(mode))
+          # files/symlinks
+          for name, mode, blob in entries:
+              p = out / name.lstrip('./')
+              typ = stat.S_IFMT(mode)
+              if typ == stat.S_IFREG:
+                  p.parent.mkdir(parents=True, exist_ok=True)
+                  p.write_bytes(blob)
+                  os.chmod(p, stat.S_IMODE(mode))
+              elif typ == stat.S_IFLNK:
+                  p.parent.mkdir(parents=True, exist_ok=True)
+                  target = blob.split(b'\0',1)[0].decode('utf-8','strict')
+                  if p.exists() or p.is_symlink(): p.unlink()
+                  p.symlink_to(target)
+          print(f'extracted {len(entries)} rootfs entries')
+          PY
+          test "$(sha256sum work/sysroot/lib/ld-2.30.so | cut -d' ' -f1)" = "dd2f57c2363db9abce352fcaf07b943e59fbd5dcca898bb39a2709350fbadb4c"
+          test "$(sha256sum work/sysroot/lib/libc-2.30.so | cut -d' ' -f1)" = "3b2cc951503e0bc40e45ebc6e8f39b92b937ab7a3b7c009377708d2473756657"
+          readlink work/sysroot/lib/ld-linux-armhf.so.3
+          readlink work/sysroot/lib/libc.so.6
+
+      - name: Build preferred dynamic c2m-idle
+        run: |
+          cmake -S "${{ github.workspace }}/fw/device_minimal" -B build/qemu-stock \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/qemu-stock --verbose
+          python3 fw/device_minimal/check_elf.py build/qemu-stock/c2m-idle --allow-dynamic
+          sha256sum build/qemu-stock/c2m-idle
+
+      - name: Execute under qemu-arm with exact stock loader/glibc
+        run: |
+          set -euo pipefail
+          rm -f /tmp/c2m_idle.marker
+          set +e
+          timeout 4s qemu-arm -strace -L work/sysroot build/qemu-stock/c2m-idle > work/qemu.stdout 2> work/qemu.strace
+          rc=$?
+          set -e
+          test "$rc" -eq 124
+          grep -F "c2m-idle 0.1.0-sprint1" work/qemu.stdout
+          test -f /tmp/c2m_idle.marker
+          grep -F "c2m-idle 0.1.0-sprint1" /tmp/c2m_idle.marker
+          grep -E "openat|write|clock_nanosleep|nanosleep" work/qemu.strace | head -80
+          ! grep -E "(^| )socket\(" work/qemu.strace
+          echo "QEMU-STOCK-RUNTIME: PASS"
+
+      - name: Cleanup firmware bytes
+        if: always()
+        run: rm -rf firmware/original work/sysroot
