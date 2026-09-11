@@ -1,0 +1,743 @@
+{
+  "adas_findings": [
+    {
+      "classification": "PROVEN_TRIVIAL_DELTA",
+      "confidence": "CONFIRMED",
+      "en_evidence": "3875 syms; SystemInit 124 B @0x94499",
+      "file": "build/fw_bin_en|vi/adas",
+      "id": "A01",
+      "interpretation": "Only symbol-size delta is SystemInit (logging/error handling); both retain MI_SYS_Init/MI_SCL_CreateDevice/IPUCreateDevice.",
+      "offset_symbol": "symbol table",
+      "source": "elf_function_diff + dynsym",
+      "vi_evidence": "3875 syms, 0 EN-only, 0 VI-only; SystemInit 100 B @0x94499"
+    },
+    {
+      "classification": "DOWNGRADED_REWRITE",
+      "confidence": "MEDIUM",
+      "en_evidence": "2731 same call sequence",
+      "file": "adas .text",
+      "id": "A02",
+      "interpretation": "Consistent with register-allocation noise until a CFG-aware proof shows otherwise; broad algorithm rewrite downgraded.",
+      "offset_symbol": "SystemInit / LaneCalib::get_extrinsic / VehicleAlgo::PedProcess",
+      "source": "thumb_callgraph_diff (2734 comparable functions)",
+      "vi_evidence": "3 changed; 2 same-sized differ only in indirect-call register token"
+    },
+    {
+      "classification": "PROVEN_SAME_COMPARED_PATHS",
+      "confidence": "HIGH-CONFIDENCE",
+      "en_evidence": "byte-identical compared paths",
+      "file": "adas",
+      "id": "A03",
+      "interpretation": "Changed license implementation downgraded; runtime UUID/custom-info/feature state still UNKNOWN.",
+      "offset_symbol": "Bit_SetRootPath/Bit_Login/Bit_ReadFeature/Bit_CheckOutSn/Bit_CheckOutFeatures + /proc/self/exe helper + dispatcher",
+      "source": "docs/reverse/BITANSWER_LICENSE_PATH_V1.md",
+      "vi_evidence": "byte-identical compared paths"
+    },
+    {
+      "classification": "SUPPORTING_CONTEXT",
+      "confidence": "MEDIUM",
+      "en_evidence": "consumer expects ringbuf_vehicle/raw_adas 1920x1440 @10Hz",
+      "file": "adas",
+      "id": "A04",
+      "interpretation": "Static consumer endpoint/geometry aligns with cardv producer name; live acceptance still needs runtime proof.",
+      "offset_symbol": "--camera_input=ringbuf_vehicle --ringbuf_name=raw_adas --image_width=1920 --image_height=1440 --vehicle_run_freq=10",
+      "source": "docs/reverse/EVIDENCE_ADAS_STRINGS.json + STOCK_ADAS_SCHEMA",
+      "vi_evidence": "same consumer defaults recovered"
+    }
+  ],
+  "analysis_mode": "static-read-only",
+  "calibration_findings": [
+    {
+      "classification": "PROVEN_SAME_COMPARED_PATHS",
+      "confidence": "MEDIUM",
+      "en_evidence": "60000.0 ms + 0.1 threshold in Regular mode; heavy-mode success returns same state path",
+      "file": "adas",
+      "id": "L01",
+      "interpretation": "Explains EN warm-up delay; no proven VI semantic break upstream of state=2 in compared functions.",
+      "offset_symbol": "UpdateInstallCalibState/PassAutoCalibCheck/ProcessHeavyMode/ProcessRegularMode",
+      "source": "prior instruction-level review (VehicleAlgo::RunLane->...->UpdateInstallCalibState(2))",
+      "vi_evidence": "effectively identical at instruction level"
+    },
+    {
+      "classification": "PROVEN_SAME",
+      "confidence": "CONFIRMED",
+      "en_evidence": "stock script accepts 1 or 2; only 0 blocks normal startup",
+      "file": "customer UBIFS /minieye/adas",
+      "id": "L02",
+      "interpretation": "state=2 is success marker, not start precondition; script delta excluded.",
+      "offset_symbol": "install_calib_state gate",
+      "source": "adas_checkcalib.sh + run.sh semantics",
+      "vi_evidence": "byte-identical script"
+    },
+    {
+      "classification": "UNKNOWN_GATE",
+      "confidence": "UNKNOWN",
+      "en_evidence": "validity depends on frame metadata + model output + samples/time/quality gates (exact thresholds partially recovered)",
+      "file": "adas",
+      "id": "L03",
+      "interpretation": "Precise failing gate (movement/GPS/timing/confidence/geometry/IMU/persistence) remains UNKNOWN without runtime logs.",
+      "offset_symbol": "LaneCalibFacade/LaneCalib/calib_service/lane_accelerator/lane_postprocess",
+      "source": "LaneCalibFacade::get_extrinsic input trace (static)",
+      "vi_evidence": "same code surface; exact live inputs unavailable"
+    }
+  ],
+  "cardv_findings": [
+    {
+      "classification": "PROVEN_DIFFERENCE",
+      "confidence": "CONFIRMED",
+      "en_evidence": "1225780 B 344b4a3f...",
+      "file": "build/fw_bin_en|vi/cardv",
+      "id": "C01",
+      "interpretation": "Equal size, different build (BuildID differs).",
+      "offset_symbol": "whole file",
+      "source": "sha256 + size",
+      "vi_evidence": "1225780 B 56db44d9..."
+    },
+    {
+      "classification": "PROVEN_DIFFERENCE_NON_PRODUCER",
+      "confidence": "CONFIRMED",
+      "en_evidence": "4478 syms; EN-only Is_Gps_info/nmea_satinfo/nema_calc_checksum/g_zkw_gps_module",
+      "file": "cardv dynsym",
+      "id": "C02",
+      "interpretation": "VI work concentrated in GPS/G-sensor/power/display, not in ring-buffer API surface.",
+      "offset_symbol": "symbol table",
+      "source": "docs/reverse/EVIDENCE_CARDV_SYMDIFF.json (elf_dynsym_diff)",
+      "vi_evidence": "4476 syms; VI-only nmea_BDGSV2info_na/SendGPSSpeedToScreen; 9 size-changed (GPS/G-sensor/restart/minieye_init)"
+    },
+    {
+      "classification": "PROVEN_SAME",
+      "confidence": "CONFIRMED",
+      "en_evidence": "exactly one raw_adas token",
+      "file": "cardv .rodata",
+      "id": "C03",
+      "interpretation": "Endpoint not renamed; offset move is layout noise.",
+      "offset_symbol": "raw_adas token EN 0xFF340 / VI 0xF5794",
+      "source": "docs/reverse/EVIDENCE_CARDV_CONTRACT.json (strings/xref)",
+      "vi_evidence": "exactly one raw_adas token, moved by layout"
+    },
+    {
+      "classification": "PROVEN_SAME_VISIBLE_CONTRACT",
+      "confidence": "HIGH-CONFIDENCE",
+      "en_evidence": "visible ctor+request/commit sequence present; normalized send+send_frame_task identical",
+      "file": "cardv",
+      "id": "C04",
+      "interpretation": "Deliberate writer-contract rewrite downgraded; live width/height/stride/format/timestamps/cadence/startup-order remain UNKNOWN.",
+      "offset_symbol": "send()/adas_minieye_send_frame_task()/minieye_init + CRingBuf::CRingBuf/RequestWriteFrame/CommitWrite",
+      "source": "docs/reverse/CARDV_RAW_ADAS_CONTRACT_V1.md + cardv_ringbuf_contract.py",
+      "vi_evidence": "same visible sequence; same normalized code; minieye_init +4 B same thread/call order"
+    }
+  ],
+  "config_findings": [
+    {
+      "classification": "PROVEN_SAME",
+      "confidence": "CONFIRMED",
+      "en_evidence": "796e555a276d849737b8034021e1464a8241ed291a332ef5a61b767d9ab860e4",
+      "file": "customer UBIFS /minieye/adas/run.sh",
+      "id": "G01",
+      "interpretation": "Release-specific shell-gate regression excluded; requires adas.flag+calib.flag, base64-decodes to adas_de/calib_de.flag, exits on --enable_vehicle=false.",
+      "offset_symbol": "whole file 1584 B",
+      "source": "ubifs_extract_file.py + sha256 (re-verified this run)",
+      "vi_evidence": "796e555a276d849737b8034021e1464a8241ed291a332ef5a61b767d9ab860e4 (identical)"
+    },
+    {
+      "classification": "PROVEN_SAME",
+      "confidence": "CONFIRMED",
+      "en_evidence": "518f22e98842eb8a6c315d0a29098c885f0d2c942c4690154ddc730034b3d8c4",
+      "file": "customer UBIFS /minieye/adas/adas_checkcalib.sh",
+      "id": "G02",
+      "interpretation": "Calibration-check script delta excluded.",
+      "offset_symbol": "whole file 1145 B",
+      "source": "ubifs_extract_file.py + prior evidence",
+      "vi_evidence": "same hash (byte-identical)"
+    },
+    {
+      "classification": "COMPATIBILITY_UNKNOWN",
+      "confidence": "UNKNOWN",
+      "en_evidence": "updater preserves config dir; generic image holds placeholder only",
+      "file": "/customer/minieye/config + /config/cgi_config.bin + /config/net_config.bin",
+      "id": "G03",
+      "interpretation": "Same persistent files can yield different VI behaviour only if parser/range/default/validation branches differ (unproven) or values are rejected at runtime (untested).",
+      "offset_symbol": "persistent keys: install_calib_state/pitch/yaw/camera_height/extrinsic/intrinsic",
+      "source": "adas_upgrade.sh + UBIFS manifest semantics",
+      "vi_evidence": "same preservation; same placeholder shape; device files unavailable"
+    }
+  ],
+  "cross_references": [
+    "VI_ADAS_FAILURE_DEEP_DIVE_V1.md",
+    "VI_KERNEL_MEDIA_DIFF_V1.md",
+    "VI_CALIBRATION_PATH_V1.md",
+    "VI_CARDV_RAW_ADAS_DEEP_DIFF_V1.md",
+    "VI_ADAS_PACKAGE_METADATA_V2.md"
+  ],
+  "excluded_causes": [
+    {
+      "cause": "Different CNN/model weights",
+      "confidence": "CONFIRMED",
+      "evidence": "6/6 blobs byte-identical (EVIDENCE_ADAS_MODEL_DIRECTORY.json)"
+    },
+    {
+      "cause": "Stale m0 offsets",
+      "confidence": "CONFIRMED",
+      "evidence": "VI m0 tracks shifted offsets self-consistently"
+    },
+    {
+      "cause": "adas_checkcalib.sh difference",
+      "confidence": "CONFIRMED",
+      "evidence": "byte-identical 1145 B 518f22e9..."
+    },
+    {
+      "cause": "Missing UpdateInstallCalibState(2) path",
+      "confidence": "MEDIUM",
+      "evidence": "Heavy/Regular success paths effectively identical"
+    },
+    {
+      "cause": "Broad lane-algorithm rewrite",
+      "confidence": "MEDIUM",
+      "evidence": "2731/2734 same call sequence; 2 diffs look like regalloc noise"
+    },
+    {
+      "cause": "raw_adas API rewrite / endpoint rename",
+      "confidence": "HIGH-CONFIDENCE",
+      "evidence": "Same CRingBuf API + single raw_adas token + identical normalized helpers"
+    },
+    {
+      "cause": "M4/display transport collapse as sole proof of inference failure",
+      "confidence": "MEDIUM",
+      "evidence": "Display reported normal; inference-vs-rendering layers separable"
+    }
+  ],
+  "exclusions": [
+    "No firmware modification",
+    "No Candidate C build",
+    "No binary patching",
+    "No Candidate A/B alteration",
+    "No commit or push"
+  ],
+  "findings": [
+    {
+      "evidence": [
+        "EN and VI kernel payloads differ; VI adds 8 MiB fb reservation.",
+        "No runtime dmesg/cmdline/media/allocator/IPU capture exists."
+      ],
+      "hypothesis": "VI kernel/media/memory integration prevents usable frames or IPU initialization",
+      "id": "F01",
+      "rank": 1,
+      "references": [
+        "docs/firmware_en_vi/01_PACKAGE_FLASH_LAYOUT.md:125-141",
+        "docs/firmware_en_vi/02_BOOT_KERNEL_ROOTFS.md:43-58",
+        "docs/firmware_en_vi/05_CAMERA_MEDIA_IMU.md:59-72"
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "evidence": [
+        "Updater preserves /customer/minieye/config.",
+        "run.sh identical; exits if flags absent or enable_vehicle=false.",
+        "Device flag contents unavailable."
+      ],
+      "hypothesis": "Persistent calibration/config state is accepted differently by VI",
+      "id": "F02",
+      "rank": 2,
+      "references": [
+        "docs/firmware_en_vi/07_CONFIG_LICENSE_CALIBRATION.md:3-64"
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "evidence": [
+        "Same CRingBuf ctor/request/commit pattern; normalized helpers identical.",
+        "Live geometry/cadence/ordering unmeasured."
+      ],
+      "hypothesis": "Frames fail upstream despite an unchanged raw_adas writer contract",
+      "id": "F03",
+      "rank": 3,
+      "references": [
+        "docs/reverse/CARDV_RAW_ADAS_CONTRACT_V1.md:21-189"
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "evidence": [
+        "6 model blobs identical; 7 gaps sum to +17862.",
+        "No proven reader/xref."
+      ],
+      "hypothesis": "ADAS interstitial package metadata or its runtime interpretation causes failure",
+      "id": "F04",
+      "rank": 4,
+      "references": [
+        "docs/reverse/ADAS_INTERSTITIAL_GAPS_V1.md:8-32"
+      ],
+      "status": "UNKNOWN"
+    },
+    {
+      "evidence": [
+        "Compared BitAnswer paths byte-identical; runtime state untested."
+      ],
+      "hypothesis": "VI changed the license/feature implementation",
+      "id": "F05",
+      "rank": 5,
+      "references": [
+        "docs/reverse/BITANSWER_LICENSE_PATH_V1.md:181-224"
+      ],
+      "status": "DOWNGRADED"
+    },
+    {
+      "evidence": [
+        "VI has display/GPS + fb changes; display-only failure cannot prove inference failure."
+      ],
+      "hypothesis": "The M4/display path alone explains total activation failure",
+      "id": "F06",
+      "rank": 6,
+      "references": [
+        "docs/reverse/SCREEN_ADAS_PATH_DIFF_V2.md"
+      ],
+      "status": "DOWNGRADED"
+    },
+    {
+      "evidence": [
+        "6/6 blobs byte-identical."
+      ],
+      "hypothesis": "Different CNN/model weights caused the regression",
+      "id": "F07",
+      "rank": 7,
+      "references": [
+        "docs/reverse/EVIDENCE_ADAS_MODEL_DIRECTORY.json"
+      ],
+      "status": "EXCLUDED_AS_PRIMARY"
+    }
+  ],
+  "firmware": {
+    "adas_upgrade_same": true,
+    "en_bootargs": "setenv bootargs ubi.mtd=ubi0,2048 rootfstype=ramfs initrd=0x21000000,0xc00000 LX_MEM=0x3ffe0000 mma_heap=mma_heap_name0,miu=0,sz=0x1f000000 mma_memblock_remove=1 cma=2M@0x23800000 loglevel=3 $(mtdparts)",
+    "en_inner": {
+      "name": "SigmastarUpgradeSD_SSC8838G.bin",
+      "sha256": "e3f2443294f71588297821ee99ebccb54559ce3660c61fde338c210903639517",
+      "size": 58359832
+    },
+    "en_outer": {
+      "SigmastarUpgradeSD_SSC8838G.bin": {
+        "head": "\n# File Partition: cis.es\nsysVer 20230803193750\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5c0",
+        "sha256": "e3f2443294f71588297821ee99ebccb54559ce3660c61fde338c210903639517",
+        "size": 58359832
+      },
+      "adas_upgrade.sh": {
+        "head": "#!/bin/sh\nfw_path=\"/mnt/mmc/image.tar\"\nfw_ver_path=\"/mnt/mmc/sysVer.txt\"\nfw_file_path=\"/mnt/mmc/",
+        "sha256": "0e18c91fd95f2a2cdf64637448d8540e946ae5bb2e37627d8bbd6bef7f7da05b",
+        "size": 2972
+      },
+      "minieye_firmware.md5": {
+        "head": "8e69fe4511366ed86b892bf413916187  SigmastarUpgradeSD_SSC8838G.bin\n",
+        "sha256": "fca994b683f6f2d934ce2ca5154a914754109e3bd6e56b54e165e7aade640831",
+        "size": 66
+      },
+      "sysVer.txt": {
+        "head": "sysVer 20230803193750\nend\n",
+        "sha256": "7cc0796927d1a85e919e322bf745f764580e9f7d481fe00ea1f7cb772358d82e",
+        "size": 26
+      }
+    },
+    "en_sysver": {
+      "head": "sysVer 20230803193750\nend\n",
+      "sha256": "7cc0796927d1a85e919e322bf745f764580e9f7d481fe00ea1f7cb772358d82e",
+      "size": 26
+    },
+    "en_tar": {
+      "path": "firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar",
+      "sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c",
+      "size": 58368000
+    },
+    "vi_bootargs": "setenv bootargs ubi.mtd=ubi0,2048 rootfstype=ramfs initrd=0x21000000,0xc00000 LX_MEM=0x3ffe0000 mma_heap=mma_heap_name0,miu=0,sz=0x1f000000 mma_memblock_remove=1 cma=2M@0x23800000 mmap_reserved=fb,miu=0,sz=0x800000,max_start_off=0x3F000000,max_end_off=0x3F800000 loglevel=3 $(mtdparts)",
+    "vi_inner": {
+      "name": "SigmastarUpgradeSD_SSC8838G.bin",
+      "sha256": "9ec1c85ec0d8b69ee4cfbe3ae557c882439d3a5a6c99c5998b7a81ec7b87c53a",
+      "size": 58105880
+    },
+    "vi_outer": {
+      "SigmastarUpgradeSD_SSC8838G.bin": {
+        "head": "\n# File Partition: cis.es\nsysVer 20230920185743\nfatload mmc 0 0x21000000 $(SdUpgradeImage) 0x5c0",
+        "sha256": "9ec1c85ec0d8b69ee4cfbe3ae557c882439d3a5a6c99c5998b7a81ec7b87c53a",
+        "size": 58105880
+      },
+      "adas_upgrade.sh": {
+        "head": "#!/bin/sh\nfw_path=\"/mnt/mmc/image.tar\"\nfw_ver_path=\"/mnt/mmc/sysVer.txt\"\nfw_file_path=\"/mnt/mmc/",
+        "sha256": "0e18c91fd95f2a2cdf64637448d8540e946ae5bb2e37627d8bbd6bef7f7da05b",
+        "size": 2972
+      },
+      "minieye_firmware.md5": {
+        "head": "ab5245740c2c7860b44d7d8adbf89ec6  SigmastarUpgradeSD_SSC8838G.bin\n",
+        "sha256": "64b1a8f1ec830b1477f15fda87e22844328238d021f385e22a1986a277f9d0fa",
+        "size": 66
+      },
+      "sysVer.txt": {
+        "head": "sysVer 20230920185743\nend\n",
+        "sha256": "158d41dc294e49391e7164bf0b68ee8582f03989919bbead3851de6ce9dcd4ea",
+        "size": 26
+      }
+    },
+    "vi_sysver": {
+      "head": "sysVer 20230920185743\nend\n",
+      "sha256": "158d41dc294e49391e7164bf0b68ee8582f03989919bbead3851de6ce9dcd4ea",
+      "size": 26
+    },
+    "vi_tar": {
+      "path": "firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar",
+      "sha256": "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa",
+      "size": 58122240
+    }
+  },
+  "generated_by": "tools/fw/vi_adas_failure_evidence.py",
+  "ground_truth": {
+    "en": "known-working ADAS baseline",
+    "vi": "known-non-working ADAS firmware on the same unit"
+  },
+  "inputs": {
+    "en_adas": {
+      "expected_sha256": "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043",
+      "path": "build/fw_bin_en/adas",
+      "sha256": "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043",
+      "size": 11636008,
+      "verified": true
+    },
+    "en_cardv": {
+      "expected_sha256": "344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c",
+      "path": "build/fw_bin_en/cardv",
+      "sha256": "344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c",
+      "size": 1225780,
+      "verified": true
+    },
+    "en_kernel": {
+      "expected_sha256": "c1fa8f7363615f1dc7d91f3308608d336fee6d89f5dcfe48e826bf4a399f5030",
+      "path": "build/carve_en/kernel.es.load0.off_00061000.size_22691f.bin",
+      "sha256": "c1fa8f7363615f1dc7d91f3308608d336fee6d89f5dcfe48e826bf4a399f5030",
+      "size": 2255135,
+      "verified": true
+    },
+    "en_sc7a20": {
+      "expected_sha256": "2d8121dd245d88684a5ece8e5647dfd04571a3184beca2a01fcac7743bbc797a",
+      "path": "build/fw_bin_en/sc7a20.ko",
+      "sha256": "2d8121dd245d88684a5ece8e5647dfd04571a3184beca2a01fcac7743bbc797a",
+      "size": 24196,
+      "verified": true
+    },
+    "en_tar": {
+      "expected_sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c",
+      "path": "firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar",
+      "sha256": "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c",
+      "size": 58368000,
+      "verified": true
+    },
+    "vi_adas": {
+      "expected_sha256": "997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1",
+      "path": "build/fw_bin_vi/adas",
+      "sha256": "997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1",
+      "size": 11653870,
+      "verified": true
+    },
+    "vi_cardv": {
+      "expected_sha256": "56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23",
+      "path": "build/fw_bin_vi/cardv",
+      "sha256": "56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23",
+      "size": 1225780,
+      "verified": true
+    },
+    "vi_kernel": {
+      "expected_sha256": "8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314",
+      "path": "build/vi_carve/kernel.es.load0.off_00061000.size_226921.bin",
+      "sha256": "8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314",
+      "size": 2255137,
+      "verified": true
+    },
+    "vi_sc7a20": {
+      "expected_sha256": "5d020616c2b67909a6bc5db19245bfedaf1301d875ae7c117c4d1888de566d64",
+      "path": "build/fw_bin_vi/sc7a20.ko",
+      "sha256": "5d020616c2b67909a6bc5db19245bfedaf1301d875ae7c117c4d1888de566d64",
+      "size": 24204,
+      "verified": true
+    },
+    "vi_tar": {
+      "expected_sha256": "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa",
+      "path": "firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar",
+      "sha256": "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa",
+      "size": 58122240,
+      "verified": true
+    }
+  },
+  "kernel_findings": [
+    {
+      "classification": "PROVEN_DIFFERENCE_NO_CAUSALITY",
+      "confidence": "CONFIRMED",
+      "en_evidence": "load=0x20008000 entry=0x20008000 comp=9 time=1690805302 dcrc_ok=True",
+      "file": "kernel.es load0 (EN vs VI)",
+      "id": "K01",
+      "interpretation": "Same load/entry excludes relocation delta; comp=9 is nonstandard SigmaStar (not zlib) so payload is opaque to local tooling; distinct timestamps prove distinct builds.",
+      "offset_symbol": "uImage header bytes 0..63",
+      "source": "uImage header parse (struct >IIIIIIIBBBB)",
+      "vi_evidence": "load=0x20008000 entry=0x20008000 comp=9 time=1695199107 dcrc_ok=True"
+    },
+    {
+      "classification": "PROVEN_DIFFERENCE_NO_CAUSALITY",
+      "confidence": "CONFIRMED",
+      "en_evidence": "setenv bootargs ubi.mtd=ubi0,2048 rootfstype=ramfs initrd=0x21000000,0xc00000 LX_MEM=0x3ffe0000 mma_heap=mma_heap_name0,miu=0,sz=0x1f000000 mma_memblock_remove=... (no mmap_reserved)",
+      "file": "upgrade_script.txt # File Partition: set_config",
+      "id": "K02",
+      "interpretation": "Proves VI reserves an extra 8 MiB window labelled fb at 0x3F000000-0x3F800000. Does not prove overlap with CMA/MMA/IPU/camera buffers, consumption at runtime, or starvation.",
+      "offset_symbol": "bootargs line",
+      "source": "build/carve_en|vi_carve/upgrade_script.txt setenv bootargs",
+      "vi_evidence": "adds mmap_reserved=fb,miu=0,sz=0x800000,max_start_off=0x3F000000,max_end_off=0x3F800000"
+    },
+    {
+      "classification": "PROVEN_DIFFERENCE_OPAQUE",
+      "confidence": "CONFIRMED",
+      "en_evidence": "size=2255071 sha=4c9b8b1ad13cbe85... first16=ecfd777c5347d6308ecf2deab2253790",
+      "file": "kernel.es.load0",
+      "id": "K03",
+      "interpretation": "Payloads are distinct builds with identical 16-byte prefix; semantic driver/config delta inside the opaque comp=9 blob remains UNKNOWN (no config/DTB recovered).",
+      "offset_symbol": "compressed payload",
+      "source": "payload sha256 of uImage body (bytes 64..end)",
+      "vi_evidence": "size=2255073 sha=cf9f928dc53bd43d... first16 identical, tail differs"
+    },
+    {
+      "classification": "SUPPORTING_CONTEXT",
+      "confidence": "MEDIUM",
+      "en_evidence": "mi_sys/mi_scl/mi_ipu/mi_vif/mi_isp/mi_sensor .ko+.so present; sc7a20.ko 24196",
+      "file": "rootfs.es.load0",
+      "id": "K04",
+      "interpretation": "Rootfs media ABI surface is narrow (only cardv+sc7a20 content-changed of 528 files); path equality does not prove identical kernel-side driver behaviour.",
+      "offset_symbol": "rootfs module set bootconfig/modules/4.9.227",
+      "source": "docs/firmware_en_vi/02_BOOT_KERNEL_ROOTFS.md + rootfs gzip/cpio magic",
+      "vi_evidence": "same named media stack present; sc7a20.ko 24204; 15 client modules rebuilt (vermagic still 4.9.227)"
+    }
+  ],
+  "package_metadata_findings": [
+    {
+      "classification": "PROVEN_SAME_BLOBS",
+      "confidence": "CONFIRMED",
+      "en_evidence": "overlay 10117644 c395db15...; 6 blobs hashed",
+      "file": "adas overlay @0x172B1C",
+      "id": "P01",
+      "interpretation": "Changed CNN weights and stale-m0 excluded as primary.",
+      "offset_symbol": "models d0/v_a/v_t/p_r/road/tl",
+      "source": "elf_overlay_report + EVIDENCE_ADAS_MODEL_DIRECTORY.json (AES directory FLAGS_m0)",
+      "vi_evidence": "overlay 10135506 6becae4d...; same 6 blob hashes, sizes equal, offsets shifted, m0 self-consistent"
+    },
+    {
+      "classification": "PROVEN_GEOMETRY_UNKNOWN_SEMANTICS",
+      "confidence": "CONFIRMED",
+      "en_evidence": "gaps 7394/16790/7624/17384/14532/20660/6746",
+      "file": "adas interstitial",
+      "id": "P02",
+      "interpretation": "Entire VI growth is non-model interstitial; format/reader/causality UNKNOWN (no proven xref/validator/log).",
+      "offset_symbol": "7 gaps ELF-end..flags",
+      "source": "adas_gap_report + EVIDENCE_ADAS_GAP_GEOMETRY.json",
+      "vi_evidence": "gaps 8706/21304/16974/15410/15616/21880/9102; deltas sum exactly +17862 = file-size delta"
+    }
+  ],
+  "payload_diff": [
+    {
+      "en_file": "cis.es.load0.off_00004000.size_5c00.bin",
+      "en_sha256": "70a587437182018af328c50fdb7d94663311857bbc14e849cb21c08913584e70",
+      "en_size": 23552,
+      "payload": "cis.es#0",
+      "same": true,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "same",
+      "vi_file": "cis.es.load0.off_00004000.size_5c00.bin",
+      "vi_sha256": "70a587437182018af328c50fdb7d94663311857bbc14e849cb21c08913584e70",
+      "vi_size": 23552
+    },
+    {
+      "en_file": "cis.es.load1.off_0000a000.size_200.bin",
+      "en_sha256": "5fedff9f36704ec2f51771adc4d5b6ff5d244a24afcfd34548d658579f129be4",
+      "en_size": 512,
+      "payload": "cis.es#1",
+      "same": true,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "same",
+      "vi_file": "cis.es.load1.off_0000a000.size_200.bin",
+      "vi_sha256": "5fedff9f36704ec2f51771adc4d5b6ff5d244a24afcfd34548d658579f129be4",
+      "vi_size": 512
+    },
+    {
+      "en_file": "customer.es.load0.off_00c5d000.size_25e7000.bin",
+      "en_sha256": "b4dabc4d789c758d94313208d57dbec279d394c4d91b6935542242a8b515dd8f",
+      "en_size": 39743488,
+      "payload": "customer.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "customer.es.load0.off_00c5d000.size_25e7000.bin",
+      "vi_sha256": "7325f9fffa461596273ae30995b4e69d80d380da5aa1cbea0f874e904b599c93",
+      "vi_size": 39743488
+    },
+    {
+      "en_file": "ipl.es.load0.off_0000b000.size_6180.bin",
+      "en_sha256": "78d4ba339b4ba5f892e9a3d5ade44a9125932188acd5e73d093fadba365a2e2e",
+      "en_size": 24960,
+      "payload": "ipl.es#0",
+      "same": true,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "same",
+      "vi_file": "ipl.es.load0.off_0000b000.size_6180.bin",
+      "vi_sha256": "78d4ba339b4ba5f892e9a3d5ade44a9125932188acd5e73d093fadba365a2e2e",
+      "vi_size": 24960
+    },
+    {
+      "en_file": "ipl_cust.es.load0.off_00012000.size_5eb0.bin",
+      "en_sha256": "6f892733ff63d4493b8465bfe6a044043ebde25d8f79ba2af1d4aceb5ffb8a6e",
+      "en_size": 24240,
+      "payload": "ipl_cust.es#0",
+      "same": true,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "same",
+      "vi_file": "ipl_cust.es.load0.off_00012000.size_5eb0.bin",
+      "vi_sha256": "6f892733ff63d4493b8465bfe6a044043ebde25d8f79ba2af1d4aceb5ffb8a6e",
+      "vi_size": 24240
+    },
+    {
+      "en_file": "kernel.es.load0.off_00061000.size_22691f.bin",
+      "en_sha256": "c1fa8f7363615f1dc7d91f3308608d336fee6d89f5dcfe48e826bf4a399f5030",
+      "en_size": 2255135,
+      "payload": "kernel.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "kernel.es.load0.off_00061000.size_226921.bin",
+      "vi_sha256": "8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314",
+      "vi_size": 2255137
+    },
+    {
+      "en_file": "misc.es.load0.off_03244000.size_200000.bin",
+      "en_sha256": "c9bbb3850500aae6312bd9bb79bed093d2ded7b9019c76ef2910434e2d6914f8",
+      "en_size": 2097152,
+      "payload": "misc.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "misc.es.load0.off_03244000.size_200000.bin",
+      "vi_sha256": "b1aafe49adce7d531b14e90b5ff79053d7d4dc36519660b803c5a2c1537d3be8",
+      "vi_size": 2097152
+    },
+    {
+      "en_file": "miservice.es.load0.off_00aca000.size_193000.bin",
+      "en_sha256": "358c01a9e9455a8d0b43587eff8eea754b4df3a538d2974cf8ff714191a16db7",
+      "en_size": 1650688,
+      "payload": "miservice.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "miservice.es.load0.off_00aca000.size_193000.bin",
+      "vi_sha256": "db3327bdc33b5b6ac49cf02ad179bc784cec811f6449112117eb9f8d176e84d9",
+      "vi_size": 1650688
+    },
+    {
+      "en_file": "oneed_cust.es.load0.off_03444000.size_364000.bin",
+      "en_sha256": "f982f15e2d18dc2549ee53617a45c44ea1764c5b84debee634bb75b8edd92a87",
+      "en_size": 3555328,
+      "payload": "oneed_cust.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "oneed_cust.es.load0.off_03444000.size_326000.bin",
+      "vi_sha256": "69bebcf4301bc778e3088dd639dc5b84766436900859c48f0ea2b80af6782915",
+      "vi_size": 3301376
+    },
+    {
+      "en_file": "rootfs.es.load0.off_00288000.size_841d6b.bin",
+      "en_sha256": "1dcc3e954910661af2bb36ae6bc53433e378e9b496eaa20717bb7479b4bd3f2b",
+      "en_size": 8658283,
+      "payload": "rootfs.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "rootfs.es.load0.off_00288000.size_841177.bin",
+      "vi_sha256": "f90f109a29711ad926e8d302df083ef4eb24876bd2c4183c2b5a6f0c16ab6edc",
+      "vi_size": 8655223
+    },
+    {
+      "en_file": "uboot.es.load0.off_00018000.size_48a44.bin",
+      "en_sha256": "7c64be8cb848af856a9f107139ee90765be4c3c3bdcd4eb49563839b57304490",
+      "en_size": 297540,
+      "payload": "uboot.es#0",
+      "same": false,
+      "source": "tools/fw/carve_upgrade.py manifests",
+      "verdict": "different",
+      "vi_file": "uboot.es.load0.off_00018000.size_48a44.bin",
+      "vi_sha256": "0e1e13409beaf77e680f5c9c5221ab21d796164dc926715e649ac52457102fd9",
+      "vi_size": 297540
+    }
+  ],
+  "root_cause_candidates": [
+    {
+      "candidate": "VI kernel/media/contiguous-memory or IPU init behaviour blocks usable frames",
+      "confidence": "UNKNOWN",
+      "contradicting": "No config/DTB/allocator/IPU log proves starvation; camera+recording work so sensor path is not grossly broken.",
+      "mechanism": "Changed reservation/allocator ordering or VIF/ISP/SCL/IPU driver behaviour could starve raw_adas or fail MI_SYS_Init/MI_SCL_CreateDevice/IPUCreateDevice at runtime.",
+      "next_test": "Read-only EN/VI capture: /proc/cmdline /proc/meminfo /proc/iomem dmesg lsmod ps + MI_* return codes + raw_adas frame counters.",
+      "proven_difference": "Distinct uImage payloads (hashes differ, +2 B); VI adds 8 MiB fb reservation 0x3F000000-0x3F800000; valid load/entry/CRC both sides.",
+      "rank": 1,
+      "supporting": "Kernel is the largest opaque VI delta; userspace media stack is otherwise identical so kernel is the natural suspect surface."
+    },
+    {
+      "candidate": "Persistent calibration/config accepted differently by VI executable",
+      "confidence": "UNKNOWN",
+      "contradicting": "No parser diff proven in compared code; generic image has placeholder only so no static incompatibility shown.",
+      "mechanism": "Same flag bytes could fail VI parser/range/validation branches, or VI requires a new key absent from EN-era files.",
+      "next_test": "Private read-only copy+decode of device flags; run EN-vs-VI parser matrix on copies; record validation logs without publishing secrets.",
+      "proven_difference": "None in scripts (run.sh + adas_checkcalib.sh byte-identical); updater preserves /customer/minieye/config (proven).",
+      "rank": 2,
+      "supporting": "Startup depends on device-specific adas.flag/calib.flag decoded to adas_de/calib_de.flag + --enable_vehicle gate."
+    },
+    {
+      "candidate": "Upstream frame starvation despite unchanged writer helpers",
+      "confidence": "UNKNOWN",
+      "contradicting": "Call-sequence equality lowers deliberate-rewrite probability; recording works so some camera path flows.",
+      "mechanism": "Sensor/VIF/ISP/SCL setup, CMA allocation, thread start timing, or startup-order race yields no/tardy/malformed frames to an unchanged writer.",
+      "next_test": "Capture cardv/adas threads, raw_adas existence, frame metadata (w/h/stride/fmt/seq/ts/fps), allocation errors on EN vs VI.",
+      "proven_difference": "cardv builds differ (equal size, distinct hash) but send()/send_frame_task normalized code identical; raw_adas token singular both sides.",
+      "rank": 3,
+      "supporting": "Static equality of writer does not prove live frames, geometry, stride, timestamps, cadence, or mapping success."
+    },
+    {
+      "candidate": "ADAS interstitial package metadata interpretation",
+      "confidence": "UNKNOWN",
+      "contradicting": "No xref/reader/parser/log ties gaps to activation; BitAnswer compared paths byte-identical.",
+      "mechanism": "Opaque protection/package records could gate model loading, feature enable, or calibration via an unidentified reader.",
+      "next_test": "Search xrefs for gap/overlay offsets; strace/mmap trace of /proc/self/exe ranges; reversible EN-base + VI-adas launch log.",
+      "proven_difference": "7 non-model gaps sum exactly to +17862 B; models identical; m0 self-consistent.",
+      "rank": 4,
+      "supporting": "Placement around protected blobs is consistent with package/protection metadata."
+    },
+    {
+      "candidate": "Runtime license/custom-info/feature state",
+      "confidence": "LOW",
+      "contradicting": "Implementation delta downgraded by byte-identity of compared paths.",
+      "mechanism": "Identical code returns different feature set when fed different UUID/license/feature blobs.",
+      "next_test": "Sanitized login/feature-query return-code capture on EN vs VI; never publish secrets.",
+      "proven_difference": "None in compared implementation (Bit_Login/ReadFeature/CheckOutSn/CheckOutFeatures/SetRootPath/dispatcher byte-identical).",
+      "rank": 5,
+      "supporting": "License root lives under preserved config dir; device-specific state untested."
+    },
+    {
+      "candidate": "Display/M4-only failure masking live inference",
+      "confidence": "LOW",
+      "contradicting": "Display-normal observation cuts both ways; no evidence inference reaches display boundary in VI.",
+      "mechanism": "Inference runs but warnings/pixels/audio never reach screen/M4, appearing as never-active lane/AI.",
+      "next_test": "Classify A-F first; if inference alive, capture ScreenService/MessagePack traffic + M4 pcap on verified interface.",
+      "proven_difference": "VI adds SendGPSSpeedToScreen + GPS/display/G-sensor/power changes + 8 MiB fb reservation; display reportedly normal.",
+      "rank": 6,
+      "supporting": "cardv owns many Send*ToScreen paths; MessagePack/AdasStatus layers separate inference from rendering."
+    }
+  ],
+  "schema": "c2m.vi_adas_failure.evidence.v1",
+  "unknowns": [
+    "Exact VI runtime failure class A-F (absent/crash/starved/IPU-fail/gate-suppressed/display-only)",
+    "Live raw_adas metadata: w/h/stride/format/bytes/seq/timestamps/fps/drops/mapping",
+    "Kernel config + DTB semantic delta inside opaque comp=9 payload",
+    "Runtime CMA/MIU/mmap_reserved consumer, allocation order, IPU return codes",
+    "Device adas.flag/calib.flag + decoded contents, enable_vehicle value, parser logs",
+    "Calibration gate inputs: movement/GPS/timing/confidence/geometry/IMU/persistence thresholds",
+    "Causal reader (if any) of the 7 interstitial regions; package validation logs",
+    "Runtime license UUID/custom-info/feature values and Bit_* return codes",
+    "Whether inference runs while screen/audio stays silent"
+  ]
+}
