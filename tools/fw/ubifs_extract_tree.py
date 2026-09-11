@@ -70,6 +70,13 @@ def main() -> int:
         if row["type"] != "symlink":
             os.chmod(dest, row["mode"])
             os.utime(dest, (row["mtime"], row["mtime"]))
+        else:
+            # Symlink times: set where the platform allows (Linux). mkfs.ubifs
+            # reads them via lstat, so the no-op manifest compare depends on it.
+            try:
+                os.utime(dest, (row["mtime"], row["mtime"]), follow_symlinks=False)
+            except (NotImplementedError, OSError):
+                pass  # inspection-only trees (e.g. Windows) keep build times
     # directory mtimes after all children are placed
     for row in sorted(doc["entries"], key=lambda r: -len(r["path"])):
         if row["type"] == "dir":
