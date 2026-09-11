@@ -83,6 +83,8 @@ jobs:
         # qemu-arm-static with the STOCK rootfs as sysroot (stock
         # ld-linux-armhf.so.3 + glibc 2.30). The daemon loops forever, so
         # `timeout -KILL` rc=137 is expected; the gates are stdout + marker.
+        # NOTE: qemu-user leaves guest /tmp untranslated (proven by the
+        # isolated prehw-qemu run), so the marker lands on host /tmp.
         run: |
           mkdir -p work/sysroot && cd work/sysroot
           gunzip -c ../carve/rootfs.es.load0.*.bin | cpio -id --no-absolute-filenames
@@ -90,12 +92,13 @@ jobs:
           mkdir -p work/sysroot/tmp
           cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/c2m-idle
           sha256sum work/sysroot/tmp/c2m-idle > work/qemu_bin.sha256
+          rm -f /tmp/c2m_idle.marker
           timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
             > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
           cat work/qemu_out.txt
           grep -q "c2m-idle 0.1.0-sprint1" work/qemu_out.txt
-          cat work/sysroot/tmp/c2m_idle.marker
-          grep -qx "c2m-idle 0.1.0-sprint1" work/sysroot/tmp/c2m_idle.marker
+          cat /tmp/c2m_idle.marker
+          grep -qx "c2m-idle 0.1.0-sprint1" /tmp/c2m_idle.marker
           echo "QEMU-RUNTIME: PASS (stock glibc-2.30 userspace; stdout + marker verified)"
       - name: P2 mutate + P1 mutated rebuild (GATE)
         run: |
