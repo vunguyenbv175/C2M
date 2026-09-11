@@ -5,3 +5,7 @@ firmware/original/V2023*
 __pycache__/
 *.pyc
 *.sqlite
+# Pre-hardware bring-up private drops (never commit SDK/models/weights)
+external/
+build/ipu/
+C2M_HW_*/
