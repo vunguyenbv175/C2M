@@ -1,0 +1,14 @@
+{
+  "EN": {
+    "file_size": 11636008,
+    "overlay_start": 1518364,
+    "overlay_size": 10117644,
+    "overlay_sha256": "c395db153a76cd15f6e50ef003ccfa4295ec87dc01e409b0721ae8d4d24c6084"
+  },
+  "VI": {
+    "file_size": 11653870,
+    "overlay_start": 1518364,
+    "overlay_size": 10135506,
+    "overlay_sha256": "6becae4d9eb413f36d0b8418a747de5fed24d8eec7d7f5f265a54b84201e04f7"
+  }
+}

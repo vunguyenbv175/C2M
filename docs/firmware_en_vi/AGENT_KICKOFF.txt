@@ -1,0 +1,38 @@
+C2M EN/VI DEEP-DIFF — CODING AGENT KICKOFF
+===========================================
+
+Read the whole directory:
+C2M_FW_REVERSE_DOCS_V1/
+
+Ground truth:
+- EN 2023-08-03 works on the user's C2M.
+- VI 2023-09-20 did not provide working ADAS on the same C2M.
+- Treat EN as GOLDEN.
+- Treat VI as DONOR + REGRESSION build.
+
+Do not rewrite ADAS yet.
+
+Top tasks:
+1. Reproduce the static carve/hash diff.
+2. Ghidra diff EN vs VI `adas`.
+3. Reverse the ~10 MB appended ADAS payload and `m0`.
+4. Ghidra diff EN vs VI `cardv`.
+5. Trace raw_adas/ringbuf_vehicle producer-consumer contract.
+6. Reverse ScreenService at port 26012 and its MessagePack/libflow path.
+7. Trace TSR enable gate and output route.
+8. Prepare reversible on-device good/bad bisect.
+
+Important correction:
+Do NOT report `h--switch_file=...` as a VI bug.
+Exact bytes contain the correct `--switch_file=...`; the h is a preceding non-delimited payload byte.
+
+Hard rules:
+- evidence first,
+- no destructive flash during initial bisect,
+- no bootloader changes,
+- no invented M4 protocol,
+- no claim that TSR is enabled until runtime config is proven,
+- preserve stock app/recorder/M4.
+
+Required first report:
+docs/C2M_EN_VI_OWNER_DELTA_REVIEW.md
