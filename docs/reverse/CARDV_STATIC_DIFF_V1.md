@@ -57,7 +57,7 @@ cardv_cmd_handler_GsensorSensitivity 148 -> 140
 minieye_init                        1212 -> 1216
 ```
 
-Most of the visible feature delta is concentrated in GPS parsing, G-sensor/power handling and restart/logging rather than the core ADAS frame-forwarding functions.
+Most visible feature delta is concentrated in GPS parsing, G-sensor/power handling and restart/logging rather than the core ADAS frame-forwarding functions.
 
 ## Call-graph comparison
 
@@ -78,19 +78,19 @@ Several of those 33 are noise from unresolved indirect registers or literal-pool
 
 `nmea_parser_real_push1` changes checksum/info parsing flow and removes calls to the EN-only `nema_calc_checksum` and `Is_Gps_info`.
 
-This looks like a substantial GPS parser refactor.
+This is a substantial GPS parser refactor.
 
 ### Screen GPS changes
 
 `SendGPSInfoToScreen` shrinks from 112 to 92 bytes and no longer calls `SetGPSLevel()` twice.
 
-VI adds a new exported:
+VI adds:
 
 ```text
 SendGPSSpeedToScreen(int)
 ```
 
-Together with the VI-only 8 MiB framebuffer bootarg, this is strong evidence that the September build included M4/display work.
+Together with the VI-only 8 MiB framebuffer reserved-memory bootarg, this is strong evidence that the September build included M4/display work.
 
 ## ADAS/media path appears structurally stable
 
@@ -109,7 +109,7 @@ minieye_adas_config_update
 
 `minieye_init` also retains the same resolved call sequence despite growing by four bytes.
 
-This does **not** prove byte-for-byte equivalence, but it lowers the probability that VI completely rewrote the `raw_adas`/Flow data path.
+This does **not** prove byte-for-byte equivalence or frame-flow equivalence, but it lowers the probability that VI completely rewrote the `raw_adas`/Flow path.
 
 ### Confirmed `DeviceSendMsgToScreenTask` sequence
 
@@ -128,11 +128,18 @@ SendWifiStatusToScreen
 SendAudioRecordStatusToScreen
 ```
 
-This is valuable for M4 reverse engineering.
-
 ### Confirmed `SendADASInfoToScreen` sequence
 
-Both builds retain the same call sequence and state accessors, including `GetADASStatus`, `SetADASStatus`, `GetADASCalibStatus` and `SetADASCalibStatus`. So the basic `cardv -> screen` ADAS status plumbing did not disappear in VI.
+Both builds retain the same call sequence and state accessors, including:
+
+```text
+GetADASStatus
+SetADASStatus
+GetADASCalibStatus
+SetADASCalibStatus
+```
+
+So the basic `cardv -> screen` ADAS status plumbing did not disappear in VI.
 
 ## G-sensor/power changes
 
@@ -140,31 +147,94 @@ VI changes `GsensorSetSensitivity` substantially and `main` gains a call to `Gse
 
 `GsensorSetPowerOnByInt` itself gains multiple `system()` calls plus `sleep()`.
 
-This matches the firmware-level change from `Camera.Menu.GSensorSensitivity` to `Camera.Menu.GSensor` and the changed `sc7a20.ko` module.
+This matches the firmware-level change from:
+
+```text
+Camera.Menu.GSensorSensitivity
+```
+
+to:
+
+```text
+Camera.Menu.GSensor
+```
+
+and the changed `sc7a20.ko` module.
 
 This path is relevant to startup/power behavior but is not yet proven causal for ADAS failure.
 
-## Regression ranking after cardv diff
+## Updated regression ranking after ADAS package reverse
 
-### Higher priority
+New static evidence proves all six embedded ADAS model blobs are byte-identical EN vs VI and VI's encrypted `m0` directory points to them correctly. The entire +17,862-byte `adas` growth lies in seven interstitial/protected regions.
 
-1. ADAS appended payload / `m0` and other data constants.
-2. GPS/screen integration only if the user's observed “ADAS dead” was actually a display/output failure.
-3. Kernel/driver/memory integration.
+This changes the ranking:
 
-### Lower than before
+### 1 — VI ADAS package metadata / validation path
 
-A wholesale `cardv` ADAS-frame pipeline rewrite is now less likely because the core resolved call sequences are stable.
+**Highest static priority.**
 
-## Runtime tests required
+Why:
+- same CNN weights;
+- same model sizes;
+- valid moved offsets;
+- very narrow executable call-graph delta;
+- all package growth sits outside the model blobs.
 
-On EN and VI, distinguish:
+### 2 — `cardv` GPS/M4/output refactor
+
+**High only if the user's “ADAS dead” observation was actually output/display failure.**
+
+VI clearly changes GPS-to-screen behavior. Runtime must determine whether inference is alive behind a dead M4/output path.
+
+### 3 — `cardv` `raw_adas` producer contract
+
+**Still important, but a wholesale rewrite is statically less likely.**
+
+The resolved call sequences remain stable. Runtime must prove whether `raw_adas` frames actually exist and advance.
+
+### 4 — kernel / SC7A20 / memory integration
+
+**Medium-high after userspace bisect.**
+
+Only move this to the top if VI `adas` works correctly when launched on the EN kernel/rootfs/cardv base.
+
+## Runtime evidence now prepared in repo
+
+Use:
 
 ```text
-ADAS process dead
-ADAS process alive but no raw_adas frames
-ADAS inference alive but no warning output
-ADAS output alive but M4/display path broken
+tools/device/collect_baseline.sh
+tools/device/classify_adas_state.py
+tools/device/compare_baselines.py
+```
+
+Classification target:
+
+```text
+A process absent
+B crash/restart loop
+C process alive but input/ringbuffer path suspect
+D process alive but inference/IPU/model init suspect
+E inference alive but warning suppressed
+F ADAS alive but display/audio path suspect
+```
+
+For M4 transport isolation:
+
+```text
+tools/m4/discover_transport.py
+```
+
+## Most decisive next experiment
+
+After backing up the known-good EN executable and config, run the **VI `adas` executable temporarily on the working EN base** without replacing NAND contents.
+
+```text
+VI adas fails on EN base
+    -> focus on ADAS package metadata / validation / persistent-data interpretation
+
+VI adas works on EN base
+    -> focus on cardv/raw_adas, kernel, drivers, framebuffer/memory integration
 ```
 
 ## Confidence
@@ -172,5 +242,7 @@ ADAS output alive but M4/display path broken
 - **CONFIRMED:** symbol additions/removals and size deltas.
 - **CONFIRMED:** VI adds `SendGPSSpeedToScreen(int)`.
 - **CONFIRMED:** core resolved call sequences listed above are unchanged.
+- **CONFIRMED:** all six embedded ADAS model blobs are identical EN vs VI.
 - **HIGH-CONFIDENCE:** VI contains a real GPS/NMEA + screen refactor.
-- **UNKNOWN:** whether that refactor caused the user's ADAS failure.
+- **HIGH-CONFIDENCE:** a wholesale `cardv` ADAS pipeline rewrite is less likely than package/output/integration explanations.
+- **UNKNOWN:** whether GPS/M4, `raw_adas`, or package validation is the actual runtime failure point on the user's unit.
