@@ -49,8 +49,14 @@ def read_all_files(nodes, jobs: list[tuple[int, int]]) -> list[bytes]:
                 chunks.append((block, _dec(rec)))
         per_file.append(chunks)
     if lzo_jobs:
-        from lzo_helper import batch_decompress
-        outs = batch_decompress(lzo_jobs)
+        try:
+            from lzo_helper import batch_decompress
+            outs = batch_decompress(lzo_jobs)
+        except RuntimeError:
+            # No helper binary (e.g. Linux without a local build): fall back
+            # to the system liblzo2 via ctypes, one block at a time.
+            from ubifs_extract_file import lzo_decompress as _lzo1
+            outs = [_lzo1(p, u) for p, u in lzo_jobs]
         for (fi, block, usize), decoded in zip(lzo_pos, outs):
             if len(decoded) != usize:
                 raise SystemExit(f"bulk-read: lzo size mismatch file#{fi} block {block}")

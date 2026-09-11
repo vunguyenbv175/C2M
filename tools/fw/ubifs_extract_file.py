@@ -250,9 +250,13 @@ def extract(image_path: Path, target: str) -> tuple[bytes, dict[str, Any]]:
             lzo_jobs.append((block, rec))
     if lzo_jobs:
         # One helper process for all LZO blocks (fast path; same bytes as
-        # per-block decompress_block).
-        from lzo_helper import batch_decompress
-        outs = batch_decompress([(r["payload"], int(r["usize"])) for _, r in lzo_jobs])
+        # per-block decompress_block). Falls back to system liblzo2 where
+        # no helper binary exists (e.g. Linux runners with liblzo2-dev).
+        try:
+            from lzo_helper import batch_decompress
+            outs = batch_decompress([(r["payload"], int(r["usize"])) for _, r in lzo_jobs])
+        except RuntimeError:
+            outs = [lzo_decompress(r["payload"], int(r["usize"])) for _, r in lzo_jobs]
         for (block, rec), decoded in zip(lzo_jobs, outs):
             if len(decoded) != int(rec["usize"]):
                 raise RuntimeError(f"lzo size mismatch block {block}")
