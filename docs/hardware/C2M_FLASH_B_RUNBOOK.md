@@ -10,6 +10,7 @@
 [ ] EN_ENHANCE_IDLE.tar SHA verified (see below) ................... READ_ONLY
 [ ] C2M_FLASH_B/ root holds 4 files (B minieye_firmware.md5 regenerated) READ_ONLY
 [ ] RECOVERY_READY still YES ....................................... READ_ONLY
+[ ] SD-upgrade trigger ALIVE (see §6; BLOCKED since 2026-10-12) .... READ_ONLY
 ```
 
 ```sh
@@ -64,6 +65,36 @@ On PASS: EN runtime baseline capture (`C2M_EN_VI_ADAS_RUNTIME_RUNBOOK.md`). On F
 Re-flash Candidate A (FLASH) via verified `C2M_FLASH_A/` SD. Do NOT edit calibration/license/config. Preserve `03_candidate_B/` evidence before rollback.
 
 A dedicated A card is NOT required. Owner decision (2026-10-12): reuse the same microSD for A then B. Before overwriting A on the card, retain an accessible private copy of the frozen A files and SHA256 manifest on the workstation (or verify private-vault access). If rollback is needed: power off C2M, return the card to the workstation, prepare FAT32 as needed, replace the B payload with the four frozen A files, verify their on-card SHA256 values, then follow `C2M_FLASH_A_RUNBOOK.md`. This recreates the recovery media; it does not rebuild or modify Candidate A. Verify the current drive identity before any formatting or writes.
+
+## 6. Flash trigger status — BLOCKED (2026-10-12, READ_ONLY finding)
+
+Two verified B cards (59 GB FAT32 + 32 GB FAT32, both 4/4 SHA-verified) are
+IGNORED by the bootloader: normal boot, files untouched, no `.bak`, no
+reboot, no C2M_DIAG. Procedure was correct (power-off insert).
+
+Evidence chain (all read-only, stock EN image from private vault):
+- The SPL upgrade script (`upgrade_script.txt` carved from the image) flashes
+  every partition UNCONDITIONALLY — no version check. If SPL engaged, B would
+  flash exactly like A did.
+- The replacement `bootcmd` that script installs (`saveenv`) contains ZERO
+  SD/MMC references — after the A flash rewrote U-Boot env, nothing checks
+  the SD card at boot anymore. The factory env (which flashed A) must have
+  contained the SD check; it is gone now.
+- OS-side suspects cleared: `minieye_daemon.sh` is a stall-reboot watchdog
+  (no upgrade role); NAND `adas_upgrade.sh` only handles `adas.bin` ADAS-app
+  packs (absent on our card → clean no-op exit, files untouched — matches
+  observations); `demo.sh` runs the NAND script unconditionally but it
+  no-ops as above.
+- Therefore B-via-SD is STRUCTURALLY blocked until the U-Boot env regains an
+  SD-upgrade check. Do NOT burn more power cycles hoping: same card + same
+  env = same ignore, deterministically.
+
+Unblock path: UART serial console (open housing + USB-TTL, TX/RX/GND only):
+interrupt autoboot, restore/run the SD-upgrade path manually, then flash B.
+Bonus: UART shell ALSO settles B verification directly (`ps`, marker) and
+serves all later M4/UART capture work. `busybox telnetd` runs (rcS) but login
+needs unknown root DES password (`/etc/passwd` hash on file, not attacked);
+SSH closed. No software-only unblock is known.
 
 ## 6. B2 variant note (additive, does NOT change B1 above)
 
