@@ -90,9 +90,9 @@ jobs:
           rc=$?
           set -e
           test "$rc" -eq 124
-          grep -F "c2m-idle 0.1.0-sprint1" work/qemu.stdout
+          grep -F "c2m-idle 0.2.0-sdlog1" work/qemu.stdout
           test -f /tmp/c2m_idle.marker
-          grep -F "c2m-idle 0.1.0-sprint1" /tmp/c2m_idle.marker
+          grep -F "c2m-idle 0.2.0-sdlog1" /tmp/c2m_idle.marker
           grep -E "openat|write|clock_nanosleep|nanosleep" work/qemu.strace | head -80
           ! grep -E "(^| )socket\(" work/qemu.strace
           echo "QEMU-STOCK-RUNTIME: PASS"

@@ -34,6 +34,7 @@ jobs:
           python3 tests/test_firmware_pipeline.py
           python3 fw/device_minimal/test_check_elf.py
           python3 fw/device_minimal/test_startup_abi.py
+          python3 fw/device_minimal/test_sdlog.py
           python3 tests/test_candidate_b.py
   arm-minimal:
     # Reproducible cross-build of the MINIMAL idle binary (static analysis only).

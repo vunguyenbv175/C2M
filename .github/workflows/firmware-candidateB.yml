@@ -96,9 +96,9 @@ jobs:
           timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
             > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
           cat work/qemu_out.txt
-          grep -q "c2m-idle 0.1.0-sprint1" work/qemu_out.txt
+          grep -q "c2m-idle 0.2.0-sdlog1" work/qemu_out.txt
           cat /tmp/c2m_idle.marker
-          grep -qx "c2m-idle 0.1.0-sprint1" /tmp/c2m_idle.marker
+          grep -qx "c2m-idle 0.2.0-sdlog1" /tmp/c2m_idle.marker
           echo "QEMU-RUNTIME: PASS (stock glibc-2.30 userspace; stdout + marker verified)"
       - name: P2 mutate + P1 mutated rebuild (GATE)
         run: |
@@ -160,7 +160,7 @@ jobs:
           8. Verify all stock functions.
           9. Verify: ps | grep c2m-idle
           10. Verify: cat /tmp/c2m_idle.marker
-          Expected marker: c2m-idle 0.1.0-sprint1
+          Expected marker: c2m-idle 0.2.0-sdlog1
           Full procedure: docs/firmware/FLASH_HW_CHECKLIST.md
           EOF
           cat "$R/SHA256SUMS.txt"

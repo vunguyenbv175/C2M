@@ -10,7 +10,8 @@
  * max need <= 2.30 — these pins are claims, the gate is the proof.
  *
  * Scope: ONLY the symbols reachable from fw/device_minimal/c2m_idle.c
- * (stdio file ops + sleep + C startup). Any new libc call MUST get a pin
+ * (stdio file ops + sleep + mkdir/getpid/time/fread for SD diagnostics
+ * + C startup). Any new libc call MUST get a pin
  * here first, or the gate fails the build (fail-closed).
  */
 #ifndef __ASSEMBLER__
@@ -27,6 +28,10 @@ __asm__(".symver fflush,fflush@GLIBC_2.4");
 __asm__(".symver fopen,fopen@GLIBC_2.4");
 __asm__(".symver fclose,fclose@GLIBC_2.4");
 __asm__(".symver sleep,sleep@GLIBC_2.4");
+__asm__(".symver fread,fread@GLIBC_2.4");
+__asm__(".symver mkdir,mkdir@GLIBC_2.4");
+__asm__(".symver getpid,getpid@GLIBC_2.4");
+__asm__(".symver time,time@GLIBC_2.4");
 /* Ubuntu enables -fstack-protector by default; bind its helper old-style. */
 __asm__(".symver __stack_chk_fail,__stack_chk_fail@GLIBC_2.4");
 #endif /* __ASSEMBLER__ */

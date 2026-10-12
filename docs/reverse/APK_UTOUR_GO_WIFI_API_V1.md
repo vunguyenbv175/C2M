@@ -265,7 +265,7 @@ curl -s -H "uid: $UID" \
 
 # 1) ⭐ VERSION FIRMWARE — so sánh với build B mong đợi
 curl -s -H "uid: $UID" http://192.168.42.1:12306/api/v1/get/c8version; echo
-curl -s -H "uid: $UID>" http://192.168.42.1:8080/api/v1/device/basic/info \
+curl -s -H "uid: $UID" http://192.168.42.1:8080/api/v1/device/basic/info \
   | python3 -m json.tool
 
 # 2) Error log của cam (thử timestamp=0 để lấy toàn bộ)
@@ -274,7 +274,7 @@ curl -s -H "uid: $UID" \
   | head -c 2000; echo
 
 # 3) Lịch sử các lần flash trước
-curl -s -H "uid: $UID>" http://192.168.42.1:8080/api/v1/device/upgrade/logs \
+curl -s -H "uid: $UID" http://192.168.42.1:8080/api/v1/device/upgrade/logs \
   | head -c 2000; echo
 
 # 4) Liệt kê file thẻ + tải 1 file (xác minh thẻ còn nguyên)

@@ -64,6 +64,7 @@ def main() -> int:
               "tools/road/test_road.py", "tests/test_firmware_pipeline.py",
               "fw/device_minimal/test_check_elf.py",
               "fw/device_minimal/test_startup_abi.py",
+              "fw/device_minimal/test_sdlog.py",
               "tests/test_candidate_b.py"]:
         run([py, t], t)
     run([py, "tools/m4/make_fixture.py"], "make_fixture")
