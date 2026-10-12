@@ -84,10 +84,18 @@ shell for the process-list and kill/no-respawn rows. Do not relabel.
   flash. Do NOT reuse B1 hashes.
 
 ```text
-B2 TAR SHA256:        TBD (after candidate pipeline)
-B2 inner SHA256:      TBD
-B2 c2m-idle SHA256:   TBD
+B2 TAR SHA256:        96b8bcda65c8a95281513931dd6b92d7db789383a5d689e398892df5e80dd03f
+B2 inner SHA256:      74baee7b6e2340e38993115952ce024a5867a7e6b56e2cd96d22b6e5c011ee53
+                      (C2M_FLASH_B/SigmastarUpgradeSD_SSC8838G.bin, 58,359,832 bytes)
+B2 c2m-idle SHA256:   TBD-on-device (build-time work/c2m_idle.sha256 in vault
+                      BUILD_EVIDENCE; exact idle bytes verified under QEMU)
 B2 marker string:     c2m-idle 0.2.0-sdlog1
+B2 flash siblings:    sysVer.txt 7cc07969…582e (26 B, same as A),
+                      adas_upgrade.sh 0e18c91f…a05b (2972 B, same as A),
+                      minieye_firmware.md5 f9d3321b…97e8a5 (66 B, B-specific)
+Pipeline:             firmware-candidateB run 38203185874 (2026-10-12),
+                      vault deliverables/20261012-r38203185874/c2m-flash/,
+                      QEMU-RUNTIME PASS on stock glibc-2.30 userspace.
 ```
 
 ## Rules
