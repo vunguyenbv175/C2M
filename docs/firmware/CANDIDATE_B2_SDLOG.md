@@ -25,7 +25,7 @@ so B1 acceptance cannot be completed on this bench.
 | `C2M_IDLE_VERSION` | `0.1.0-sprint1` | `0.2.0-sdlog1` |
 | `/tmp/c2m_idle.marker` | `c2m-idle 0.1.0-sprint1` | `c2m-idle 0.2.0-sdlog1` (same path) |
 | hook `/customer/wifi/rcInsDriver.sh` | append `/customer/c2m/c2m-idle &` | IDENTICAL (no change) |
-| new libc symbols | — | `fread`, `mkdir`, `getpid`, `time` (pinned `@GLIBC_2.4` in `glibc_compat.h`; CI ELF gate proves max need ≤ 2.30) |
+| new libc symbols | — | `fread`, `mkdir`, `getpid`, `memset`, `raise` (libgcc soft-div `%`/`/` zero path), `__printf_chk`, `__fprintf_chk`, `fopen64` (Ubuntu fortify/LFS redirects, all pinned `@GLIBC_2.4` in `glibc_compat.h`; CI ELF gate proves max need ≤ 2.30). Deliberately ABSENT: `time()` (would bind `__time64@GLIBC_2.34`, missing on the 2.30 device) and stack protector (`__stack_chk_guard` binds from ld-linux itself, breaking NEEDED==[libc]; disabled via `-fno-stack-protector` — daemon has no hostile input) |
 | stock services touched | none | none |
 
 ## Diag design (fail-safe, bounded, no PII)
@@ -36,13 +36,15 @@ so B1 acceptance cannot be completed on this bench.
 <dir>/boot-fb.log               fallback when counter unusable
 ```
 
-- START: `v pid boot(up to 8 hex of /proc/.../boot_id) uptime marker=(ok|fail) t(wall)`.
+- START: `v pid boot(up to 8 hex of /proc/.../boot_id) uptime marker=(ok|fail)`.
 - HB: every 5th 60 s wake (300 s) with uptime + sequence.
 - No card / full card / read-only / missing mount → diag silently disabled;
   **daemon keeps running, stock boot never blocked** (host-proven fail-safe test).
 - Ring of 8 + per-file cap + shared fallback → storage strictly bounded.
-- Logged fields only: version, pid, boot-id fragment, uptime, wall clock,
-  marker result. No serials, keys, credentials, memory dumps.
+- Logged fields only: version, pid, boot-id fragment, uptime, marker result.
+  Ordering across boots comes from uptime + boot counter + card file mtimes
+  (no wall clock: `time()` is deliberately unused — see toolchain notes).
+  No serials, keys, credentials, memory dumps.
 - SD mount path `/mnt/mmc` is CONFIRMED from stock `adas_upgrade.sh`; whether
   it is mounted when `rcInsDriver.sh` runs at normal boot is UNKNOWN — the
   code degrades gracefully either way, and the first field trial will settle it.

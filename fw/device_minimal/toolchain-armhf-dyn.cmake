@@ -14,7 +14,17 @@ set(CMAKE_C_COMPILER arm-linux-gnueabihf-gcc)
 # Freestanding startup (sources coupled in CMakeLists.txt): our own _start
 # binds __libc_start_main@GLIBC_2.4; the toolchain crt1.o would bind 2.34.
 set(C2M_USE_CUSTOM_START ON CACHE BOOL "use freestanding start.S")
+# Stack protector OFF for this daemon (CI-proven necessity, 2026-10-12): with
+# Ubuntu's default -fstack-protector-strong, the diag stack buffers pull in
+# __stack_chk_guard, whose GLIBC_2.4 version node binds from ld-linux itself
+# (readelf VERNEED file #2) — keeping a DT_NEEDED on ld-linux-armhf.so.3 and
+# breaking the B1-proven NEEDED==[libc.so.6] contract. The daemon has no
+# hostile input surface (fixed buffers, manual bounds, /proc + own files
+# only), so the protector buys nothing here. (-fno-pie was also tried on a
+# scratch branch and does NOT clear the NEEDED; the guard binding is
+# PIC-independent.)
 add_compile_options(-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16 -Os -Wall -Wextra
+  -fno-stack-protector
   -include ${CMAKE_CURRENT_LIST_DIR}/glibc_compat.h)
 add_link_options(-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16 -nostartfiles -no-pie
   -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,--no-undefined -Wl,-z,noexecstack)

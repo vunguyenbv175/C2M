@@ -9,7 +9,7 @@
  *   <DIAG_DIR>/boot.seq      decimal boot counter (ring 0..RING-1)
  *   <DIAG_DIR>/boot-<i>.log  START + HEARTBEAT lines, capped per file
  *   <DIAG_DIR>/boot-fb.log   shared fallback when the counter is unusable
- * START carries version/pid/boot-id/uptime/marker-result/wall-clock.
+ * START carries version/pid/boot-id/uptime/marker-result.
  * HEARTBEAT carries uptime + sequence number every BEAT_EVERY wakes.
  * No network, no M4 transmit, no camera, no ADAS, no config writes.
  * No serials, keys, credentials or memory dumps are ever logged.
@@ -17,7 +17,6 @@
  */
 #include <stdio.h>
 #include <unistd.h>
-#include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -209,9 +208,6 @@ static void diag_init(struct Diag *d, const char *version, int marker_ok) {
     s_cat(line, sizeof(line), num);
     s_cat(line, sizeof(line), " marker=");
     s_cat(line, sizeof(line), marker_ok ? "ok" : "fail");
-    s_cat(line, sizeof(line), " t=");
-    u_dec(num, sizeof(num), (unsigned long)time(0));
-    s_cat(line, sizeof(line), num);
     s_cat(line, sizeof(line), "\n");
     diag_write(d, line);
 }
@@ -230,9 +226,6 @@ static void diag_beat(struct Diag *d, unsigned long n) {
     s_cat(line, sizeof(line), num);
     s_cat(line, sizeof(line), " n=");
     u_dec(num, sizeof(num), n);
-    s_cat(line, sizeof(line), num);
-    s_cat(line, sizeof(line), " t=");
-    u_dec(num, sizeof(num), (unsigned long)time(0));
     s_cat(line, sizeof(line), num);
     s_cat(line, sizeof(line), "\n");
     diag_write(d, line);

@@ -43,7 +43,11 @@ Consequences (binding on our build flags):
 
 ## 3. Reproducible cross-build contract
 
-- Source: `fw/device_minimal/c2m_idle.c` (C99, only `<stdio.h>/<unistd.h>`).
+- Source: `fw/device_minimal/c2m_idle.c` (C99; `<stdio.h>/<unistd.h>` plus
+  `<sys/stat.h>/<sys/types.h>` for the best-effort SD diagnostics; no
+  `time()` and no stack protector — both proven ABI-incompatible with the
+  2.30 baseline, see `glibc_compat.h` header comment and the dyn toolchain
+  file).
 - Two build variants (both `-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16`,
   NO neon, `-Os`):
   - **dynamic / stock-ABI (P0 preferred, Sprint 2 proven):**
