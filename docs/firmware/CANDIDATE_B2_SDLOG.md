@@ -1,6 +1,11 @@
 # Candidate B2 — EN + c2m-idle with SD diagnostics (0.2.0-sdlog1)
 
-**Date:** 2026-10-12. **Status:** IMPLEMENTED + HOST-TESTED, NOT device-tested.
+**Date:** 2026-10-12. **Status:** IMPLEMENTED + HOST-TESTED; runtime acceptance
+BLOCKED (2026-10-13): the shipped launch line was appended after `exit $?`.
+Operator reports successful reversion-package flash, but recording-card
+read-back has no B2 logs. See `CANDIDATE_B2_HOOK_FAILURE.md`. No runtime PASS
+or device process evidence is claimed. Hook-fix code + tests landed
+2026-10-14 (`CANDIDATE_B2_HOOK_REPAIR.md`); fixed image rebuild pending.
 Frozen B1 (`EN_ENHANCE_IDLE.tar` `247e9a82…`, idle `0.1.0-sprint1`) is UNCHANGED
 and remains the reference. B2 is a separate, owner-authorized variant for one
 reason: without USB data or a device shell, B1's `/tmp` marker is unobservable,
@@ -97,6 +102,17 @@ Pipeline:             firmware-candidateB run 38203185874 (2026-10-12),
                       vault deliverables/20261012-r38203185874/c2m-flash/,
                       QEMU-RUNTIME PASS on stock glibc-2.30 userspace.
 ```
+
+## Separate SD reversion follow-up (2026-10-13)
+
+The frozen B2 hashes above remain unchanged. Stock U-Boot rejects identical
+update tokens under its normal SD gate; A and this frozen B2 share
+`20230803193750`. Owner authorized a separate package with a matching distinct
+token in the sidecar/inner script and fresh MD5, with all partition payloads
+unchanged. See `CANDIDATE_B2_SD_REVERSION.md` for its separate hashes, exact
+version-only proof and verified SD preparation. This does NOT establish a
+successful flash or B2 runtime on the camera. The format prompt alone is not
+a verdict; it also occurred after the accepted A run.
 
 ## Rules
 

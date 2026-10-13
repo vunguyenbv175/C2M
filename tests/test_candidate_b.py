@@ -14,10 +14,13 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -208,6 +211,199 @@ def main() -> int:
                        "--out-manifest", str(tmp / "mut3.json"))
         if rc == 0:
             fails.append("mutate with tampered base not rejected")
+
+        # 2b. terminal-exit hook (stock shape): launch must be INSERTED
+        # BEFORE the exit, preserving the exit status. The shipped B2 defect
+        # was the launch line AFTER `exit` (dead code — hook is executed,
+        # not sourced).
+        treeE = tmp / "treeE"
+        (treeE / "wifi").mkdir(parents=True)
+        exit_hook = b"#!/bin/sh\necho hi\nsleep 1\nexit $?\n"
+        (treeE / "wifi" / "rcInsDriver.sh").write_bytes(exit_hook)
+        stockE = manifest([dict(reg("/wifi/rcInsDriver.sh", exit_hook),
+                                sha256=sh(exit_hook),
+                                size=len(exit_hook))])
+        (tmp / "stockE.json").write_text(json.dumps(stockE))
+        rc, _ = run_py("mutate_customer.py", "--tree", str(treeE),
+                       "--manifest", str(tmp / "stockE.json"),
+                       "--idle-bin", str(tmp / "idle.bin"),
+                       "--out-manifest", str(tmp / "mutE.json"))
+        if rc != 0:
+            fails.append("mutate terminal-exit hook failed")
+        else:
+            mutE = json.loads((tmp / "mutE.json").read_text())
+            if mutE.get("hook_mode") != "insert-before-terminal-exit":
+                fails.append("hook_mode not insert-before-terminal-exit")
+            hx = (treeE / "wifi" / "rcInsDriver.sh").read_bytes()
+            hxt = hx.decode("ascii")
+            stripped = [ln.strip(" \t") for ln in hxt.split("\n")]
+            nonempty = [ln for ln in stripped if ln]
+            if nonempty[-1] != "exit $_c2m_rc":
+                fails.append("repaired hook must end with preserved exit")
+            exits = [i for i, ln in enumerate(stripped) if ln.startswith("exit")]
+            launches = [i for i, ln in enumerate(stripped)
+                        if "/customer/c2m/c2m-idle" in ln]
+            if not launches or not exits or max(launches) > min(exits):
+                fails.append("launch line not before terminal exit "
+                             "(dead-code shape present?)")
+            # exact expectation: only the 3-line block inserted, stock
+            # bytes otherwise identical
+            want = (exit_hook.decode().rsplit("exit $?\n", 1)[0]
+                    + "_c2m_rc=$?\n"
+                      "/customer/c2m/c2m-idle >/dev/null 2>&1 &\n"
+                      "exit $_c2m_rc\n")
+            if hxt != want:
+                fails.append("repaired hook bytes differ beyond inserted block")
+            # double-repair (manifest pinned to repaired hook) must fail
+            stockE2 = manifest([dict(reg("/wifi/rcInsDriver.sh", hx),
+                                     sha256=sh(hx), size=len(hx))])
+            (tmp / "stockE2.json").write_text(json.dumps(stockE2))
+            rc, out = run_py("mutate_customer.py", "--tree", str(treeE),
+                             "--manifest", str(tmp / "stockE2.json"),
+                             "--idle-bin", str(tmp / "idle.bin"),
+                             "--out-manifest", str(tmp / "mutE2.json"))
+            if rc == 0 or "double-repair" not in out:
+                fails.append("double-repair not rejected")
+
+        # 2c. the repaired hook must actually EXECUTE the launch (the old
+        # shape never ran it): run mutated hooks under sh with a fake
+        # daemon, check exit-status preservation, backgrounding (no
+        # foreground wait) and failure isolation (missing binary).
+        def await_file(path: Path, timeout: float = 5.0) -> bool:
+            # Background launch is asynchronous by design: poll instead
+            # of asserting immediacy (no sleep in the hook itself).
+            start = time.monotonic()
+            while time.monotonic() - start < timeout:
+                if path.is_file():
+                    return True
+                time.sleep(0.1)
+            return False
+
+        sh_bin = shutil.which("sh")
+        if not sh_bin:
+            fails.append("sh missing for hook execution test")
+        else:
+            execdir = tmp / "exec"
+            execdir.mkdir()
+            sentinel = execdir / "launched"
+            fake = execdir / "fake-idle"
+            fake.write_text("#!/bin/sh\necho launched > \"%s\"\nsleep 20\n"
+                            % sentinel.as_posix())
+            os.chmod(fake, 0o755)
+            for code, tail in ((0, "exit 0\n"), (3, "exit 3\n")):
+                hx_tree = execdir / f"hx{code}"
+                (hx_tree / "wifi").mkdir(parents=True)
+                sbytes = ("#!/bin/sh\necho hi\n" + tail).encode()
+                (hx_tree / "wifi" / "rcInsDriver.sh").write_bytes(sbytes)
+                sm = manifest([dict(reg("/wifi/rcInsDriver.sh", sbytes),
+                                     sha256=sh(sbytes), size=len(sbytes))])
+                (execdir / f"stock{code}.json").write_text(json.dumps(sm))
+                rc, out = run_py(
+                    "mutate_customer.py", "--tree", str(hx_tree),
+                    "--manifest", str(execdir / f"stock{code}.json"),
+                    "--idle-bin", str(tmp / "idle.bin"),
+                    "--hook-line", fake.as_posix() + " &",
+                    "--out-manifest", str(execdir / f"m{code}.json"))
+                if rc != 0:
+                    fails.append(f"mutate exec hook code={code} failed")
+                    continue
+                if sentinel.exists():
+                    sentinel.unlink()
+                t0 = time.monotonic()
+                try:
+                    r = subprocess.run(
+                        [sh_bin, str(hx_tree / "wifi" / "rcInsDriver.sh")],
+                        capture_output=True, text=True, timeout=30)
+                except subprocess.TimeoutExpired:
+                    fails.append(f"hook code={code} hung (launch foregrounded?)")
+                    continue
+                dt = time.monotonic() - t0
+                if r.returncode != code:
+                    fails.append(f"hook exit {r.returncode} != stock {code}")
+                if not await_file(sentinel):
+                    fails.append(f"background launch did not run (code={code})")
+                if dt >= 10:
+                    fails.append(f"hook blocked on launch ({dt:.1f}s)")
+            # missing binary: stock status must survive, hook must not hang
+            hx_tree = execdir / "hxmiss"
+            (hx_tree / "wifi").mkdir(parents=True)
+            sbytes = b"#!/bin/sh\necho hi\nexit 0\n"
+            (hx_tree / "wifi" / "rcInsDriver.sh").write_bytes(sbytes)
+            sm = manifest([dict(reg("/wifi/rcInsDriver.sh", sbytes),
+                                 sha256=sh(sbytes), size=len(sbytes))])
+            (execdir / "stockmiss.json").write_text(json.dumps(sm))
+            rc, _ = run_py(
+                "mutate_customer.py", "--tree", str(hx_tree),
+                "--manifest", str(execdir / "stockmiss.json"),
+                "--idle-bin", str(tmp / "idle.bin"),
+                "--hook-line", (execdir / "no-such-binary").as_posix() + " &",
+                "--out-manifest", str(execdir / "mmiss.json"))
+            if rc != 0:
+                fails.append("mutate missing-binary hook failed")
+            else:
+                try:
+                    r = subprocess.run(
+                        [sh_bin, str(hx_tree / "wifi" / "rcInsDriver.sh")],
+                        capture_output=True, text=True, timeout=30)
+                except subprocess.TimeoutExpired:
+                    fails.append("missing-binary hook hung")
+                    r = None
+                if r is not None and r.returncode != 0:
+                    fails.append("missing binary changed hook exit status")
+
+        # 2d. stock Wi-Fi-OFF branch shape: stub nvconf to report Wi-Fi
+        # disabled; the repaired hook must still launch the daemon and
+        # exit with the stock status.
+        if sh_bin is None:
+            fails.append("sh missing for wifi-branch execution test")
+        else:
+            stubdir = tmp / "stubbin"
+            stubdir.mkdir()
+            (stubdir / "nvconf").write_text("#!/bin/sh\necho 0\n")
+            os.chmod(stubdir / "nvconf", 0o755)
+            sentinel_b = tmp / "launched_off"
+            fake_b = tmp / "fake-idle-off"
+            fake_b.write_text("#!/bin/sh\necho launched > \"%s\"\n"
+                              % sentinel_b.as_posix())
+            os.chmod(fake_b, 0o755)
+            off_hook = (b"#!/bin/sh\n"
+                        b"WIFIFUNC=`nvconf get 0 Camera.Menu.WifiConf`\n"
+                        b"if [ $WIFIFUNC = \"0\" ]; then\n"
+                        b"echo \"wifi disable by default.\"\n"
+                        b"else\n"
+                        b"echo \"wifi on (unstubbed path)\"\n"
+                        b"fi\n"
+                        b"exit $?\n")
+            treeO = tmp / "treeO"
+            (treeO / "wifi").mkdir(parents=True)
+            (treeO / "wifi" / "rcInsDriver.sh").write_bytes(off_hook)
+            stockO = manifest([dict(reg("/wifi/rcInsDriver.sh", off_hook),
+                                     sha256=sh(off_hook),
+                                     size=len(off_hook))])
+            (tmp / "stockO.json").write_text(json.dumps(stockO))
+            rc, out = run_py(
+                "mutate_customer.py", "--tree", str(treeO),
+                "--manifest", str(tmp / "stockO.json"),
+                "--idle-bin", str(tmp / "idle.bin"),
+                "--hook-line", fake_b.as_posix() + " &",
+                "--out-manifest", str(tmp / "mutO.json"))
+            if rc != 0:
+                fails.append("mutate wifi-off hook failed")
+            else:
+                env = dict(os.environ)
+                env["PATH"] = stubdir.as_posix() + os.pathsep + env.get("PATH", "")
+                try:
+                    r = subprocess.run(
+                        [sh_bin, str(treeO / "wifi" / "rcInsDriver.sh")],
+                        capture_output=True, text=True, timeout=30, env=env)
+                except subprocess.TimeoutExpired:
+                    fails.append("wifi-off hook hung")
+                    r = None
+                if r is not None:
+                    if r.returncode != 0:
+                        fails.append("wifi-off hook exit != stock 0")
+                    if not await_file(sentinel_b):
+                        fails.append("wifi-off branch did not launch daemon")
 
         # 3. candidate_diff allowlist
         ksha = sh(b"k" * 0x100)

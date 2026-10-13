@@ -65,7 +65,8 @@ def main() -> int:
               "fw/device_minimal/test_check_elf.py",
               "fw/device_minimal/test_startup_abi.py",
               "fw/device_minimal/test_sdlog.py",
-              "tests/test_candidate_b.py"]:
+              "tests/test_candidate_b.py",
+              "tools/fw/test_reversion_sd_package.py"]:
         run([py, t], t)
     run([py, "tools/m4/make_fixture.py"], "make_fixture")
     if args.evidence:

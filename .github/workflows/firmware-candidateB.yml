@@ -146,7 +146,9 @@ jobs:
           ### Candidate B (EN_ENHANCE_IDLE.tar)
           Stock EN + minimal idle daemon ONLY:
             ADD /c2m, ADD /c2m/c2m-idle, MODIFY /wifi/rcInsDriver.sh
-            (one appended line: /customer/c2m/c2m-idle &).
+            (launch block inserted BEFORE the hook's terminal exit line:
+            save stock status, start daemon backgrounded with stdio
+            detached, exit with the saved status).
           No ADAS/M4/camera/kernel/bootloader/model/calibration change.
 
           ### Physical flashing sequence
