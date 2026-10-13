@@ -246,11 +246,17 @@ def main() -> int:
             if not launches or not exits or max(launches) > min(exits):
                 fails.append("launch line not before terminal exit "
                              "(dead-code shape present?)")
-            # exact expectation: only the 3-line block inserted, stock
+            # exact expectation: only the launch block inserted, stock
             # bytes otherwise identical
             want = (exit_hook.decode().rsplit("exit $?\n", 1)[0]
                     + "_c2m_rc=$?\n"
-                      "/customer/c2m/c2m-idle >/dev/null 2>&1 &\n"
+                      "( _c2m_n=0\n"
+                      "while [ $_c2m_n -lt 30 ]; do\n"
+                      "grep -qs ' /mnt/mmc ' /proc/mounts && break\n"
+                      "sleep 2\n"
+                      "_c2m_n=$(($_c2m_n + 1))\n"
+                      "done\n"
+                      "/customer/c2m/c2m-idle >/dev/null 2>&1 & ) >/dev/null 2>&1 &\n"
                       "exit $_c2m_rc\n")
             if hxt != want:
                 fails.append("repaired hook bytes differ beyond inserted block")
@@ -279,12 +285,38 @@ def main() -> int:
                 time.sleep(0.1)
             return False
 
+        def sh_path(path: Path) -> str:
+            # MSYS/Git sh splits PATH on ':' too, so a 'C:/...' entry would
+            # shatter into garbage: use the '/c/...' form inside sh.
+            s = path.as_posix()
+            if len(s) > 2 and s[1] == ":":
+                s = "/" + s[0].lower() + s[2:]
+            return s
+
+        def run_hook(sh_bin: str, hook_path: Path, stubdir: Path):
+            # Git/MSYS sh prefers its own /usr/bin over inherited PATH, so
+            # stubs for stock tool names (sleep/grep) must take precedence
+            # via an INNER export; unique stub names need no such help.
+            # Device behavior is unchanged (fixed command names either way).
+            cmd = ("export PATH='%s:$PATH'; exec '%s'"
+                   % (sh_path(stubdir), sh_path(hook_path)))
+            return subprocess.run([sh_bin, "-c", cmd], capture_output=True,
+                                  text=True, timeout=30)
+
         sh_bin = shutil.which("sh")
         if not sh_bin:
             fails.append("sh missing for hook execution test")
         else:
             execdir = tmp / "exec"
             execdir.mkdir()
+            # Stubs: instant sleep + never-mounted card, so the bounded
+            # mount wait expires in milliseconds on the test machine.
+            wstub = execdir / "wstub"
+            wstub.mkdir()
+            (wstub / "sleep").write_text("#!/bin/sh\nexit 0\n")
+            (wstub / "grep").write_text("#!/bin/sh\nexit 1\n")
+            os.chmod(wstub / "sleep", 0o755)
+            os.chmod(wstub / "grep", 0o755)
             sentinel = execdir / "launched"
             fake = execdir / "fake-idle"
             fake.write_text("#!/bin/sh\necho launched > \"%s\"\nsleep 20\n"
@@ -311,9 +343,8 @@ def main() -> int:
                     sentinel.unlink()
                 t0 = time.monotonic()
                 try:
-                    r = subprocess.run(
-                        [sh_bin, str(hx_tree / "wifi" / "rcInsDriver.sh")],
-                        capture_output=True, text=True, timeout=30)
+                    r = run_hook(sh_bin, hx_tree / "wifi" / "rcInsDriver.sh",
+                                 wstub)
                 except subprocess.TimeoutExpired:
                     fails.append(f"hook code={code} hung (launch foregrounded?)")
                     continue
@@ -342,9 +373,8 @@ def main() -> int:
                 fails.append("mutate missing-binary hook failed")
             else:
                 try:
-                    r = subprocess.run(
-                        [sh_bin, str(hx_tree / "wifi" / "rcInsDriver.sh")],
-                        capture_output=True, text=True, timeout=30)
+                    r = run_hook(sh_bin, hx_tree / "wifi" / "rcInsDriver.sh",
+                                 wstub)
                 except subprocess.TimeoutExpired:
                     fails.append("missing-binary hook hung")
                     r = None
@@ -360,7 +390,11 @@ def main() -> int:
             stubdir = tmp / "stubbin"
             stubdir.mkdir()
             (stubdir / "nvconf").write_text("#!/bin/sh\necho 0\n")
+            (stubdir / "sleep").write_text("#!/bin/sh\nexit 0\n")
+            (stubdir / "grep").write_text("#!/bin/sh\nexit 1\n")
             os.chmod(stubdir / "nvconf", 0o755)
+            os.chmod(stubdir / "sleep", 0o755)
+            os.chmod(stubdir / "grep", 0o755)
             sentinel_b = tmp / "launched_off"
             fake_b = tmp / "fake-idle-off"
             fake_b.write_text("#!/bin/sh\necho launched > \"%s\"\n"
@@ -390,12 +424,9 @@ def main() -> int:
             if rc != 0:
                 fails.append("mutate wifi-off hook failed")
             else:
-                env = dict(os.environ)
-                env["PATH"] = stubdir.as_posix() + os.pathsep + env.get("PATH", "")
                 try:
-                    r = subprocess.run(
-                        [sh_bin, str(treeO / "wifi" / "rcInsDriver.sh")],
-                        capture_output=True, text=True, timeout=30, env=env)
+                    r = run_hook(sh_bin, treeO / "wifi" / "rcInsDriver.sh",
+                                 stubdir)
                 except subprocess.TimeoutExpired:
                     fails.append("wifi-off hook hung")
                     r = None
@@ -404,6 +435,105 @@ def main() -> int:
                         fails.append("wifi-off hook exit != stock 0")
                     if not await_file(sentinel_b):
                         fails.append("wifi-off branch did not launch daemon")
+
+        # 2e. mount-gated launch: the daemon must start only AFTER the
+        # /mnt/mmc mount appears, but must still start when it never does
+        # (bounded wait, never gates the daemon forever).
+        if sh_bin is None:
+            fails.append("sh missing for mount-wait execution test")
+        else:
+            mdir = tmp / "mountwait"
+            mdir.mkdir()
+            # NOTE: the inner PATH export mangles the inherited Windows
+            # PATH (drive-letter colons), so stubs must use shell builtins
+            # ONLY (no wc/cat/ls). The poll counter is a token dir:
+            # one empty file per grep call, counted via glob + $#.
+            tokens = mdir / "tokens"
+            tokens.mkdir()
+            sent_m = mdir / "sent_mounted"
+            fake_m = mdir / "fake-idle"
+            fake_m.write_text("#!/bin/sh\nset -- \"%s\"/*\n"
+                              "[ -e \"$1\" ] && echo $# > \"%s\"\n"
+                              % (tokens.as_posix(), sent_m.as_posix()))
+            os.chmod(fake_m, 0o755)
+            mstub = mdir / "mstub"
+            mstub.mkdir()
+            # grep stub: mount "appears" on the 3rd poll.
+            (mstub / "grep").write_text(
+                "#!/bin/sh\ni=0\n"
+                "while [ -e \"%s/$i\" ]; do i=$((i + 1)); done\n"
+                ": > \"%s/$i\"\n"
+                "[ \"$i\" -ge 2 ]\n" % (tokens.as_posix(),
+                                        tokens.as_posix()))
+            (mstub / "sleep").write_text("#!/bin/sh\nexit 0\n")
+            os.chmod(mstub / "grep", 0o755)
+            os.chmod(mstub / "sleep", 0o755)
+            mtree = mdir / "hx"
+            (mtree / "wifi").mkdir(parents=True)
+            mbytes = b"#!/bin/sh\nexit 0\n"
+            (mtree / "wifi" / "rcInsDriver.sh").write_bytes(mbytes)
+            mm = manifest([dict(reg("/wifi/rcInsDriver.sh", mbytes),
+                                 sha256=sh(mbytes), size=len(mbytes))])
+            (mdir / "stockm.json").write_text(json.dumps(mm))
+            rc, _ = run_py(
+                "mutate_customer.py", "--tree", str(mtree),
+                "--manifest", str(mdir / "stockm.json"),
+                "--idle-bin", str(tmp / "idle.bin"),
+                "--hook-line", fake_m.as_posix() + " &",
+                "--out-manifest", str(mdir / "mm.json"))
+            if rc != 0:
+                fails.append("mutate mount-wait hook failed")
+            else:
+                t0 = time.monotonic()
+                r = run_hook(sh_bin, mtree / "wifi" / "rcInsDriver.sh", mstub)
+                dt = time.monotonic() - t0
+                if r.returncode != 0:
+                    fails.append("mount-wait hook exit != 0")
+                if dt >= 10:
+                    fails.append(f"mount-wait hook blocked ({dt:.1f}s)")
+                if not await_file(sent_m):
+                    fails.append("mount-gated launch did not run")
+                else:
+                    try:
+                        polls = int(sent_m.read_text().strip().split()[0])
+                    except ValueError:
+                        polls = -1
+                    if polls < 3:
+                        fails.append(f"daemon launched before mount "
+                                    f"(polls={polls})")
+            # expiry: mount never appears -> daemon still launches.
+            mstub2 = mdir / "mstub2"
+            mstub2.mkdir()
+            (mstub2 / "grep").write_text("#!/bin/sh\nexit 1\n")
+            (mstub2 / "sleep").write_text("#!/bin/sh\nexit 0\n")
+            os.chmod(mstub2 / "grep", 0o755)
+            os.chmod(mstub2 / "sleep", 0o755)
+            sent_x = mdir / "sent_expired"
+            fake_x = mdir / "fake-idle-x"
+            fake_x.write_text("#!/bin/sh\necho launched > \"%s\"\n"
+                              % sent_x.as_posix())
+            os.chmod(fake_x, 0o755)
+            mtree2 = mdir / "hx2"
+            (mtree2 / "wifi").mkdir(parents=True)
+            (mtree2 / "wifi" / "rcInsDriver.sh").write_bytes(mbytes)
+            mm2 = manifest([dict(reg("/wifi/rcInsDriver.sh", mbytes),
+                                  sha256=sh(mbytes), size=len(mbytes))])
+            (mdir / "stockm2.json").write_text(json.dumps(mm2))
+            rc, _ = run_py(
+                "mutate_customer.py", "--tree", str(mtree2),
+                "--manifest", str(mdir / "stockm2.json"),
+                "--idle-bin", str(tmp / "idle.bin"),
+                "--hook-line", fake_x.as_posix() + " &",
+                "--out-manifest", str(mdir / "mm2.json"))
+            if rc != 0:
+                fails.append("mutate wait-expiry hook failed")
+            else:
+                r = run_hook(sh_bin, mtree2 / "wifi" / "rcInsDriver.sh",
+                             mstub2)
+                if r.returncode != 0:
+                    fails.append("wait-expiry hook exit != 0")
+                if not await_file(sent_x):
+                    fails.append("daemon missing after wait expiry")
 
         # 3. candidate_diff allowlist
         ksha = sh(b"k" * 0x100)

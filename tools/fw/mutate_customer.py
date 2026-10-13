@@ -10,11 +10,14 @@ Mutation (exactly):
      /customer/wifi/rcInsDriver.sh) on a REACHABLE path that preserves the
      stock exit status:
        - hook ends with a terminal `exit ...` line (the stock shape):
-         insert a 3-line launch block BEFORE that line: save `$?`, start
-         the daemon backgrounded with stdio detached, then exit with the
-         saved status. Appending after it would be dead code: the hook is
-         executed (not sourced), so `exit` ends the script before any
-         later line runs (B2 field defect, 2026-10-13).
+         insert a launch block BEFORE that line: save `$?`, wait bounded
+         (30x2s, backgrounded subshell) for the `/mnt/mmc` recording-card
+         mount, start the daemon backgrounded with stdio detached, then
+         exit with the saved status. Appending after it would be dead code:
+         the hook is executed (not sourced), so `exit` ends the script
+         before any later line runs (B2 field defect, 2026-10-13). The
+         mount wait fixes the 2026-10-14 field finding (daemon START at
+         uptime=6 on the flash card, no logs on recording-card boots).
        - hook has no terminal `exit`: append the single launch line at EOF
          (legacy fallback; reachable because control falls off the end).
 
@@ -103,7 +106,22 @@ def main() -> int:
         cmd = args.hook_line.rstrip()
         if cmd.endswith("&"):
             cmd = cmd[:-1].rstrip()
-        block = ["_c2m_rc=$?", cmd + " >/dev/null 2>&1 &", tail]
+        # The hook runs seconds after boot, possibly BEFORE the recording
+        # card is mounted, while the daemon initializes its SD log stream
+        # once at startup (field proof 2026-10-14: START at uptime=6 on the
+        # flash card, no logs on later recording-card boots). Wait for the
+        # mount bounded (30x2s) inside a backgrounded subshell so the hook
+        # itself still exits immediately; a never-mounted card still gets
+        # the daemon after the wait expires. Only grep/sleep/$(( )).
+        block = ["_c2m_rc=$?",
+                 "( _c2m_n=0",
+                 "while [ $_c2m_n -lt 30 ]; do",
+                 "grep -qs ' /mnt/mmc ' /proc/mounts && break",
+                 "sleep 2",
+                 "_c2m_n=$(($_c2m_n + 1))",
+                 "done",
+                 cmd + " >/dev/null 2>&1 & ) >/dev/null 2>&1 &",
+                 tail]
         new_text = "\n".join(hook_lines[:last_idx] + block + hook_lines[last_idx + 1:])
         mode = "insert-before-terminal-exit"
     else:

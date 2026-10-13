@@ -147,8 +147,9 @@ jobs:
           Stock EN + minimal idle daemon ONLY:
             ADD /c2m, ADD /c2m/c2m-idle, MODIFY /wifi/rcInsDriver.sh
             (launch block inserted BEFORE the hook's terminal exit line:
-            save stock status, start daemon backgrounded with stdio
-            detached, exit with the saved status).
+            save stock status, wait bounded 30x2s for the /mnt/mmc mount
+            in a backgrounded detached subshell, start daemon backgrounded
+            with stdio detached, exit with the saved status).
           No ADAS/M4/camera/kernel/bootloader/model/calibration change.
 
           ### Physical flashing sequence

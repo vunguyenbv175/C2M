@@ -175,3 +175,9 @@ implemented (`tools/fw/mutate_customer.py`, `tests/test_candidate_b.py`; see
 is NOT built yet — it requires the Linux pipeline with a fresh update token.
 The inserted `C2M_FLASH_B` card still holds the defective package: do NOT
 flash it.
+
+Hookfix build update (2026-10-14): pipeline run 38409086397 GREEN, vault
+image verified, fresh token `20261013000002`, card rewritten 4/4 verified
+(no format). See `docs/firmware/CANDIDATE_B2_HOOKFIX_BUILD.md`. This card is
+now the ONLY authorized next-flash package; the verdict above still stands
+until its flash + log evidence.
