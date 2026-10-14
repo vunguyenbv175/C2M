@@ -85,6 +85,7 @@ EOF
 )
 cp "$work/wpa_supplicant-2.12/wpa_supplicant/wpa_supplicant" "$out/wpa_supplicant"
 chmod 755 "$out/wpa_supplicant"
+arm-linux-gnueabihf-readelf -W --dyn-syms "$out/wpa_supplicant" | grep GLIBC_ | sort
 python3 fw/device_minimal/check_elf.py "$out/wpa_supplicant" --allow-dynamic
 timeout 20 qemu-arm-static -L "$sysroot" "$out/wpa_supplicant" -v
 # Ship attribution/licenses with private deliverable (not exposed web content).
