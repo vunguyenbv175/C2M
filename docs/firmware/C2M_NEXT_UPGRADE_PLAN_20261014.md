@@ -1,6 +1,11 @@
 # Kế hoạch nâng cấp C2M sau bản C — 2026-10-14
 
-**Trạng thái:** kế hoạch đề xuất, chưa triển khai firmware D, chưa yêu cầu flash.
+**Trạng thái:** kế hoạch nền, chưa triển khai firmware D, chưa yêu cầu flash.
+**Ưu tiên mới của owner (2026-10-14):** triển khai nhanh nâng cấp TSR/biển báo,
+không bản chỉ thêm chẩn đoán. Lộ trình sản phẩm được thay bởi
+`CANDIDATE_D_TSR_FAST_TRACK.md` sau tham khảo commits muse.ai `56eca24`,
+`dfae204` và DB riêng `signs_vn.bin`. Các guard/recovery/evidence dưới đây
+vẫn áp dụng; D1 chẩn đoán không còn mặc định là bản phải flash trước TSR.
 **Quyết định đã chốt:** giữ âm thanh/kích hoạt ADAS theo hãng; không thêm lời
 chào mỗi boot, không ép hiệu chuẩn lại chỉ để nghe câu chào.
 
