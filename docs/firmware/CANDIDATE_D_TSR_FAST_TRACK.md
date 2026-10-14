@@ -1,9 +1,11 @@
 # Candidate D-TSR — fast track after C / muse.ai inputs (2026-10-14)
 
-**Status: DEVELOPMENT, NOT FLASH-READY.** Owner requests a real sign/TSR
-upgrade rather than another diagnostic-only release. This supersedes D1 as
-product priority, not the safety/verification rules. No D package is built
-or flashed by this document. Current installed package is C, token
+**Plan status: direct experiment now built at owner's explicit request.**
+See `CANDIDATE_D_TSR_BUILD_20261014.md`: D profile candidate is host-validated
+and SD read-back verified, manual device flash pending. This does NOT prove
+TSR recognition/output. Owner prioritizes sign/TSR over a diagnostic-only
+release; experiment permission supersedes the earlier no-build gate, not
+byte/backup/stock-preservation verification rules. Current installed package is C, token
 `20261014000002` (owner-reported flash).
 
 ## 1. Inputs accepted
@@ -35,8 +37,12 @@ warning/display for at least a tested class. Threshold tuning alone changes
 warning behavior, not detector accuracy or sign coverage.
 
 Static observation leads:
-- `AdasCollectService`, `collect_export_port=25012` (bind/path/activation
+- `AdasCollectService`, `collect_export_port=25012`, static default bind
+  `collect_export_addr=127.0.0.1` (loopback; runtime override/path/output still
   unverified); TSR topic `tsr`, keys `tsr_trace_res_list`, `tsr_warning`.
+  No external response at 25012 is expected if this default remains; it is
+  NOT proof that TSR failed. Do not invent `enable_collect_service`: no such
+  flag was found. D experiment does not expose new listening interfaces.
 - `AdasScreenService`, static port 26012; actual production WebSocket path,
   source and TSR distribution to it still unverified.
 - Libflow envelope/subscription exists in `tools/m4/libflow_protocol.py`.
