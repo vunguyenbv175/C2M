@@ -41,7 +41,9 @@ Static observation leads:
   source and TSR distribution to it still unverified.
 - Libflow envelope/subscription exists in `tools/m4/libflow_protocol.py`.
   Static TSR names are recognized but schema/units remain unverified; no
-  semantic injection is authorized.
+  semantic injection is authorized. Host-only `tools/m4/capture_tsr_readonly.py`
+  now enforces identity-first, bounded capture and sends only the stock TSR
+  subscribe frame; its runtime result is still UNVERIFIED.
 - Stock shell contains `audioplay 1 dev0 <absolute WAV path>` to cardv FIFO.
   This is stronger static evidence than internal function `play_wav_cmd`.
   It still does NOT prove safe arbitration with stock safety warnings during
@@ -116,6 +118,20 @@ When owner can power the stationary cam and connect the laptop:
 If external collector is unavailable, static GPS/UI IPC reader and local TSR
 subscriber can be researched on host; do not guess struct offsets, bind ports
 or install a serial consumer to get data quickly.
+
+Prepared capture command (DO NOT execute until stationary cam, correct AP and
+owner authorization are confirmed; no credential guessing):
+
+```powershell
+python tools/m4/capture_tsr_readonly.py --expected-uuid <owner-confirmed-UUID> `
+  --stationary-authorized --port 25012 --seconds 15 `
+  --out build/tsr-live-private-first
+```
+
+The script verifies the known CGI UUID before connecting WS; it does not open
+UART/FIFO or set settings. No frames while stationary is not detection FAIL.
+A service/path connection failure remains BLOCKED rather than trying random
+ports, URL paths or credentials.
 
 ### Step 2: reviewed flags/recovery for a D candidate
 

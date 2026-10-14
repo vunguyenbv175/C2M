@@ -43,6 +43,7 @@ jobs:
         run: |
           pip install msgpack websocket-client 2>/dev/null || pip3 install msgpack websocket-client
           python3 tools/m4/test_protocol.py
+          python3 tools/m4/test_capture_tsr_readonly.py
           python3 tools/m4/test_normalize_adas.py
           python3 tools/m4/test_m4_policy.py
           python3 tools/m4/make_fixture.py
