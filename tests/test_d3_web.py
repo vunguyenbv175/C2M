@@ -75,6 +75,13 @@ class CoreTests(unittest.TestCase):
         self.assertIn("IW_MODE_MASTER", source)
         self.assertNotIn("_TIME_BITS", source)  # compatible with camera's old 32-bit glibc
 
+    def test_http_form_referrer_policy_preserves_same_origin(self) -> None:
+        # Reproduced on D3 hardware in Chromium: no-referrer makes the
+        # legitimate HTTP form's Origin "null", which must stay rejected.
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn(r"Referrer-Policy: same-origin\r\n", source)
+        self.assertNotIn(r"Referrer-Policy: no-referrer\r\n", source)
+
 
 @unittest.skipUnless(LINUX, "Linux-only HTTP/AP binding code; portable core tested above")
 class LocalhostTests(unittest.TestCase):
@@ -113,6 +120,7 @@ class LocalhostTests(unittest.TestCase):
         code, headers, page = self.request("GET", "/")
         self.assertEqual(code, 200)
         self.assertEqual(headers["cache-control"], "no-store")
+        self.assertEqual(headers["referrer-policy"], "same-origin")
         tokens = re.findall(rb'name="csrf" value="([0-9a-f]{64})"', page)
         self.assertEqual(len(tokens), 3)
         self.assertEqual(len(set(tokens)), 1)
@@ -295,6 +303,24 @@ class LocalhostTests(unittest.TestCase):
         self.assertEqual(self.post("/api/wifi", valid)[0], 403)
         self.token = new
         self.assertEqual(self.post("/api/wifi", valid)[0], 303)
+
+    def test_no_origin_and_exact_authority_contract(self) -> None:
+        # Missing Origin is a non-browser client, not opaque Origin:null.
+        body = urlencode({"csrf": self.token, "ssid": "IEEE", "password": "password"}).encode()
+        head = (f"POST /api/wifi HTTP/1.1\r\nHost: {self.host}\r\n"
+                "Content-Type: application/x-www-form-urlencoded\r\n"
+                f"Content-Length: {len(body)}\r\n\r\n").encode()
+        self.assertEqual(self.raw(head + body)[0], 303)
+        original = (self.config / "wifi.conf").read_bytes()
+        for extra in ({"Origin": "null"}, {"Origin": "https://" + self.host},
+                      {"Origin": self.origin + "/"}, {"Origin": "http://127.0.0.1"},
+                      {"Host": f"localhost:{self.port}"}, {"Host": "127.0.0.1"}):
+            with self.subTest(extra=extra):
+                code, _, response = self.post("/api/wifi", {"ssid": "IEEE", "password": "password"}, extra)
+                self.assertEqual(code, 403)
+                self.assertEqual(json.loads(response)["error"], "origin_or_host_rejected")
+                self.assertEqual((self.config / "wifi.conf").read_bytes(), original)
+        self.assertEqual(self.request("POST", "/api/wifi", body, {"Origin": ""})[0], 400)
 
     def test_invalid_credentials_do_not_write_anything(self) -> None:
         cases = [("", "password"), ("s" * 33, "password"), ("é" * 17, "password"),

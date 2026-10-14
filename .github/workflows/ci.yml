@@ -64,6 +64,16 @@ jobs:
           python3 tests/test_d3_wifi_control.py
           python3 tests/test_d3_gps.py
           python3 tools/fw/test_reversion_sd_package.py
+      - name: D3 real-browser loopback form regression (no device access)
+        env:
+          C2M_REQUIRE_BROWSER_TEST: "1"
+        run: |
+          python3 -m pip install websocket-client
+          if ! command -v google-chrome >/dev/null; then
+            echo "Runner Chrome missing; refusing to skip browser regression"
+            exit 1
+          fi
+          python3 tests/test_d3_web_browser.py
   arm-minimal:
     # Reproducible cross-build of the MINIMAL idle binary (static analysis only).
     # Label: HOST-CROSS-BUILT, NOT device-tested. No firmware needed.

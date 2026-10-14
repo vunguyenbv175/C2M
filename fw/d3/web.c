@@ -611,7 +611,10 @@ static void respond(int fd, int code, const char *type, const char *extra, const
     int64_t deadline = now_ms()+C2M_WEB_TIMEOUT_MS;
     len = snprintf(header, sizeof(header), "HTTP/1.1 %d %s\r\nContent-Type: %s\r\n"
         "Content-Length: %lu\r\nConnection: close\r\nCache-Control: no-store\r\n"
-        "X-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n"
+        /* Chromium serializes HTTP form Origin as null with no-referrer.
+         * same-origin keeps legitimate POST origins, without cross-site leaks.
+         * Do not accept Origin:null or weaken the Host/CSRF checks instead. */
+        "X-Content-Type-Options: nosniff\r\nReferrer-Policy: same-origin\r\n"
         "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; "
         "form-action 'self'; frame-ancestors 'none'; base-uri 'none'\r\n%s\r\n",
         code, reason(code), type, (unsigned long)n, extra ? extra : "");

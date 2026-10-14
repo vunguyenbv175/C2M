@@ -69,8 +69,12 @@ The four D3 updater members and existing diagnostics remained byte/hash
 identical, cache was flushed, volume Healthy/NOT Dirty. The firmware token is
 still `20261014000005`; no rebuild or camera flash was performed.
 
-This is an owner-requested same-card recording trial, NOT a proven fix for the
-format prompt. Local report:
+This was an owner-requested same-card recording trial, NOT a proven fix for
+the format prompt. Subsequent owner feedback after flashing D3: the same
+32GB card **still asked for format**; owner returned to a MINIEYE recording
+card. The directory-only trial therefore did not solve card acceptance.
+See `docs/firmware/D3_FIELD_FINDINGS_20261014.md` for read-back evidence.
+Local preparation report:
 `C2M_HW_20261012/05_candidate_D/d3_same_card_layout.json`.
 
 After the owner manually flashes D3, the correct test is:

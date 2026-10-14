@@ -1,8 +1,11 @@
 # Candidate D3 release — Wi-Fi/AP+STA and passive Bluetooth — 2026-10-14
 
-**Status: HOST-VALIDATED + FLASH CARD READ-BACK 4/4 VERIFIED;
-MANUAL CAMERA FLASH PENDING.** D3 source commit `8a8320d`; firmware pipeline
-run `38550553664` GREEN, general CI run `38550548495` GREEN.
+**Status: OWNER REPORTS MANUAL D3 FLASH; NATIVE SERVICES AND RECORDING-CARD
+DIAGNOSTICS OBSERVED; WI-FI FORM BUG CONFIRMED; AP+STA NOT PROVEN.** D3 release
+source commit `8a8320d`; firmware pipeline run `38550553664` GREEN, general CI
+run `38550548495` GREEN. First field results and source-fix scope:
+`docs/firmware/D3_FIELD_FINDINGS_20261014.md`. Repository fixes do not update
+the already-flashed camera.
 
 The earlier connected 59GB `MINIEYE` recording card was not written. Later,
 the connected card was positively reidentified as the 32GB `C2M_FLASH_B`
@@ -52,9 +55,9 @@ new detector, M4 injection or new audio backend is included.
 - D3 currently stops at WPA association status (`associated_no_ip`); DHCP,
   default route and Internet proof are deliberately not included. The private
   `build/d3-dhcp-draft/` work is not part of this release.
-- Bluetooth result is not available until the owner boots D3 and reads the
-  recording card diagnostic file. Kernel HCI absence is inconclusive about
-  physical hardware.
+- First field Bluetooth diagnostic is complete:
+  `NO_HCI_OBSERVED_NOT_HARDWARE_ABSENCE`. Kernel HCI absence is inconclusive
+  about physical hardware; no radio test was performed.
 - TSR recognition/display/audio of real signs remains unproven; D3 does not
   claim to add a detector.
 
@@ -101,6 +104,14 @@ recovery media. After boot, check live view, recording, app/AP, ADAS
 Vietnamese audio, D2 profile status and reboot stability before trying Wi-Fi.
 
 For Wi-Fi: join the camera AP, open `http://<camera-AP-IP>:8099/`, save a
-network, then explicitly connect. The page will report whether the driver
-supports AP+STA; it must not claim Internet until a future DHCP/route helper
-is independently added. For Bluetooth: read `C2M_DIAG/bluetooth-D3.txt`.
+network, then explicitly connect. The first field page showed the expected AP
+but its native form POST was rejected because the deployed page advertised
+`Referrer-Policy: no-referrer`, causing Chromium to send `Origin: null`.
+Source correction is `same-origin`; it has not been flashed. The first field
+controller status was `ap_not_verified` / `sta_supported=no`, which is an
+initial nl80211 verification failure—not proof of absent AP+STA hardware.
+Do not enter upstream credentials until a corrected build is installed and
+status is `yes` or an explicit, independently understood capability result.
+The service must not claim Internet until a future DHCP/route helper is
+independently added. For Bluetooth: read `C2M_DIAG/bluetooth-D3.txt`; the
+current verdict is `NO_HCI_OBSERVED_NOT_HARDWARE_ABSENCE`.
