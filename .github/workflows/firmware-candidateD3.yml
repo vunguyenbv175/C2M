@@ -127,12 +127,12 @@ jobs:
         run: |
           cat > work/stock-sh <<'EOF'
           #!/bin/sh
-          exec qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" sh "$@"
+          exec /usr/bin/qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" sh "$@"
           EOF
           chmod +x work/stock-sh
           mkdir -p work/stock-applets
           for app in awk base64 cat cmp cp grep head md5sum mkdir mv rm sync uname wc; do
-            printf '#!/bin/sh\nexec qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" %s "$@"\n' "$app" > "work/stock-applets/$app"
+            printf '#!/bin/sh\nexec /usr/bin/qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" %s "$@"\n' "$app" > "work/stock-applets/$app"
             chmod +x "work/stock-applets/$app"
           done
           export C2M_TEST_SYSROOT="$PWD/work/sysroot"
@@ -146,7 +146,10 @@ jobs:
         run: |
           # build.sh checks each available ARM ELF and runs --self-test against
           # the exact extracted stock glibc-2.30 sysroot. No live radio/network.
-          if ! (
+          # Do not put the gate group in `if ! (...)`: that disables errexit
+          # throughout the subshell and can hide an earlier failed build.
+          trap 'cat work/d3_build_tests.txt' ERR
+          (
             set -eu
             bash fw/d3/build.sh --out work/d3-services --sysroot work/sysroot
             bash fw/d3/build_supplicant.sh --out work/d3-services --sysroot work/sysroot
@@ -169,10 +172,8 @@ jobs:
             python3 tests/test_d3_wifi_control.py
             python3 tools/fw/test_d3_mutation.py
             python3 tests/test_d3_gps.py
-          ) > work/d3_build_tests.txt 2>&1; then
-            cat work/d3_build_tests.txt
-            exit 1
-          fi
+          ) > work/d3_build_tests.txt 2>&1
+          trap - ERR
           cat work/d3_build_tests.txt
           # Hash installed files, not compiler intermediates. GPS is optional;
           # do not invent a service or mark it ready when no binary was built.

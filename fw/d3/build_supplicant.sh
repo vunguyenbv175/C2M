@@ -70,7 +70,7 @@ EOF
     PKG_CONFIG_LIBDIR="$work/nl/lib/pkgconfig" PKG_CONFIG_PATH= \
         make -j2 wpa_supplicant CC=arm-linux-gnueabihf-gcc \
         PKG_CONFIG="$work/pkg-config-static" EXTRA_CFLAGS="$flags" \
-        LDFLAGS="-nostartfiles -no-pie $work/start.o -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,-z,noexecstack"
+        LDFLAGS="-nostartfiles -no-pie $work/start.o -L$work/nl/lib -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,-z,noexecstack"
 )
 cp "$work/wpa_supplicant-2.12/wpa_supplicant/wpa_supplicant" "$out/wpa_supplicant"
 chmod 755 "$out/wpa_supplicant"

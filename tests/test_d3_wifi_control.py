@@ -148,7 +148,9 @@ int main(int argc, char **argv) {
     CHECK(linkat(fd, "secret", fd, "hardlink", 0) == 0);
     CHECK(read_private(fd, "secret", input, sizeof(input), NULL) < 0);
     CHECK(unlinkat(fd, "hardlink", 0) == 0);
-    snprintf(status, sizeof(status), "%s/status", path);
+    CHECK(strlen(path) + sizeof("/status") <= sizeof(status));
+    memcpy(status, path, strlen(path));
+    memcpy(status + strlen(path), "/status", sizeof("/status"));
     w.status = status; w.supported = -1; w.state = "unknown"; w.error = "nl80211_unavailable";
     CHECK(status_write(&w) == 0);
     CHECK(read_private(fd, "status", input, sizeof(input), NULL) > 0);
