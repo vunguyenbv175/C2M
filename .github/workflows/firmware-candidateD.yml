@@ -1,0 +1,327 @@
+name: firmware-candidateD
+# MANUAL ONLY. Candidate D = C's exact VI audio set + unchanged idle daemon
+# and mount-wait launch + checked, synchronous experimental TSR shell profile.
+# No Warner/GPS/model/ADAS/cardv binary changes; no new audio beyond C.
+#
+# Firmware/audio bytes stay in the PRIVATE vault. Pin the EN TAR and each of
+# the eight actually used WAVs independently (hashes from build/c_final).
+# Do not pin unrelated vault work or trust its mutable checksum manifest.
+#
+# CI preserves the STOCK update token: NOT FLASH-READY until a separately
+# verified local version-only reversion after retrieval. This workflow never
+# accesses a camera/SD card or dispatches a firmware update.
+# Public artifacts use an explicit evidence-only path list: no firmware,
+# audio, raw device config, or private config backups. The TSR shell is our
+# plain source code, safe to include as evidence. All gates are fail-closed.
+"on":
+  workflow_dispatch:
+jobs:
+  candidate-d:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host-only checked TSR experiment tests (GATE)
+        run: |
+          mkdir -p work
+          test -x /bin/sh
+          /bin/sh -n fw/tsr/tsr_profile_boot.sh
+          if ! python3 tools/fw/test_tsr_experiment.py > work/tsr_experiment_tests.txt 2>&1; then
+            cat work/tsr_experiment_tests.txt
+            exit 1
+          fi
+          cat work/tsr_experiment_tests.txt
+          cp fw/tsr/tsr_profile_boot.sh work/tsr_profile_boot.sh
+          sha256sum work/tsr_profile_boot.sh > work/tsr_profile_boot.sha256
+      - name: Fetch EN TAR + exact C VI audio assets + verify independent SHA-256 pins (GATE)
+        env:
+          FIRMWARE_VAULT_KEY: ${{ secrets.FIRMWARE_VAULT_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_KEY" || \
+            { echo "FIRMWARE_VAULT_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh firmware/original
+          printf '%s\n' "$FIRMWARE_VAULT_KEY" > ~/.ssh/fw_vault
+          chmod 600 ~/.ssh/fw_vault
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/fw-vault
+          cp /tmp/fw-vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar \
+            firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
+          echo "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c  firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar" \
+            | sha256sum -c -
+          cat > work/vi_audio_SHA256SUMS.txt <<'EOF'
+          da07eae4699be3b06f23f5849923ebd7a96e4ba02a2b542b3cf52cc5ffa6951b  vi_LDW.wav
+          ca936446d3c3d538314e70fb8e27b095edcc67076775e8ad2fe20ed7b28fd93b  vi_PCW.wav
+          f63818ee429255a4e4beca8799b0956e40984051f8f558eb5725356247ae2581  vi_SAG.wav
+          1efa8d01880d17aa77a8a846031ed24c2820f331841a667cf92d83c0b32e0c92  vi_VB.wav
+          f8e27c89c9121341bfe5d88e390dbffbb6baddea4a2e800a46da2c4ddd9c407f  vi_adas_activated.wav
+          be268e0c3b0981833b2e58488f37dea394b4cd8581a515530ebc4fed9e3c9ebe  vi_adas_fail.wav
+          b9433c6e4813f8334bbfdbb2148f5a82e1c3be4484f5584d759540fb29a6e1bf  vi_updating.wav
+          36ef89d27a3a1ee8fa71c1dcf0100308545f65befc8a1d1d12ba2e815844acbd  tlr_green_on.wav
+          EOF
+          mkdir -p work/vi-audios
+          while read -r hash filename; do
+            cp "/tmp/fw-vault/assets/vi-audios/$filename" "work/vi-audios/$filename"
+          done < work/vi_audio_SHA256SUMS.txt
+          (cd work/vi-audios && sha256sum --strict -c ../vi_audio_SHA256SUMS.txt)
+          rm -rf /tmp/fw-vault ~/.ssh/fw_vault
+      - name: Install toolchain (versions recorded below)
+        run: |
+          mkdir -p work
+          sudo apt-get update && sudo apt-get install -y \
+            mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev \
+            qemu-user-static cpio
+          mkfs.ubifs -h 2>&1 | head -3
+          arm-linux-gnueabihf-gcc --version
+          qemu-arm-static --version | head -1
+          dpkg-query -W mtd-utils gcc-arm-linux-gnueabihf libc6-dev-armhf-cross liblzo2-dev \
+            qemu-user-static cpio > work/tool_versions.txt
+      - name: Inspect EN package + geometry + manifest
+        run: |
+          mkdir -p work
+          python3 tools/fw/carve_upgrade.py \
+            firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar -o work/carve
+          CUST=$(ls work/carve/customer.es.load0.*.bin)
+          echo "CUST=$CUST" >> $GITHUB_ENV
+          python3 tools/fw/ubifs_geometry.py "$CUST" -o work/customer_geometry.json
+          python3 tools/fw/ubifs_manifest.py "$CUST" -o work/customer_manifest.json
+      - name: P1 no-op rebuild (GATE)
+        run: |
+          python3 tools/fw/ubifs_extract_tree.py "$CUST" work/tree \
+            --manifest work/customer_manifest.json --report work/tree_report.json
+          sudo bash tools/fw/rebuild_customer.sh --mode noop \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --out work/customer_noop.es --report work/rebuild_noop.json
+      - name: P0 dynamic idle binary (unchanged C stock-ABI path)
+        run: |
+          cmake -S "${{ github.workspace }}/fw/device_minimal" -B build/arm-dyn-b \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/arm-dyn-b --verbose
+          arm-linux-gnueabihf-readelf -S build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | grep -E "note|attributes"
+          arm-linux-gnueabihf-objdump -d build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | head -30
+          python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
+          sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
+      - name: QEMU stock-rootfs runtime proof (exact idle binary; not TSR recognition proof)
+        run: |
+          mkdir -p work/sysroot && cd work/sysroot
+          gunzip -c ../carve/rootfs.es.load0.*.bin | cpio -id --no-absolute-filenames
+          cd ../..
+          mkdir -p work/sysroot/tmp
+          cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/c2m-idle
+          sha256sum work/sysroot/tmp/c2m-idle > work/qemu_bin.sha256
+          rm -f /tmp/c2m_idle.marker
+          timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
+            > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
+          cat work/qemu_out.txt
+          grep -q "c2m-idle 0.2.0-sdlog1" work/qemu_out.txt
+          cat /tmp/c2m_idle.marker
+          grep -qx "c2m-idle 0.2.0-sdlog1" /tmp/c2m_idle.marker
+          echo "QEMU-RUNTIME: PASS (stock glibc-2.30 userspace; stdout + marker verified)"
+      - name: Execute D profile tests with exact stock BusyBox applets (GATE)
+        run: |
+          cat > work/stock-sh <<'EOF'
+          #!/bin/sh
+          exec qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" sh "$@"
+          EOF
+          chmod +x work/stock-sh
+          mkdir -p work/stock-applets
+          for app in awk base64 cat cmp cp grep md5sum mkdir mv rm sync wc; do
+            printf '#!/bin/sh\nexec qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" %s "$@"\n' "$app" > "work/stock-applets/$app"
+            chmod +x "work/stock-applets/$app"
+          done
+          export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+          export C2M_TSR_TEST_SHELL="$PWD/work/stock-sh"
+          export C2M_TSR_TEST_TIMEOUT=60
+          export PATH="$PWD/work/stock-applets:$PATH"
+          python3 tools/fw/test_tsr_experiment.py > work/tsr_stock_busybox_tests.txt 2>&1 || \
+            { cat work/tsr_stock_busybox_tests.txt; exit 1; }
+          cat work/tsr_stock_busybox_tests.txt
+      - name: P2 mutate (C idle + exact C VI audio + checked TSR experiment) + rebuild (GATE)
+        run: |
+          python3 - > work/audio_map.json <<'EOF'
+          import json
+          pairs = [("LDW.wav", "vi_LDW.wav"), ("PCW.wav", "vi_PCW.wav"),
+                   ("SAG.wav", "vi_SAG.wav"), ("VB.wav", "vi_VB.wav"),
+                   ("adas_activated.wav", "vi_adas_activated.wav"),
+                   ("adas_fail.wav", "vi_adas_fail.wav"),
+                   ("updating.wav", "vi_updating.wav"),
+                   ("tlr_green_on.wav", "tlr_green_on.wav")]
+          print(json.dumps([{"path": "/minieye/adas/audios/" + img,
+                             "file": "work/vi-audios/" + src}
+                            for img, src in pairs], indent=2))
+          EOF
+          cat work/audio_map.json
+          python3 tools/fw/mutate_customer.py --tree work/tree \
+            --manifest work/customer_manifest.json \
+            --idle-bin build/arm-dyn-b/c2m-idle \
+            --audio-replacements work/audio_map.json \
+            --tsr-experiment \
+            --out-manifest work/mutation.json
+          cmp -s work/tsr_profile_boot.sh work/tree/c2m/tsr_profile_boot.sh
+          sudo bash tools/fw/rebuild_customer.sh --mode mutated \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --mut-manifest work/mutation.json \
+            --out work/customer_D.es --report work/rebuild_D.json
+      - name: P3 assemble + deep validate + allowlist diff Candidate D (existing B output names; GATE)
+        run: |
+          python3 tools/fw/build_candidates.py \
+            --en-tar firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar \
+            --workdir work/candidates --customer-b work/customer_D.es
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          for filename, expected in (("validate_A_deep.json", "VALID"),
+                                     ("validate_B_deep.json", "VALID"),
+                                     ("candidate_B_diff.json", "ALLOWLIST-OK")):
+              verdict = json.loads((Path("work/candidates") / filename).read_text())["verdict"]
+              if verdict != expected:
+                  raise SystemExit(f"D-GATE: {filename}: {verdict} != {expected}")
+          print("D-GATE: both deep validations VALID; protected-payload diff ALLOWLIST-OK")
+          EOF
+          sha256sum work/candidates/EN_ENHANCE_IDLE.tar work/candidates/EN_REPACK_GOLDEN.tar \
+            > work/candidate_hashes.txt
+      - name: Assemble private release layout (A + D; stock token; NOT FLASH-READY)
+        run: |
+          R=release/c2m-flash
+          mkdir -p "$R/C2M_FLASH_A" "$R/C2M_FLASH_D" "$R/BUILD_EVIDENCE"
+          cp work/candidates/EN_REPACK_GOLDEN.tar work/candidates/EN_ENHANCE_IDLE.tar "$R/"
+          tar -C "$R/C2M_FLASH_A" -xf "$R/EN_REPACK_GOLDEN.tar"
+          tar -C "$R/C2M_FLASH_D" -xf "$R/EN_ENHANCE_IDLE.tar"
+          test "$(ls "$R/C2M_FLASH_A" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          test "$(ls "$R/C2M_FLASH_D" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          cp work/candidate_hashes.txt work/c2m_idle.sha256 work/qemu_bin.sha256 \
+            work/qemu_out.txt work/mutation.json work/audio_map.json work/tool_versions.txt \
+            work/vi_audio_SHA256SUMS.txt work/tsr_experiment_tests.txt \
+            work/tsr_stock_busybox_tests.txt work/tsr_profile_boot.sh work/tsr_profile_boot.sha256 "$R/BUILD_EVIDENCE/"
+          cp work/customer_geometry.json work/customer_manifest.json work/tree_report.json \
+            work/rebuild_noop.json work/rebuild_noop.compare.txt \
+            work/rebuild_D.json work/rebuild_D.compare.txt work/rebuild_D.bmanifest.json \
+            "$R/BUILD_EVIDENCE/"
+          cp work/candidates/EN_PACKAGE_CONTRACT_B.json work/candidates/EN_PACKAGE_CONTRACT_B.md \
+            work/candidates/candidate_B_diff.json work/candidates/repack_A.json \
+            work/candidates/validate_A_deep.json work/candidates/validate_A_deep.md \
+            work/candidates/validate_B_deep.json work/candidates/validate_B_deep.md \
+            "$R/BUILD_EVIDENCE/"
+          cd "$R" && sha256sum EN_REPACK_GOLDEN.tar EN_ENHANCE_IDLE.tar \
+            C2M_FLASH_A/* C2M_FLASH_D/* > SHA256SUMS.txt && cd ../..
+          cat > "$R/FLASH_README.txt" <<'EOF'
+          C2M CANDIDATE D — CI ASSEMBLY ONLY / NOT FLASH-READY / NOT FLASH-PROVEN.
+
+          ### Required local preparation after private retrieval
+          Both CI packages preserve the STOCK EN update token. No fresh sysVer
+          token is minted here. Do NOT copy these raw CI folders to an SD card
+          or assume the updater will accept them over the installed firmware.
+          Verify retrieved hashes first, then perform the separately authorized,
+          fail-closed LOCAL version-only reversion for D to 20261014000003 using
+          tools/fw/reversion_sd_package.py and exact source-member SHA-256 pins.
+          Verify its report, all four resulting files and refreshed inner MD5.
+          Do not hand-edit sysVer or mix CI/reverted files. A is a stock-token
+          control/reference, not an automatically usable rollback package.
+
+          ### Candidate A (EN_REPACK_GOLDEN.tar)
+          Byte-identical stock EN control, rebuilt from the pinned golden TAR
+          with zero intended changes.
+
+          ### Candidate D (EN_ENHANCE_IDLE.tar in THIS deliverable)
+          C's exact eight Vietnamese ADAS WAV replacements/addition, unchanged
+          minimal idle daemon and background bounded mount-wait launch, plus
+          /customer/c2m/tsr_profile_boot.sh. The hook runs the checked shell
+          synchronously with /bin/sh while preserving the stock hook exit code;
+          background mount-wait copies status (no config payload) to
+          /mnt/mmc/C2M_DIAG/tsr-profile-D.txt. No new audio beyond C.
+
+          D is an EXPERIMENTAL STATIC PROFILE. TSR recognition, display, warning
+          behavior and hardware boot are UNVERIFIED. Only these profile targets:
+            --enable_tsr=true
+            --tsrw_interval=5
+            --tsrw_sli_over_min_ratio=10
+            --tsrw_sli_over_min_thresh=5
+            --tsrw_sli_host_speed_min_thresh=20
+          Other thresholds/flags remain unchanged. Ranges, units and these
+          threshold/timing choices are hypotheses, NOT validated vendor limits
+          or safety claims. Synthetic host tests cover checked application,
+          idempotency and rejection/no-write paths; QEMU proves only idle runtime.
+          A status of APPLIED_WAIT_STOCK_REDECODE is not TSR recognition proof.
+          The authoritative encoded adas.flag is checked/backed up and replaced;
+          stock run.sh reconciles adas_de.flag. Device backup .c2m-tsr-pre-d is
+          pre-D/post-C, NOT factory/pre-C state. No raw config is public evidence.
+
+          ### Preserve core / full updater warning
+          No Warner/GPS/ADAS/cardv/camera/model/calibration/kernel/bootloader
+          binary change. Package diff and customer manifest gates preserve
+          everything outside the narrow hook/idle/profile/audio allowlist.
+          This is the STOCK FULL UPDATER, NOT a customer-only write: it can write
+          unchanged core partitions too. Do not substitute a custom flash script.
+
+          ### Hardware validation only after verified local reversion
+          Follow docs/firmware/FLASH_HW_CHECKLIST.md with stable power, known-good
+          FAT32 media and a recovery plan. Use only the complete locally reverted
+          D four-file folder, never the raw CI C2M_FLASH_D/ folder. Verify boot,
+          camera, recording, ADAS/display/Wi-Fi/reboot and idle/status diagnostics
+          before any supervised TSR experiment. Do not rely on TSR for safety;
+          recognition/threshold tests remain unproven hardware hypotheses.
+          EOF
+          cat "$R/SHA256SUMS.txt"
+      - name: Publish release to private vault (firmware bytes stay private)
+        env:
+          FIRMWARE_VAULT_PUSH_KEY: ${{ secrets.FIRMWARE_VAULT_PUSH_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_PUSH_KEY" || \
+            { echo "FIRMWARE_VAULT_PUSH_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$FIRMWARE_VAULT_PUSH_KEY" > ~/.ssh/fw_vault_push
+          chmod 600 ~/.ssh/fw_vault_push
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault_push -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/vault-out
+          D="deliverables/$(date -u +%Y%m%d)-r${GITHUB_RUN_ID}"
+          echo "VAULT_DIR=$D" >> $GITHUB_ENV
+          mkdir -p "/tmp/vault-out/$D"
+          cp -r release/c2m-flash "/tmp/vault-out/$D/"
+          cd /tmp/vault-out && git add "$D" \
+            && git -c user.name=c2m-ci -c user.email=c2m-ci@local \
+               commit -m "candidate D experimental flash deliverables ${D} (stock token; local reversion required)" \
+            && git push origin main
+          rm -rf /tmp/vault-out ~/.ssh/fw_vault_push
+          echo "VAULT-DIR: $D"
+      - name: Upload evidence (explicit reports/hashes/source ONLY; no firmware/audio/raw config)
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidateD-evidence
+          if-no-files-found: error
+          path: |
+            work/customer_geometry.json
+            work/customer_manifest.json
+            work/tree_report.json
+            work/rebuild_noop.json
+            work/rebuild_noop.compare.txt
+            work/mutation.json
+            work/audio_map.json
+            work/vi_audio_SHA256SUMS.txt
+            work/rebuild_D.json
+            work/rebuild_D.compare.txt
+            work/rebuild_D.bmanifest.json
+            work/candidates/EN_PACKAGE_CONTRACT_B.md
+            work/candidates/EN_PACKAGE_CONTRACT_B.json
+            work/candidates/validate_A_deep.json
+            work/candidates/validate_A_deep.md
+            work/candidates/validate_B_deep.json
+            work/candidates/validate_B_deep.md
+            work/candidates/candidate_B_diff.json
+            work/candidates/repack_A.json
+            work/candidate_hashes.txt
+            work/c2m_idle.sha256
+            work/qemu_bin.sha256
+            work/qemu_out.txt
+            work/tool_versions.txt
+            work/tsr_experiment_tests.txt
+            work/tsr_stock_busybox_tests.txt
+            work/tsr_profile_boot.sh
+            work/tsr_profile_boot.sha256
+            release/c2m-flash/FLASH_README.txt
+            release/c2m-flash/SHA256SUMS.txt

@@ -113,8 +113,11 @@ def main() -> int:
     ap.add_argument("--hook-line", default=DEFAULT_HOOK_LINE)
     ap.add_argument("--audio-replacements", type=Path, default=None,
                     help="JSON list of {path (image-absolute), file (local wav)}")
-    ap.add_argument("--tsr-patch", action="store_true",
-                    help="prepend idempotent TSR flag patch to the hook block")
+    tsr = ap.add_mutually_exclusive_group()
+    tsr.add_argument("--tsr-patch", action="store_true",
+                     help="legacy C literal TSR flag patch (frozen behavior)")
+    tsr.add_argument("--tsr-experiment", action="store_true",
+                     help="D experimental checked TSR profile + private backup/status")
     ap.add_argument("--out-manifest", type=Path, required=True)
     args = ap.parse_args()
 
@@ -172,6 +175,8 @@ def main() -> int:
                 print("MUTATE-FAIL: TSR patch already present")
                 return 1
             block += TSR_PATCH_LINES
+        if args.tsr_experiment:
+            block += ["/bin/sh /customer/c2m/tsr_profile_boot.sh >/dev/null 2>&1"]
         block += ["( _c2m_n=0",
                   "while [ $_c2m_n -lt 30 ]; do",
                   "grep -qs ' /mnt/mmc ' /proc/mounts && break",
@@ -180,9 +185,19 @@ def main() -> int:
                   "done",
                   cmd + " >/dev/null 2>&1 & ) >/dev/null 2>&1 &",
                   tail]
+        if args.tsr_experiment:
+            launch_index = next(i for i, line in enumerate(block) if line.startswith(cmd + " >"))
+            block[launch_index:launch_index] = [
+                "if grep -qs ' /mnt/mmc ' /proc/mounts; then",
+                "mkdir -p /mnt/mmc/C2M_DIAG",
+                "cp /tmp/c2m_tsr_status.txt /mnt/mmc/C2M_DIAG/tsr-profile-D.txt",
+                "fi"]
         new_text = "\n".join(hook_lines[:last_idx] + block + hook_lines[last_idx + 1:])
         mode = "insert-before-terminal-exit"
     else:
+        if args.tsr_patch or args.tsr_experiment:
+            print("MUTATE-FAIL: TSR requires reachable stock terminal-exit hook shape")
+            return 1
         new_text = text + args.hook_line + "\n"
         mode = "append-eof"
 
@@ -194,6 +209,17 @@ def main() -> int:
     os.chmod(idle.parent, 0o755)
     idle.write_bytes(args.idle_bin.read_bytes())
     os.chmod(idle, 0o755)
+
+    profile_path = None
+    if args.tsr_experiment:
+        profile_source = Path(__file__).resolve().parents[2] / "fw/tsr/tsr_profile_boot.sh"
+        profile_path = args.tree / "c2m/tsr_profile_boot.sh"
+        profile_bytes = profile_source.read_bytes()
+        if b"\r" in profile_bytes or not profile_bytes.startswith(b"#!/bin/sh\n"):
+            print("MUTATE-FAIL: D profile script must be LF shell")
+            return 1
+        profile_path.write_bytes(profile_bytes)
+        os.chmod(profile_path, 0o755)
 
     replaced: dict[str, dict] = {}
     if args.audio_replacements is not None:
@@ -310,6 +336,7 @@ def main() -> int:
            "hook_line": args.hook_line,
            "hook_mode": mode,
            "tsr_patch": bool(args.tsr_patch),
+           "tsr_experiment": bool(args.tsr_experiment),
            "added": [{"path": "/c2m", "type": "dir",
                       "mode": 0o755, "mode_oct": "0o755",
                       "uid": 1001, "gid": 1001},
@@ -322,6 +349,11 @@ def main() -> int:
                          "old_sha256": stock[hook_img_path]["sha256"],
                          "new_sha256": sha_file(hook),
                          "change": f"{mode} {len(new_text) - len(text)} bytes"}]}
+    if profile_path is not None:
+        doc["added"].append({"path": "/c2m/tsr_profile_boot.sh", "type": "reg",
+                             "mode": 0o755, "mode_oct": "0o755",
+                             "size": profile_path.stat().st_size,
+                             "sha256": sha_file(profile_path)})
     args.out_manifest.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     print(json.dumps(doc, indent=2))
     return 0
