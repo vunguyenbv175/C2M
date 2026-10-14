@@ -1,6 +1,7 @@
 # Local-only artifacts (never commit)
 build/
 release/
+work/
 firmware/original/V2023*
 __pycache__/
 *.pyc

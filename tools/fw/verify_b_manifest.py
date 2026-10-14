@@ -32,11 +32,23 @@ def main() -> int:
     actual = {r["path"]: r for r in json.loads(args.actual.read_text(encoding="utf-8"))["entries"]}
     mut = json.loads(args.mut.read_text(encoding="utf-8"))
     added = {a["path"]: a for a in mut["added"]}
+    replaced = mut.get("replaced", {})
     hook = mut["hook"]
     new_hook_sha = next(m["new_sha256"] for m in mut["modified"] if m["path"] == hook)
     bad: list[str] = []
     for p, s in stock.items():
         if p == hook:
+            continue
+        if p in replaced:
+            # Authorized content swap (e.g. wav assets + md5sum.txt): the
+            # rebuilt image must carry EXACTLY the recorded bytes.
+            a = actual.get(p)
+            exp = replaced[p]
+            if a is None:
+                bad.append(f"REPLACED-MISSING {p}")
+            elif a.get("sha256") != exp["new_sha256"] or a.get("size") != exp["new_size"]:
+                bad.append(f"REPLACED-MISMATCH {p}: got sha {a.get('sha256')} "
+                           f"size {a.get('size')}, want {exp['new_sha256']} {exp['new_size']}")
             continue
         a = actual.get(p)
         if a is None:
@@ -64,7 +76,16 @@ def main() -> int:
         bad.append(f"HOOK-MISSING {hook}")
     elif h.get("sha256") != new_hook_sha:
         bad.append(f"HOOK-SHA {hook}: {h.get('sha256')} != {new_hook_sha}")
-    extra = set(actual) - set(stock) - set(added)
+    allowed_new = {p for p, r in replaced.items()
+                   if r.get("old_sha256") == "(absent-in-image)"}
+    for p in sorted(allowed_new):
+        a = actual.get(p)
+        exp = replaced[p]
+        if a is None:
+            bad.append(f"ADDED-MISSING {p}")
+        elif a.get("sha256") != exp["new_sha256"] or a.get("size") != exp["new_size"]:
+            bad.append(f"ADDED-MISMATCH {p}")
+    extra = set(actual) - set(stock) - set(added) - allowed_new
     if extra:
         bad.append(f"UNEXPECTED-PATHS {sorted(extra)}")
     doc = {"verdict": "OK" if not bad else "BLOCK", "violations": bad,

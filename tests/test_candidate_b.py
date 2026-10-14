@@ -16,6 +16,7 @@ import io
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
@@ -534,6 +535,163 @@ def main() -> int:
                     fails.append("wait-expiry hook exit != 0")
                 if not await_file(sent_x):
                     fails.append("daemon missing after wait expiry")
+
+        # 2f. audio replacement (wav swap + md5sum refresh + md5sum-listed
+        # addition) + TSR flag patch in the hook block.
+        def fake_wav(nframes: int, rate: int = 24000) -> bytes:
+            payload = b"\x01\x02" * nframes
+            return (struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", 36 + len(payload),
+                                b"WAVE", b"fmt ", 16, 1, 1, rate, rate * 2,
+                                2, 16, b"data", len(payload)) + payload)
+
+        adir = tmp / "au"
+        (adir / "wifi").mkdir(parents=True)
+        (adir / "minieye" / "adas" / "audios").mkdir(parents=True)
+        au_hook = b"#!/bin/sh\necho hi\nexit $?\n"
+        (adir / "wifi" / "rcInsDriver.sh").write_bytes(au_hook)
+        old_a = fake_wav(100)
+        (adir / "minieye" / "adas" / "audios" / "A.wav").write_bytes(old_a)
+        md5_lines = ["%s  ./audios/A.wav" % hashlib.md5(old_a).hexdigest(),
+                     "8e320b19d08eaec12a573bd446fd92c5  ./audios/tlr_green_on.wav",
+                     "deadbeefdeadbeefdeadbeefdeadbeef  ./run.sh"]
+        # NOTE: binary write — text mode would CRLF-convert on Windows and
+        # break the base-integrity hash (same rule as firmware artifacts).
+        (adir / "minieye" / "adas" / "md5sum.txt").write_bytes(
+            ("\n".join(md5_lines) + "\n").encode("ascii"))
+        au_stock = manifest([
+            reg("/wifi/rcInsDriver.sh", au_hook),
+            reg("/minieye/adas/audios/A.wav", old_a),
+            reg("/minieye/adas/md5sum.txt",
+                ("\n".join(md5_lines) + "\n").encode()),
+        ])
+        (tmp / "au_stock.json").write_text(json.dumps(au_stock))
+        new_a, new_t = fake_wav(150), fake_wav(80)
+        (tmp / "newA.wav").write_bytes(new_a)
+        (tmp / "newT.wav").write_bytes(new_t)
+        au_map = [{"path": "/minieye/adas/audios/A.wav",
+                   "file": str(tmp / "newA.wav")},
+                  {"path": "/minieye/adas/audios/tlr_green_on.wav",
+                   "file": str(tmp / "newT.wav")}]
+        (tmp / "au_map.json").write_text(json.dumps(au_map))
+        rc, out = run_py(
+            "mutate_customer.py", "--tree", str(adir),
+            "--manifest", str(tmp / "au_stock.json"),
+            "--idle-bin", str(tmp / "idle.bin"),
+            "--audio-replacements", str(tmp / "au_map.json"),
+            "--tsr-patch", "--out-manifest", str(tmp / "au_mut.json"))
+        if rc != 0:
+            fails.append("mutate audio+tsr failed: " + out[-300:])
+        else:
+            if (adir / "minieye" / "adas" / "audios" / "A.wav").read_bytes() != new_a:
+                fails.append("wav swap not applied")
+            tlr = adir / "minieye" / "adas" / "audios" / "tlr_green_on.wav"
+            if not tlr.is_file() or tlr.read_bytes() != new_t:
+                fails.append("md5sum-listed addition not created")
+            got = (adir / "minieye" / "adas" / "md5sum.txt").read_text().split("\n")
+            if (got[0] != "%s  ./audios/A.wav" % hashlib.md5(new_a).hexdigest()
+                    or got[1] != "%s  ./audios/tlr_green_on.wav" % hashlib.md5(new_t).hexdigest()
+                    or not got[2].startswith("deadbeef")):
+                fails.append("md5sum.txt lines not refreshed exactly")
+            hx = (adir / "wifi" / "rcInsDriver.sh").read_text()
+            if "c2m_adas_de.tmp" not in hx or "--enable_tsr=" not in hx:
+                fails.append("tsr patch missing from hook block")
+            if hx.index("c2m_adas_de.tmp") > hx.index("/customer/c2m/c2m-idle"):
+                fails.append("tsr patch not before daemon launch")
+            mut = json.loads((tmp / "au_mut.json").read_text())
+            if not mut.get("tsr_patch") or len(mut.get("replaced", {})) != 3:
+                fails.append("mutation manifest missing audio/tsr record")
+            # verify_b_manifest accepts exactly this shape.
+            actual_entries = [
+                reg("/wifi/rcInsDriver.sh",
+                    (adir / "wifi" / "rcInsDriver.sh").read_bytes()),
+                reg("/minieye/adas/audios/A.wav", new_a),
+                reg("/minieye/adas/md5sum.txt",
+                    (adir / "minieye" / "adas" / "md5sum.txt").read_bytes()),
+                {"path": "/c2m", "inode": 9, "type": "dir", "mode": 0o755,
+                 "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+                 "size": 96, "mtime": 1691062662},
+                reg("/c2m/c2m-idle", b"ARMFAKE", mode=0o755),
+                reg("/minieye/adas/audios/tlr_green_on.wav", new_t),
+            ]
+            (tmp / "au_actual.json").write_text(json.dumps(manifest(actual_entries)))
+            r = subprocess.run(
+                [sys.executable, "tools/fw/verify_b_manifest.py", "--stock",
+                 str(tmp / "au_stock.json"), "--mut", str(tmp / "au_mut.json"),
+                 "--actual", str(tmp / "au_actual.json")],
+                cwd=ROOT, capture_output=True, text=True)
+            if r.returncode != 0:
+                fails.append("verify_b_manifest replaced-shape failed: "
+                             + r.stdout[-400:])
+        # 2g. TSR patch LOGIC with real base64/sed/grep: run the verbatim
+        # block lines with only the device prefix substituted (device paths
+        # are uncreatable on the test machine). Proves decode/flip/re-encode
+        # consistency + idempotency, i.e. run.sh will observe no md5 drift.
+        if sh_bin is None:
+            fails.append("sh missing for tsr logic test")
+        else:
+            sys.path.insert(0, str(ROOT / "tools" / "fw"))
+            import mutate_customer as _mc
+            sys.path.pop(0)
+            troot = tmp / "tsr"
+            cfg = troot / "customer" / "minieye" / "config"
+            cfg.mkdir(parents=True)
+            flag_src = b"--enable_vehicle=true\n--enable_tsr=false\n--enable_lane=true\n"
+            import base64 as _b64
+            (cfg / "adas.flag").write_bytes(_b64.encodebytes(flag_src))
+            blk = "\n".join(_mc.TSR_PATCH_LINES)
+            blk = blk.replace("/customer/minieye/config",
+                              (cfg.as_posix()))
+            blk = blk.replace("/tmp/c2m_adas_de.tmp",
+                              (tmp / "c2m_adas_de.tmp").as_posix())
+            tscript = tmp / "tsr_block.sh"
+            tscript.write_text("#!/bin/sh\n" + blk + "\n")
+            # plain env: real base64/sed/grep must resolve (no stub PATH).
+            r1 = subprocess.run([sh_bin, str(tscript)], capture_output=True,
+                                text=True, timeout=30)
+            de = (cfg / "adas_de.flag").read_bytes()
+            if r1.returncode != 0 or b"--enable_tsr=true\n" not in de:
+                fails.append("tsr block did not flip the flag")
+            if _b64.decodebytes((cfg / "adas.flag").read_bytes()) != de:
+                fails.append("tsr rewrite broke adas.flag/adas_de.flag sync")
+            if b"--enable_vehicle=true\n--enable_lane=true\n" not in de.replace(
+                    b"--enable_tsr=true\n", b""):
+                fails.append("tsr rewrite disturbed other flags")
+            snap = (cfg / "adas.flag").read_bytes(), de
+            r2 = subprocess.run([sh_bin, str(tscript)], capture_output=True,
+                                text=True, timeout=30)
+            if r2.returncode != 0 or (cfg / "adas.flag").read_bytes() != snap[0] \
+                    or (cfg / "adas_de.flag").read_bytes() != snap[1]:
+                fails.append("tsr patch not idempotent")
+            # sh -n syntax gate on a real mutated hook with the TSR block.
+            hx = (adir / "wifi" / "rcInsDriver.sh").read_bytes()
+            (tmp / "syntax_hook.sh").write_bytes(hx)
+            r3 = subprocess.run([sh_bin, "-n", str(tmp / "syntax_hook.sh")],
+                                capture_output=True, text=True, timeout=30)
+            if r3.returncode != 0:
+                fails.append("mutated hook sh -n failed: " + r3.stderr[-300:])
+
+        # negative: wrong wav encoding rejected on a FRESH stock tree
+        # (isolates the format gate from base-integrity).
+        adir2 = tmp / "au2"
+        (adir2 / "wifi").mkdir(parents=True)
+        (adir2 / "minieye" / "adas" / "audios").mkdir(parents=True)
+        (adir2 / "wifi" / "rcInsDriver.sh").write_bytes(au_hook)
+        (adir2 / "minieye" / "adas" / "audios" / "A.wav").write_bytes(old_a)
+        (adir2 / "minieye" / "adas" / "md5sum.txt").write_bytes(
+            ("\n".join(md5_lines) + "\n").encode("ascii"))
+        bad_rate = fake_wav(100, rate=8000)
+        (tmp / "bad.wav").write_bytes(bad_rate)
+        (tmp / "bad_map.json").write_text(json.dumps(
+            [{"path": "/minieye/adas/audios/A.wav",
+              "file": str(tmp / "bad.wav")}]))
+        rc, out = run_py(
+            "mutate_customer.py", "--tree", str(adir2),
+            "--manifest", str(tmp / "au_stock.json"),
+            "--idle-bin", str(tmp / "idle.bin"),
+            "--audio-replacements", str(tmp / "bad_map.json"),
+            "--out-manifest", str(tmp / "au_mut_bad.json"))
+        if rc == 0 or "wav rejected" not in out:
+            fails.append("bad wav encoding not rejected")
 
         # 3. candidate_diff allowlist
         ksha = sh(b"k" * 0x100)
