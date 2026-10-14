@@ -42,8 +42,19 @@ flags="-Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-stack-protector 
     make -j2
     make install
 )
+# libnl static archives contain constructor registration. Unlike our small
+# services, upstream needs an init callback passed to glibc2.30 startup.
+python3 - "$work/start.S" <<'PY'
+from pathlib import Path
+import sys
+s=Path('fw/device_minimal/start.S').read_text()
+s=s.replace('mov a4, #0\n    push {a4}', 'mov a4, #0\n    push {a4}\n    ldr a4, =c2m_init_arrays')
+Path(sys.argv[1]).write_text(s)
+PY
 arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
-    -c fw/device_minimal/start.S -o "$work/start.o"
+    -c "$work/start.S" -o "$work/start.o"
+arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
+    -c fw/d3/init_arrays.c -o "$work/init_arrays.o"
 cat > "$work/pkg-config-static" <<'EOF'
 #!/bin/sh
 exec pkg-config --static "$@"
@@ -70,7 +81,7 @@ EOF
     PKG_CONFIG_LIBDIR="$work/nl/lib/pkgconfig" PKG_CONFIG_PATH= \
         make -j2 wpa_supplicant CC=arm-linux-gnueabihf-gcc \
         PKG_CONFIG="$work/pkg-config-static" EXTRA_CFLAGS="$flags" \
-        LDFLAGS="-nostartfiles -no-pie $work/start.o -L$work/nl/lib -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,-z,noexecstack"
+        LDFLAGS="-nostartfiles -no-pie $work/start.o $work/init_arrays.o -L$work/nl/lib -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 -Wl,-z,noexecstack"
 )
 cp "$work/wpa_supplicant-2.12/wpa_supplicant/wpa_supplicant" "$out/wpa_supplicant"
 chmod 755 "$out/wpa_supplicant"

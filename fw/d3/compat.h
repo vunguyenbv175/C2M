@@ -7,6 +7,13 @@
 #if defined(__arm__) && defined(__GLIBC__)
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdlib.h>
+/* glibc 2.38 C23 redirects. Our numeric inputs use explicit decimal/hex,
+ * not C23 0b prefixes; bind the same integer conversions available on 2.30. */
+__asm__(".symver __isoc23_strtol,strtol@GLIBC_2.4");
+__asm__(".symver __isoc23_strtoul,strtoul@GLIBC_2.4");
+__asm__(".symver __isoc23_strtoll,strtoll@GLIBC_2.4");
+__asm__(".symver __isoc23_strtoull,strtoull@GLIBC_2.4");
 extern int __xstat(int, const char *, struct stat *);
 extern int __lxstat(int, const char *, struct stat *);
 extern int __fxstat(int, int, struct stat *);

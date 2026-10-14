@@ -265,11 +265,11 @@ jobs:
           mkdir -p "$R/OPEN_SOURCE"
           cp work/d3-upstream/wpa_supplicant-2.12.tar.gz work/d3-upstream/libnl-3.11.0.tar.gz \
             work/d3-services/wpa_supplicant.COPYING fw/d3/build_supplicant.sh fw/d3/compat.h \
-            fw/device_minimal/start.S "$R/OPEN_SOURCE/"
+            fw/device_minimal/start.S fw/d3/init_arrays.c "$R/OPEN_SOURCE/"
           # Relinkable objects + exact recipe/source for the statically linked
           # LGPL libnl. Private deliverable only, never public artifacts.
           tar -C work/d3-upstream -czf "$R/OPEN_SOURCE/supplicant-relink.tar.gz" \
-            wpa_supplicant-2.12 libnl-3.11.0 nl start.o compat_prefix.h pkg-config-static
+            wpa_supplicant-2.12 libnl-3.11.0 nl start.S start.o init_arrays.o compat_prefix.h pkg-config-static
           cp work/customer_geometry.json work/customer_manifest.json work/tree_report.json \
             work/rebuild_noop.json work/rebuild_noop.compare.txt \
             work/rebuild_D3.json work/rebuild_D3.compare.txt work/rebuild_D3.bmanifest.json \
