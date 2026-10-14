@@ -154,3 +154,22 @@ their permitted **Linux headless / camera / regional-cache** integration.
 If headless API is not offered, seek a *licensed phone-app event relay*
 or fall back to Lily-style offline + OSM/Overpass. Do not put unsupported
 enterprise-only SDK into the D3 shipping path.
+
+
+## 2026-10-14 supplement: VietMap Agent documentation link (user-supplied)
+
+Official resource: https://maps.vietmap.vn/docs/assets/agents/agents.zip
+- The URL is an actual binary ZIP (\`application/x-zip-compressed\` according to browser fetch), **but archive extraction was NOT possible in this review environment**. Do not imply that its contents have been inventoried.
+- A related, independently retrievable official agent guide is:
+  https://maps.vietmap.vn/docs/assets/agents/map-display.txt
+  and is linked under **"Map Display Agent Doc"** on
+  https://maps.vietmap.vn/docs/map-api/tilemap/
+  and https://maps.vietmap.vn/docs/sdk-mobile/overview/.
+- That guide explicitly covers **tilemap styles, VietMap GL JS, Flutter, React Native, Android/iOS SDK, traffic tile overlays, static-map PNG**. It documents
+  \`/maps/styles/{tm,lm,dm,hm}/style.json\`, \`/api/tf/{z}/{x}/{y}.png\`
+  and \`POST /api/maps/statics/tm\`.
+- The guide contains **no section or endpoint describing Speed Alert, Driving Alert, physical traffic-sign/road-speed retrieval, or free Driving Alert entitlement**.
+- Security detail: browser/mobile tile styles expose the tile key and should use console domain/IP/quota restrictions; backend Static Map / Traffic proxy keys belong on a server.
+- Coordinate boundary: GL JS uses \`[lng,lat]\`, most VietMap REST points use \`lat,lng\`.
+- **Reassessment:** VietMap's official "AI agent" documentation **cannot** be treated as proof of free speed-sign API. Retain status \`Driving Alert trial OFF / SDK enterprise or special key\` from independently checked product docs, unless full ZIP/API contract supplies contrary evidence.
+- **Follow-up:** acquire the ZIP itself as a local attachment or using a network-enabled build environment; inventory file manifest, search \`driving|speed|alert|maxspeed|traffic_sign|quota|offline|cache\`, and trace full request/response/auth for any candidate endpoint. Do not guess what unseen ZIP contents say.
