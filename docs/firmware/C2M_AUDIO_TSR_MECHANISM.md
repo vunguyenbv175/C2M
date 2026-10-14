@@ -1,7 +1,9 @@
 # C2M audio + TSR mechanisms (stock EN static evidence, 2026-10-14)
 
-All paths below are IMAGE-RELATIVE (`/customer/...` on device). No device
-shell was used; no firmware built yet.
+All paths below are IMAGE-RELATIVE (`/customer/...` on device). Static
+analysis was performed without a device shell. Candidate C was subsequently
+built and flashed on 2026-10-14; the owner reports Vietnamese warning audio.
+TSR recognition/output and the effective device flags remain unverified.
 
 ## Audio playback path
 
@@ -12,18 +14,19 @@ shell was used; no firmware built yet.
 - `/minieye/adas/audios.txt` maps warning IDs to wav files:
   `fcw/hwm/vb/stop_and_go/ldw/pcw/fail/calib_success/tlr_green_on`, with
   duration-ms, privilege and loop fields. `tlr_green_on.wav` is listed but
-  MISSING from the image (traffic-light audio slot exists, file absent).
+  MISSING from the stock EN/VI images; Candidate C adds this asset. Having
+  the slot/file does not prove the traffic-light event will fire.
 - WAV format (checked `adas_activated.wav`): RIFF/WAVE, PCM16, mono,
   24000 Hz. Replacements must use the same encoding.
-- Integrity: `adas_checksum.sh` (`md5sum -c md5sum.txt`) has NO caller in
-  the boot path (stock boots fine despite the missing tlr wav), so it is
-  treated as legacy/dead — PROVEN further 2026-10-14: stock `md5sum.txt`
-  lines for FCW/HMW/LDW do not match the shipped file bytes either
-  (e.g. FCW listed `08998a0f…`, file md5 `c61c15d8…`, byte-identical across
-  EN/B4/C images), yet stock ADAS runs. Any wav/audios.txt change must still
-  update `md5sum.txt` for consistency (`md5sum.txt` lists run.sh, audios.txt
-  and all wavs, but not itself); vendor-stale lines for untouched files are
-  preserved verbatim. `adas_checksize.sh` checks SIZES from
+- Integrity: static boot-path inspection found NO caller of
+  `adas_checksum.sh` (`md5sum -c md5sum.txt`). Stock boots despite the missing
+  tlr wav; 2026-10-14 inspection also found stale FCW/HMW entries (e.g. FCW
+  listed `08998a0f…`, actual md5 `c61c15d8…`, identical B4/C bytes). This
+  supports treating it as non-gating on the observed boot path, NOT proof
+  that it is never called in any mode. Any wav/audios.txt change must still
+  update its matching `md5sum.txt` lines (`md5sum.txt` lists run.sh,
+  audios.txt and wavs, but not itself); vendor-stale lines for untouched
+  files are preserved verbatim. `adas_checksize.sh` checks SIZES from
   `filesize.txt`, which lists `run.sh` (1584 B) but NO wavs/audios.txt —
   so wav swaps need no size bookkeeping, while any `run.sh` edit MUST
   update `filesize.txt` too.
@@ -42,17 +45,23 @@ shell was used; no firmware built yet.
 - TSR enable strategy (no `run.sh` edit needed): our boot hook runs BEFORE
   `adas_service.sh` (`demo.sh`: hook ~:100, adas :107), so it can patch the
   decoded flag + re-encode consistently with stock tools
-  (base64/md5sum/sed). Rollback = flash without the hook change; device
-  config untouched by hand.
+  (base64/md5sum/sed). The current implementation writes BOTH persistent
+  device flag files, has no original-config backup, and silently skips a
+  file without the literal `--enable_tsr=false`. Therefore the effective
+  runtime setting still needs evidence. IMPORTANT: flashing A/B without
+  this hook does NOT guarantee TSR is disabled again, because config is
+  preserved. Firmware rollback and config rollback are separate tasks;
+  an explicit, owner-authorized recovery path must preserve calibration,
+  license and all unrelated flags.
 
 ## Startup greeting options
 
-1. Replace `adas_activated.wav` (plays on the `calib_success` event per
-   `audios.txt` — i.e. after (re)calibration, NOT on every boot/power-on.
-   Confirmed 2026-10-14: field-verified C build plays VI warnings but no
-   greeting on normal boots, matching this mapping). Same swap pattern as
-   warning wavs, no new mechanism. RECOMMENDED when a vendor calib sound
-   is acceptable.
+1. Replace `adas_activated.wav`: `audios.txt` maps this asset to
+   `calib_success`, not a per-boot greeting. The owner reported Vietnamese
+   warnings but no greeting after flashing C (2026-10-14), consistent with
+   this mapping; the exact event trigger has not been captured at runtime.
+   Same swap pattern as warning wavs, no new mechanism. Owner chose to keep
+   vendor behavior; no forced calibration or custom per-boot greeting.
 2. Hook-triggered fifo play at boot: needs `play_wav_cmd`-style command
    discovery in cardv (RE work, deferred).
 3. Replace a oneed system wav (e.g. Record_On): requires extending the
@@ -60,8 +69,16 @@ shell was used; no firmware built yet.
 
 ## Vietnamese audio source
 
-No VI TAR is available locally (vault holds EN only); the VI donor wavs
-documented in `08_AUDIO_VIETNAM_LOCALIZATION.md` cannot be extracted until
-a VI image is obtained. Practical sources: owner-recorded voice (phone mic
-is fine) or TTS, converted to PCM16/mono/24kHz. Keep each clip within the
-original duration OR update `audios.txt` duration + `md5sum.txt` together.
+The hash-verified VI TAR has now supplied seven changed ADAS wavs; FCW/HMW
+remain unchanged. Private assets are in vault `assets/vi-audios/` with
+`SHA256SUMS.txt`. Candidate C adds Vietnamese TTS "Đèn xanh" (1128 ms,
+PCM16/mono/24 kHz) for the missing traffic-light file. No firmware/audio
+bytes are published in the public repo.
+
+Measured from final C wavs: LDW 1579 ms vs listed 1003 ms; PCW 1535 vs 1211;
+SAG 1920 vs 1112; VB 1579 vs 1152; calib_success 2261 vs 2047; fail 3925 vs
+3562. The VI donor uses the same list despite different wav lengths. Do not
+assume the duration field is harmless or that speech is clipped: measure
+complete playback and warning preemption first. If list durations need
+changing, update `audios.txt` and its md5 line together under an explicit
+allowlist; preserve warning priority/loop fields.
