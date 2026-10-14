@@ -1,7 +1,10 @@
 # Candidate C — Vietnamese ADAS audio + TSR enable (2026-10-14)
 
-**Status:** HOST-VALIDATED + SD READ-BACK VERIFIED; manual device flash
-pending. Separately authorized artifact; frozen A/B1/B2 hashes untouched.
+**Status:** HOST-VALIDATED + SD READ-BACK VERIFIED + DEVICE-FLASHED
+2026-10-14. Field result: VI warnings confirmed by ear (LDW/PCW/FCW group);
+no startup greeting on normal boots — EXPECTED, see `audios.txt` mapping
+(`calib_success` → `adas_activated.wav`, not a per-boot event). Owner chose
+to keep the vendor calib sound; no custom per-boot greeting planned.
 
 ## Content vs B4 (mount-wait)
 

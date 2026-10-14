@@ -47,9 +47,12 @@ shell was used; no firmware built yet.
 
 ## Startup greeting options
 
-1. Replace `adas_activated.wav` (plays at every ADAS activation — the
-   effective startup moment). Same swap pattern as warning wavs, no new
-   mechanism. RECOMMENDED.
+1. Replace `adas_activated.wav` (plays on the `calib_success` event per
+   `audios.txt` — i.e. after (re)calibration, NOT on every boot/power-on.
+   Confirmed 2026-10-14: field-verified C build plays VI warnings but no
+   greeting on normal boots, matching this mapping). Same swap pattern as
+   warning wavs, no new mechanism. RECOMMENDED when a vendor calib sound
+   is acceptable.
 2. Hook-triggered fifo play at boot: needs `play_wav_cmd`-style command
    discovery in cardv (RE work, deferred).
 3. Replace a oneed system wav (e.g. Record_On): requires extending the
