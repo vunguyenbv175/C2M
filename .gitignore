@@ -10,3 +10,5 @@ __pycache__/
 external/
 build/ipu/
 C2M_HW_*/
+# Owner-provided third-party sign database (private, no redistribution)
+/signs_vn.bin

@@ -7,17 +7,57 @@ Record: double lat, double lon, float heading (-999=unknown),
         char type[16], char label[64] (utf-8, NUL-padded). LE.
 """
 import argparse
+import math
+import os
 import sqlite3
 import struct
 import sys
+import tempfile
 
 MAGIC = b"C2MSDB01"
 REC = struct.Struct("<ddf16s64s")
 
 
 def enc(s, n):
-    b = s.encode("utf-8")[: n - 1]
+    if not isinstance(s, str) or any(ord(c) < 32 or ord(c) == 127 for c in s):
+        raise ValueError("invalid database string")
+    # Trim on a UTF-8 character boundary, not in the middle of a codepoint.
+    b = s.encode("utf-8")[: n - 1].decode("utf-8", "ignore").encode("utf-8")
     return b + b"\x00" * (n - len(b))
+
+
+def write_signs(signs, out):
+    from pathlib import Path
+    rows = []
+    for lat, lon, heading, typ, label in signs:
+        if not all(math.isfinite(float(v)) for v in (lat, lon, heading)):
+            raise ValueError("nonfinite coordinates/heading")
+        if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+            raise ValueError("coordinates outside range")
+        if heading != -999 and not 0 <= heading <= 360:
+            raise ValueError("invalid heading")
+        if not typ:
+            raise ValueError("empty sign type")
+        rows.append((lat, lon, 0 if heading == 360 else heading, typ, label))
+    if not 0 < len(rows) <= 40000:
+        raise ValueError("database count outside deployment bound")
+    rows.sort(key=lambda row: (row[0], row[1], row[2], row[3], row[4]))
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=out.name + ".", dir=out.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(MAGIC + struct.pack("<I", len(rows)))
+            for lat, lon, hdg, typ, label in rows:
+                stream.write(REC.pack(lat, lon, float(hdg), enc(typ, 16), enc(label, 64)))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, out)
+    except BaseException:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+        raise
+    return len(rows)
 
 
 def demo_signs():
@@ -45,27 +85,28 @@ def demo_signs():
 
 
 def from_sqlite(path):
-    con = sqlite3.connect(path)
-    rows = con.execute(
-        "SELECT lat, lon, COALESCE(heading_deg, -999), sign_type, label_vi FROM signs"
-    ).fetchall()
+    if not path:
+        raise ValueError("exactly one source is required: --demo or --sqlite")
+    con = sqlite3.connect("file:" + os.path.abspath(path) + "?mode=ro", uri=True)
+    try:
+        rows = con.execute(
+            "SELECT lat, lon, COALESCE(heading_deg, -999), sign_type, label_vi FROM signs"
+        ).fetchall()
+    finally:
+        con.close()
     return [(r[0], r[1], r[2] if r[2] is not None else -999.0, r[3], r[4] or r[3])
             for r in rows]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--demo", action="store_true")
-    ap.add_argument("--sqlite", default=None)
+    source = ap.add_mutually_exclusive_group(required=True)
+    source.add_argument("--demo", action="store_true")
+    source.add_argument("--sqlite")
     ap.add_argument("out")
     a = ap.parse_args()
     signs = demo_signs() if a.demo else from_sqlite(a.sqlite)
-    with open(a.out, "wb") as f:
-        f.write(MAGIC)
-        f.write(struct.pack("<I", len(signs)))
-        for lat, lon, hdg, typ, label in signs:
-            f.write(REC.pack(lat, lon, float(hdg), enc(typ, 16), enc(label, 64)))
-    print(f"wrote {len(signs)} signs -> {a.out}")
+    print(f"wrote {write_signs(signs, a.out)} signs -> {a.out}")
 
 
 if __name__ == "__main__":

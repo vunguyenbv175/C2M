@@ -130,7 +130,7 @@ CGI/APK. Tương tự TSR: code có, data/config thiếu hoặc tắt.
 cảnh báo GPS chuẩn vendor mà không cần viết code mới. Đây là hướng điều tra
 giá trị cao nhất hiện tại (xếp trên cả daemon tự viết).
 
-## 8. Daemon on-device `c2m-warner` (đã build prototype)
+## 8. Daemon on-device `c2m-warner` (replay-only prototype; NOT on-device)
 
 Theo chỉ đạo "không dùng app điện thoại, chạy offline trên C2M trước":
 đã port Warner engine sang C tại `fw/warner/`:
@@ -143,20 +143,24 @@ Theo chỉ đạo "không dùng app điện thoại, chạy offline trên C2M tr
   `fw/device_minimal/toolchain-armhf-dyn.cmake`; cần cài
   `gcc-arm-linux-gnueabihf` trên máy build (VM hiện chưa có).
 
-Bring-up trên thiết bị thật còn 3 việc:
-1. **GPS input:** verify `/dev/ttyS1` có bị cardv giữ độc quyền không;
-   thử `/dev/ttyS2` nếu xung đột.
-2. **Alert output:** verify format lệnh `play_wav_cmd` qua `/tmp/cardv_fifo`
-   rồi mới móc vào điểm `HOOK` trong main.c.
-3. **Triển khai:** nhét binary + `signs.bin` vào SD hook (cơ chế như
-   candidate C), chạy như daemon nền.
+Review cập nhật: entrypoint đã được giới hạn HOST/REPLAY để chặn busy-loop
+và đọc tranh UART; việc deploy chưa được phép.
+1. **GPS input:** cần nguồn fan-out thụ động đã chứng minh, không mở ttyS1/S2
+   cùng `cardv`; đọc chậm vẫn tiêu thụ bytes, kiểm ownership không tạo tap.
+2. **Alert output:** grammar và arbitration âm thanh/hiển thị phải được xác
+   minh; log/stdout không phải nâng cấp cảnh báo người dùng.
+3. **Triển khai:** chỉ sau input/output, DB, ABI/QEMU và manifest gates. Không
+   cài launcher tự chạy bản replay, không flash chỉ để thấy thêm log.
 
 ## 9. Roadmap cập nhật (on-device first, không app điện thoại)
 
 - **Phase 0 (ngay):** lái thử Candidate C theo checklist TSR.
 - **Phase 1:** điều tra `edog` — format `/edogs`, công tắc bật, audio pack
   (có thể tự TTS). Nếu mở được → xong, khỏi viết daemon.
-- **Phase 2 (song song):** cross-build `c2m-warner`, bring-up 3 việc trên,
-  nạp DB biển cho tuyến hay đi.
+- **Phase 2 (song song):** cross-build `c2m-warner`, nhưng chỉ bring-up bằng
+  replay trước. `signs_vn.bin` (28,551 điểm, ~2.86 MB, nguồn Lily APK) là
+  private owner-provided input, không commit/redistribute; chưa đủ để gọi là
+  DB đã triển khai. Không mở ttyS1/S2 trên firmware và không móc audio/M4 khi
+  chưa có passive/runtime contract.
 - **Phase 3:** fusion TSR × GPS trên cam (khi có kênh đọc TSR runtime).
 - **Phase 4:** crowdsource DB từ chính xe (ghi nhận TSR detect + GPS).

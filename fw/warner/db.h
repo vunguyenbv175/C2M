@@ -5,7 +5,9 @@
  *   offset 8:  u32 sign count
  *   offset 12: records, each 100 bytes:
  *              double lat, double lon, float heading_deg (-999 = unknown),
- *              char type[16], char label[64]  (NUL-padded)
+ *              char type[16], char label[64]  (NUL-padded UTF-8)
+ * Loader accepts exact-size LE IEEE files up to 40,000 records. Invalid or
+ * partial DB returns NULL and n_out=0; heading 360 is normalized to 0.
  */
 #ifndef SIGNDB_H
 #define SIGNDB_H

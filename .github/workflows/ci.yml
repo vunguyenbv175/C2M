@@ -15,6 +15,24 @@ jobs:
         run: cmake --build build
       - name: CTest
         run: ctest --test-dir build --output-on-failure
+      - name: Warner native build + hostile-input guards (no device access)
+        run: |
+          cmake -S fw/warner -B build/warner-native -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/warner-native
+          ctest --test-dir build/warner-native --output-on-failure
+          python3 fw/warner/tools/test_signs_tools.py
+          python3 fw/warner/tools/build_signs_bin.py --demo build/warner-native/signs.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          payload = 'GPRMC,084522,A,1046.32,N,10641.49,E,21.6,90.0,141026,,,A'
+          checksum = 0
+          for char in payload:
+              checksum ^= ord(char)
+          Path('build/warner-native/replay.nmea').write_text('$' + payload + '*%02X\n' % checksum)
+          PY
+          timeout 5 build/warner-native/c2m-warner --replay build/warner-native/replay.nmea \
+            -s build/warner-native/signs.bin > build/warner-native/replay.txt
+          grep -q 'SIMULATION ALERT' build/warner-native/replay.txt
       - name: Standalone header checks
         run: |
           for h in $(find include -name '*.hpp'); do

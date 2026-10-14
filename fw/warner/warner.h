@@ -48,8 +48,10 @@ void warner_init(warner_t *w, const warner_sign_t *signs, int n_signs);
  * If never attached, cooldown is disabled. */
 void warner_set_state(warner_t *w, double *last_alert);
 
-/* Returns number of alerts written to out[] (capacity max_alerts).
- * now_s: monotonic seconds (e.g. from clock_gettime). */
+/* Replay-only advisory selection: returns nearest directional DB matches.
+ * Unknown-heading signs and movement below 5 km/h are suppressed.
+ * now_s is ordered replay time, NOT proof of live GPS freshness. Cooldown
+ * currently commits selection; a future live backend must commit delivery. */
 int warner_update(warner_t *w, double lat, double lon, double heading_deg,
                   double speed_kmh, double now_s,
                   warner_alert_t *out, int max_alerts);

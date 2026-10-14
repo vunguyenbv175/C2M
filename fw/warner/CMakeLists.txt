@@ -15,8 +15,14 @@ if(C2M_USE_CUSTOM_START)
   target_sources(c2m-warner PRIVATE ../device_minimal/start.S)
 endif()
 
-# host-only unit test
-add_executable(test_warner test_warner.c warner.c nmea.c)
-target_link_libraries(test_warner PRIVATE m)
-enable_testing()
-add_test(NAME warner_unit COMMAND test_warner)
+# Native tests must not inherit freestanding ARM -nostartfiles without _start.
+if(NOT CMAKE_CROSSCOMPILING)
+  add_executable(test_warner test_warner.c warner.c nmea.c)
+  target_link_libraries(test_warner PRIVATE m)
+  add_executable(test_warner_guards test_guards.c warner.c nmea.c db.c)
+  target_link_libraries(test_warner_guards PRIVATE m)
+  enable_testing()
+  add_test(NAME warner_unit COMMAND test_warner)
+  add_test(NAME warner_guards COMMAND test_warner_guards
+    "${CMAKE_CURRENT_BINARY_DIR}/guard-test.bin")
+endif()

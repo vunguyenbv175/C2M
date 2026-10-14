@@ -12,20 +12,13 @@ Usage:
 
 Output: C2MSDB01 signs.bin (see build_signs_bin.py for the record format).
 """
+import argparse
 import gzip
 import json
 import glob
 import os
-import struct
-import sys
 
-MAGIC = b"C2MSDB01"
-REC = struct.Struct("<ddf16s64s")
-
-
-def enc(s, n):
-    b = s.encode("utf-8")[: n - 1]
-    return b + b"\x00" * (n - len(b))
+from build_signs_bin import write_signs
 
 
 TYPE_MAP = {
@@ -39,10 +32,16 @@ TYPE_MAP = {
 
 
 def main():
-    src_dir, out = sys.argv[1], sys.argv[2]
+    ap = argparse.ArgumentParser()
+    ap.add_argument("source_dir")
+    ap.add_argument("out")
+    args = ap.parse_args()
+    src_dir, out = args.source_dir, args.out
     recs = []
-    for f in glob.glob(os.path.join(src_dir, "*_pins.bin")):
-        for p in json.loads(gzip.decompress(open(f, "rb").read())):
+    for f in sorted(glob.glob(os.path.join(src_dir, "*_pins.bin"))):
+        with open(f, "rb") as stream:
+            pins = json.loads(gzip.decompress(stream.read()))
+        for p in pins:
             t = p.get("t", "?")
             if t not in TYPE_MAP:
                 continue
@@ -53,12 +52,8 @@ def main():
             if heading < 0:
                 heading = -999.0
             recs.append((p["y"], p["g"], heading, code, label))
-    with open(out, "wb") as fh:
-        fh.write(MAGIC)
-        fh.write(struct.pack("<I", len(recs)))
-        for lat, lon, hdg, code, label in recs:
-            fh.write(REC.pack(lat, lon, hdg, enc(code, 16), enc(label, 64)))
-    print(f"wrote {len(recs)} records to {out}")
+    count = write_signs(recs, out)
+    print(f"wrote {count} records to {out}")
 
 
 if __name__ == "__main__":

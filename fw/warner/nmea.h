@@ -1,5 +1,6 @@
 /* Minimal NMEA RMC parser: $GPRMC/$GNRMC/$BDRMC -> fix, lat, lon, speed, course.
- * Returns 1 on valid fix, 0 otherwise. Checksum verified when present. */
+ * Returns 1 on a complete valid fix, 0 otherwise. Checksum is REQUIRED;
+ * empty fields, invalid coordinates/time/speed/course fail closed. */
 #ifndef NMEA_H
 #define NMEA_H
 
