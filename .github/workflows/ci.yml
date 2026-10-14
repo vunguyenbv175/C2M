@@ -58,6 +58,11 @@ jobs:
           python3 tests/test_candidate_b.py
           python3 tools/fw/test_tsr_profile.py
           python3 tools/fw/test_tsr_experiment.py
+          python3 tools/fw/test_d3_connectivity.py
+          python3 tools/fw/test_d3_mutation.py
+          python3 tests/test_d3_web.py
+          python3 tests/test_d3_wifi_control.py
+          python3 tests/test_d3_gps.py
           python3 tools/fw/test_reversion_sd_package.py
   arm-minimal:
     # Reproducible cross-build of the MINIMAL idle binary (static analysis only).

@@ -1,0 +1,434 @@
+name: firmware-candidateD3
+# MANUAL ONLY. Candidate D3 = unchanged C VI audio/idle + checked D TSR
+# profile + isolated D3 AP-only web UI, concurrency-gated Wi-Fi and passive BT probe.
+# No stock camera/kernel/ADAS/GPS/cardv/model binary changes. No new audio.
+# Optional D3 GPS service is staged only if its real source/build is available;
+# no speed-camera database bytes or fake GPS/audio-ready claim are included.
+#
+# Firmware/audio bytes stay in the PRIVATE vault. Pin the EN TAR and each of
+# the eight actually used WAVs independently (hashes from build/c_final).
+# Do not pin unrelated vault work or trust its mutable checksum manifest.
+#
+# CI preserves the STOCK update token: NOT FLASH-READY until a separately
+# verified local version-only reversion after retrieval. This workflow never
+# accesses a camera/SD card or dispatches a firmware update.
+# Public artifacts use an explicit evidence-only path list: no firmware,
+# ARM binaries, audio, credentials, database, raw device config or backups.
+# Plain source, synthetic tests and hashes are safe evidence; gates fail closed.
+"on":
+  workflow_dispatch:
+jobs:
+  candidate-d3:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host-only checked TSR experiment tests (GATE)
+        run: |
+          mkdir -p work
+          test -x /bin/sh
+          /bin/sh -n fw/tsr/tsr_profile_boot.sh
+          if ! python3 tools/fw/test_tsr_experiment.py > work/tsr_experiment_tests.txt 2>&1; then
+            cat work/tsr_experiment_tests.txt
+            exit 1
+          fi
+          cat work/tsr_experiment_tests.txt
+          cp fw/tsr/tsr_profile_boot.sh work/tsr_profile_boot.sh
+          sha256sum work/tsr_profile_boot.sh > work/tsr_profile_boot.sha256
+      - name: Fetch EN TAR + exact C VI audio assets + verify independent SHA-256 pins (GATE)
+        env:
+          FIRMWARE_VAULT_KEY: ${{ secrets.FIRMWARE_VAULT_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_KEY" || \
+            { echo "FIRMWARE_VAULT_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh firmware/original
+          printf '%s\n' "$FIRMWARE_VAULT_KEY" > ~/.ssh/fw_vault
+          chmod 600 ~/.ssh/fw_vault
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/fw-vault
+          cp /tmp/fw-vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar \
+            firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
+          echo "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c  firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar" \
+            | sha256sum -c -
+          cat > work/vi_audio_SHA256SUMS.txt <<'EOF'
+          da07eae4699be3b06f23f5849923ebd7a96e4ba02a2b542b3cf52cc5ffa6951b  vi_LDW.wav
+          ca936446d3c3d538314e70fb8e27b095edcc67076775e8ad2fe20ed7b28fd93b  vi_PCW.wav
+          f63818ee429255a4e4beca8799b0956e40984051f8f558eb5725356247ae2581  vi_SAG.wav
+          1efa8d01880d17aa77a8a846031ed24c2820f331841a667cf92d83c0b32e0c92  vi_VB.wav
+          f8e27c89c9121341bfe5d88e390dbffbb6baddea4a2e800a46da2c4ddd9c407f  vi_adas_activated.wav
+          be268e0c3b0981833b2e58488f37dea394b4cd8581a515530ebc4fed9e3c9ebe  vi_adas_fail.wav
+          b9433c6e4813f8334bbfdbb2148f5a82e1c3be4484f5584d759540fb29a6e1bf  vi_updating.wav
+          36ef89d27a3a1ee8fa71c1dcf0100308545f65befc8a1d1d12ba2e815844acbd  tlr_green_on.wav
+          EOF
+          mkdir -p work/vi-audios
+          while read -r hash filename; do
+            cp "/tmp/fw-vault/assets/vi-audios/$filename" "work/vi-audios/$filename"
+          done < work/vi_audio_SHA256SUMS.txt
+          (cd work/vi-audios && sha256sum --strict -c ../vi_audio_SHA256SUMS.txt)
+          rm -rf /tmp/fw-vault ~/.ssh/fw_vault
+      - name: Install toolchain and host test compiler (versions recorded below)
+        run: |
+          mkdir -p work
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev \
+            qemu-user-static cpio curl pkg-config flex bison
+          mkfs.ubifs -h 2>&1 | head -3
+          arm-linux-gnueabihf-gcc --version
+          gcc --version | head -1
+          qemu-arm-static --version | head -1
+          dpkg-query -W build-essential gcc mtd-utils gcc-arm-linux-gnueabihf \
+            libc6-dev-armhf-cross liblzo2-dev qemu-user-static cpio > work/tool_versions.txt
+      - name: Inspect EN package + geometry + manifest
+        run: |
+          mkdir -p work
+          python3 tools/fw/carve_upgrade.py \
+            firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar -o work/carve
+          CUST=$(ls work/carve/customer.es.load0.*.bin)
+          echo "CUST=$CUST" >> $GITHUB_ENV
+          python3 tools/fw/ubifs_geometry.py "$CUST" -o work/customer_geometry.json
+          python3 tools/fw/ubifs_manifest.py "$CUST" -o work/customer_manifest.json
+      - name: P1 no-op rebuild (GATE)
+        run: |
+          python3 tools/fw/ubifs_extract_tree.py "$CUST" work/tree \
+            --manifest work/customer_manifest.json --report work/tree_report.json
+          sudo bash tools/fw/rebuild_customer.sh --mode noop \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --out work/customer_noop.es --report work/rebuild_noop.json
+      - name: P0 dynamic idle binary (unchanged C stock-ABI path)
+        run: |
+          cmake -S "${{ github.workspace }}/fw/device_minimal" -B build/arm-dyn-b \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/arm-dyn-b --verbose
+          arm-linux-gnueabihf-readelf -S build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | grep -E "note|attributes"
+          arm-linux-gnueabihf-objdump -d build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | head -30
+          python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
+          sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
+      - name: QEMU stock-rootfs runtime proof (exact idle binary; not TSR recognition proof)
+        run: |
+          mkdir -p work/sysroot && cd work/sysroot
+          gunzip -c ../carve/rootfs.es.load0.*.bin | cpio -id --no-absolute-filenames
+          cd ../..
+          mkdir -p work/sysroot/tmp
+          cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/c2m-idle
+          sha256sum work/sysroot/tmp/c2m-idle > work/qemu_bin.sha256
+          rm -f /tmp/c2m_idle.marker
+          timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
+            > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
+          cat work/qemu_out.txt
+          grep -q "c2m-idle 0.2.0-sdlog1" work/qemu_out.txt
+          cat /tmp/c2m_idle.marker
+          grep -qx "c2m-idle 0.2.0-sdlog1" /tmp/c2m_idle.marker
+          echo "QEMU-RUNTIME: PASS (stock glibc-2.30 userspace; stdout + marker verified)"
+      - name: Execute D profile tests with exact stock BusyBox applets (GATE)
+        run: |
+          cat > work/stock-sh <<'EOF'
+          #!/bin/sh
+          exec qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" sh "$@"
+          EOF
+          chmod +x work/stock-sh
+          mkdir -p work/stock-applets
+          for app in awk base64 cat cmp cp grep head md5sum mkdir mv rm sync uname wc; do
+            printf '#!/bin/sh\nexec qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" %s "$@"\n' "$app" > "work/stock-applets/$app"
+            chmod +x "work/stock-applets/$app"
+          done
+          export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+          export C2M_TSR_TEST_SHELL="$PWD/work/stock-sh"
+          export C2M_TSR_TEST_TIMEOUT=60
+          export PATH="$PWD/work/stock-applets:$PATH"
+          python3 tools/fw/test_tsr_experiment.py > work/tsr_stock_busybox_tests.txt 2>&1 || \
+            { cat work/tsr_stock_busybox_tests.txt; exit 1; }
+          cat work/tsr_stock_busybox_tests.txt
+      - name: Standalone D3 stock-ABI build + QEMU self-tests + Linux synthetic gates (GATE)
+        run: |
+          # build.sh checks each available ARM ELF and runs --self-test against
+          # the exact extracted stock glibc-2.30 sysroot. No live radio/network.
+          if ! (
+            set -eu
+            bash fw/d3/build.sh --out work/d3-services --sysroot work/sysroot
+            bash fw/d3/build_supplicant.sh --out work/d3-services --sysroot work/sysroot
+            cp work/d3-services/supplicant_SOURCE.json work/d3_supplicant_source.json
+            for file in boot.sh connectivity_probe.sh c2m-web c2m-wifi wpa_supplicant; do
+              test -f "work/d3-services/$file"
+              test ! -L "work/d3-services/$file"
+            done
+            test -x work/d3-services/c2m-web
+            test -x work/d3-services/c2m-wifi
+            export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+            "$PWD/work/stock-sh" -n work/d3-services/boot.sh
+            "$PWD/work/stock-sh" -n work/d3-services/connectivity_probe.sh
+            (
+              export C2M_PROBE_SHELL="$(python3 -c 'import json, os; print(json.dumps([os.path.abspath("work/stock-sh")]))')"
+              export PATH="$PWD/work/stock-applets:$PATH"
+              python3 tools/fw/test_d3_connectivity.py
+            )
+            python3 tests/test_d3_web.py
+            python3 tests/test_d3_wifi_control.py
+            python3 tools/fw/test_d3_mutation.py
+            python3 tests/test_d3_gps.py
+          ) > work/d3_build_tests.txt 2>&1; then
+            cat work/d3_build_tests.txt
+            exit 1
+          fi
+          cat work/d3_build_tests.txt
+          # Hash installed files, not compiler intermediates. GPS is optional;
+          # do not invent a service or mark it ready when no binary was built.
+          (
+            cd work/d3-services
+            sha256sum boot.sh connectivity_probe.sh c2m-web c2m-wifi wpa_supplicant
+            if [ -f c2m-gps ]; then
+              test ! -L c2m-gps
+              test -x c2m-gps
+              sha256sum c2m-gps
+            fi
+          ) > work/d3_services.sha256
+          find fw/d3 -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
+            -print0 | sort -z | xargs -0 sha256sum > work/d3_source.sha256
+          sha256sum tools/fw/test_d3_connectivity.py tests/test_d3_web.py \
+            tests/test_d3_wifi_control.py > work/d3_test_source.sha256
+          cp work/d3-services/boot.sh work/d3_boot.sh
+          cp work/d3-services/connectivity_probe.sh work/d3_connectivity_probe.sh
+          cp fw/d3/build.sh work/d3_build.sh
+      - name: P2 mutate (C idle/audio + unchanged TSR profile + isolated D3 services) + rebuild (GATE)
+        run: |
+          python3 - > work/audio_map.json <<'EOF'
+          import json
+          pairs = [("LDW.wav", "vi_LDW.wav"), ("PCW.wav", "vi_PCW.wav"),
+                   ("SAG.wav", "vi_SAG.wav"), ("VB.wav", "vi_VB.wav"),
+                   ("adas_activated.wav", "vi_adas_activated.wav"),
+                   ("adas_fail.wav", "vi_adas_fail.wav"),
+                   ("updating.wav", "vi_updating.wav"),
+                   ("tlr_green_on.wav", "tlr_green_on.wav")]
+          print(json.dumps([{"path": "/minieye/adas/audios/" + img,
+                             "file": "work/vi-audios/" + src}
+                            for img, src in pairs], indent=2))
+          EOF
+          cat work/audio_map.json
+          python3 tools/fw/mutate_customer.py --tree work/tree \
+            --manifest work/customer_manifest.json \
+            --idle-bin build/arm-dyn-b/c2m-idle \
+            --audio-replacements work/audio_map.json \
+            --tsr-experiment \
+            --d3-services-dir work/d3-services \
+            --out-manifest work/mutation.json
+          cmp -s work/tsr_profile_boot.sh work/tree/c2m/tsr_profile_boot.sh
+          for file in boot.sh connectivity_probe.sh c2m-web c2m-wifi wpa_supplicant; do
+            cmp -s "work/d3-services/$file" "work/tree/c2m/$file"
+          done
+          if [ -f work/d3-services/c2m-gps ]; then
+            cmp -s work/d3-services/c2m-gps work/tree/c2m/c2m-gps
+          fi
+          sudo bash tools/fw/rebuild_customer.sh --mode mutated \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --mut-manifest work/mutation.json \
+            --out work/customer_D3.es --report work/rebuild_D3.json
+      - name: P3 assemble + deep validate + allowlist diff Candidate D3 (existing B output names; GATE)
+        run: |
+          python3 tools/fw/build_candidates.py \
+            --en-tar firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar \
+            --workdir work/candidates --customer-b work/customer_D3.es
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          for filename, expected in (("validate_A_deep.json", "VALID"),
+                                     ("validate_B_deep.json", "VALID"),
+                                     ("candidate_B_diff.json", "ALLOWLIST-OK")):
+              verdict = json.loads((Path("work/candidates") / filename).read_text())["verdict"]
+              if verdict != expected:
+                  raise SystemExit(f"D3-GATE: {filename}: {verdict} != {expected}")
+          print("D3-GATE: both deep validations VALID; protected-payload diff ALLOWLIST-OK")
+          EOF
+          sha256sum work/candidates/EN_ENHANCE_IDLE.tar work/candidates/EN_REPACK_GOLDEN.tar \
+            > work/candidate_hashes.txt
+      - name: Assemble private release layout (A + D3; stock token; NOT FLASH-READY)
+        run: |
+          R=release/c2m-flash
+          mkdir -p "$R/C2M_FLASH_A" "$R/C2M_FLASH_D3" "$R/BUILD_EVIDENCE"
+          cp work/candidates/EN_REPACK_GOLDEN.tar work/candidates/EN_ENHANCE_IDLE.tar "$R/"
+          tar -C "$R/C2M_FLASH_A" -xf "$R/EN_REPACK_GOLDEN.tar"
+          tar -C "$R/C2M_FLASH_D3" -xf "$R/EN_ENHANCE_IDLE.tar"
+          test "$(ls "$R/C2M_FLASH_A" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          test "$(ls "$R/C2M_FLASH_D3" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          cp work/candidate_hashes.txt work/c2m_idle.sha256 work/qemu_bin.sha256 \
+            work/qemu_out.txt work/mutation.json work/audio_map.json work/tool_versions.txt \
+            work/vi_audio_SHA256SUMS.txt work/tsr_experiment_tests.txt \
+            work/tsr_stock_busybox_tests.txt work/tsr_profile_boot.sh work/tsr_profile_boot.sha256 \
+            work/d3_build_tests.txt work/d3_services.sha256 work/d3_source.sha256 \
+            work/d3_test_source.sha256 work/d3_supplicant_source.json \
+            work/d3_boot.sh work/d3_connectivity_probe.sh work/d3_build.sh "$R/BUILD_EVIDENCE/"
+          mkdir -p "$R/OPEN_SOURCE"
+          cp work/d3-upstream/wpa_supplicant-2.12.tar.gz work/d3-upstream/libnl-3.11.0.tar.gz \
+            work/d3-services/wpa_supplicant.COPYING fw/d3/build_supplicant.sh fw/d3/compat.h \
+            fw/device_minimal/start.S "$R/OPEN_SOURCE/"
+          # Relinkable objects + exact recipe/source for the statically linked
+          # LGPL libnl. Private deliverable only, never public artifacts.
+          tar -C work/d3-upstream -czf "$R/OPEN_SOURCE/supplicant-relink.tar.gz" \
+            wpa_supplicant-2.12 libnl-3.11.0 nl start.o compat_prefix.h pkg-config-static
+          cp work/customer_geometry.json work/customer_manifest.json work/tree_report.json \
+            work/rebuild_noop.json work/rebuild_noop.compare.txt \
+            work/rebuild_D3.json work/rebuild_D3.compare.txt work/rebuild_D3.bmanifest.json \
+            "$R/BUILD_EVIDENCE/"
+          cp work/candidates/EN_PACKAGE_CONTRACT_B.json work/candidates/EN_PACKAGE_CONTRACT_B.md \
+            work/candidates/candidate_B_diff.json work/candidates/repack_A.json \
+            work/candidates/validate_A_deep.json work/candidates/validate_A_deep.md \
+            work/candidates/validate_B_deep.json work/candidates/validate_B_deep.md \
+            "$R/BUILD_EVIDENCE/"
+          cd "$R" && sha256sum EN_REPACK_GOLDEN.tar EN_ENHANCE_IDLE.tar \
+            C2M_FLASH_A/* C2M_FLASH_D3/* > SHA256SUMS.txt && cd ../..
+          cat > "$R/FLASH_README.txt" <<'EOF'
+          C2M CANDIDATE D3 — CI ASSEMBLY ONLY / NOT FLASH-READY / NOT FLASH-PROVEN.
+
+          ### Required local preparation after private retrieval
+          Both CI packages preserve the STOCK EN update token. No fresh sysVer
+          token is minted here. Do NOT copy these raw CI folders to an SD card
+          or assume the updater will accept them over the installed firmware.
+          Verify retrieved hashes first, then perform the separately authorized,
+          fail-closed LOCAL version-only reversion for D3 to 20261014000005 using
+          tools/fw/reversion_sd_package.py and exact source-member SHA-256 pins.
+          This is a reserved FUTURE LOCAL token, not a token written by CI.
+          Verify its report, all four resulting files and refreshed inner MD5.
+          Do not hand-edit sysVer or mix CI/reverted files. A is a stock-token
+          control/reference, not an automatically usable rollback package.
+
+          ### Candidate A (EN_REPACK_GOLDEN.tar)
+          Byte-identical stock EN control, rebuilt from the pinned golden TAR
+          with zero intended changes.
+
+          ### Candidate D3 (EN_ENHANCE_IDLE.tar in THIS deliverable)
+          C's exact eight Vietnamese ADAS WAV replacements/addition, unchanged
+          minimal idle daemon and background bounded mount-wait launch, plus
+          /customer/c2m/tsr_profile_boot.sh and flat isolated D3 service files.
+          The checked TSR shell still runs synchronously with /bin/sh while
+          preserving the stock hook exit code. Existing background mount-wait
+          starts the unchanged idle daemon first, then /customer/c2m/boot.sh.
+          TSR status (no config payload) remains /mnt/mmc/C2M_DIAG/tsr-profile-D.txt.
+          No new audio beyond C; D/D2 profile flags are unchanged by D3.
+
+          ### D3 Vietnamese Wi-Fi UI and honest connectivity limits
+          The Vietnamese Wi-Fi UI listens on port 8099 ONLY on the existing
+          stock AP address/interface, never a wildcard or STA-facing bind.
+          Boot does NOT automatically associate a STA or replace the stock AP.
+          AP+STA connection is gated by real kernel/driver advertisement of
+          simultaneous AP+STA capability and same-channel operation. If that
+          proof is missing or unsupported, refuse the request; never perform
+          an exclusive AP-to-STA mode switch. Host fixtures are not hardware
+          proof: STA association and Internet connectivity remain UNKNOWN
+          until supervised field validation on the actual camera.
+          Saved Wi-Fi credentials/settings are private device config, not
+          public evidence. No real credentials are used by synthetic CI tests.
+          Bluetooth is a read-only presence inventory ONLY: HCI observation is
+          not radio/pairing proof; no module loading, RF changes or UART probes.
+          Optional c2m-gps is included only when actually built and ABI-tested;
+          its absence is allowed and must not be advertised as GPS-ready.
+          No speed-camera database bytes are included initially. No fabricated
+          GPS fix, warning/audio-ready status or safety capability is claimed.
+
+          ### Unchanged experimental TSR profile
+          TSR recognition, display, warning behavior and hardware boot are
+          UNVERIFIED. Only these existing profile targets are applied:
+            --enable_tsr=true
+            --tsrw_interval=5
+            --tsrw_sli_over_min_ratio=10
+            --tsrw_sli_over_min_thresh=5
+            --tsrw_sli_host_speed_min_thresh=20
+          Other thresholds/flags remain unchanged. Ranges, units and these
+          threshold/timing choices are hypotheses, NOT validated vendor limits
+          or safety claims. The existing seven TSR synthetic gates remain;
+          exact stock BusyBox testing adds no recognition proof. QEMU proves
+          userspace/self-test execution only, not Wi-Fi/BT/GPS hardware behavior.
+          A status of APPLIED_WAIT_STOCK_REDECODE is not TSR recognition proof.
+          The authoritative encoded adas.flag is checked/backed up and replaced;
+          stock run.sh reconciles adas_de.flag. Device backup .c2m-tsr-pre-d is
+          pre-D/post-C, NOT factory/pre-C state. No raw config is public evidence.
+
+          ### Preserve core / full updater warning
+          No stock Warner/GPS/ADAS/cardv/camera/model/calibration/kernel/bootloader
+          binary change. Package diff and customer manifest gates preserve
+          everything outside the narrow hook/idle/profile/audio/D3 allowlist.
+          This is the STOCK FULL UPDATER, NOT a customer-only write: it can write
+          unchanged core partitions too. Do not substitute a custom flash script.
+          CI never accesses a camera/card or dispatches an update; D3 service
+          tests use synthetic fixtures and stock-rootfs QEMU self-tests only.
+
+          ### Hardware validation only after verified local reversion
+          Follow docs/firmware/FLASH_HW_CHECKLIST.md with stable power, known-good
+          FAT32 media and a recovery plan. Use only the complete locally reverted
+          D3 four-file folder, never the raw CI C2M_FLASH_D3/ folder. Verify boot,
+          camera, recording, ADAS/display, unchanged stock AP, reboot and idle/
+          status diagnostics before testing the AP-only :8099 UI. Validate real
+          concurrent same-channel capability before any STA connection attempt.
+          Do not rely on TSR, GPS, connectivity or alerts for safety; hardware
+          behavior and recognition/threshold choices remain unproven hypotheses.
+          EOF
+          cat "$R/SHA256SUMS.txt"
+      - name: Publish release to private vault (firmware bytes stay private)
+        env:
+          FIRMWARE_VAULT_PUSH_KEY: ${{ secrets.FIRMWARE_VAULT_PUSH_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_PUSH_KEY" || \
+            { echo "FIRMWARE_VAULT_PUSH_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$FIRMWARE_VAULT_PUSH_KEY" > ~/.ssh/fw_vault_push
+          chmod 600 ~/.ssh/fw_vault_push
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault_push -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/vault-out
+          D="deliverables/$(date -u +%Y%m%d)-r${GITHUB_RUN_ID}"
+          echo "VAULT_DIR=$D" >> $GITHUB_ENV
+          mkdir -p "/tmp/vault-out/$D"
+          cp -r release/c2m-flash "/tmp/vault-out/$D/"
+          cd /tmp/vault-out && git add "$D" \
+            && git -c user.name=c2m-ci -c user.email=c2m-ci@local \
+               commit -m "candidate D3 experimental flash deliverables ${D} (stock token; local reversion required)" \
+            && git push origin main
+          rm -rf /tmp/vault-out ~/.ssh/fw_vault_push
+          echo "VAULT-DIR: $D"
+      - name: Upload evidence (explicit reports/hashes/plain source ONLY; no binaries/audio/config/keys)
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidateD3-evidence
+          if-no-files-found: error
+          path: |
+            work/customer_geometry.json
+            work/customer_manifest.json
+            work/tree_report.json
+            work/rebuild_noop.json
+            work/rebuild_noop.compare.txt
+            work/mutation.json
+            work/audio_map.json
+            work/vi_audio_SHA256SUMS.txt
+            work/rebuild_D3.json
+            work/rebuild_D3.compare.txt
+            work/rebuild_D3.bmanifest.json
+            work/candidates/EN_PACKAGE_CONTRACT_B.md
+            work/candidates/EN_PACKAGE_CONTRACT_B.json
+            work/candidates/validate_A_deep.json
+            work/candidates/validate_A_deep.md
+            work/candidates/validate_B_deep.json
+            work/candidates/validate_B_deep.md
+            work/candidates/candidate_B_diff.json
+            work/candidates/repack_A.json
+            work/candidate_hashes.txt
+            work/c2m_idle.sha256
+            work/qemu_bin.sha256
+            work/qemu_out.txt
+            work/tool_versions.txt
+            work/tsr_experiment_tests.txt
+            work/tsr_stock_busybox_tests.txt
+            work/tsr_profile_boot.sh
+            work/tsr_profile_boot.sha256
+            work/d3_build_tests.txt
+            work/d3_services.sha256
+            work/d3_source.sha256
+            work/d3_test_source.sha256
+            work/d3_supplicant_source.json
+            work/d3_boot.sh
+            work/d3_connectivity_probe.sh
+            work/d3_build.sh
+            release/c2m-flash/FLASH_README.txt
+            release/c2m-flash/SHA256SUMS.txt

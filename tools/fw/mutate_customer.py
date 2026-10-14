@@ -118,8 +118,27 @@ def main() -> int:
                      help="legacy C literal TSR flag patch (frozen behavior)")
     tsr.add_argument("--tsr-experiment", action="store_true",
                      help="D experimental checked TSR profile + private backup/status")
+    ap.add_argument("--d3-services-dir", type=Path,
+                    help="D3 isolated boot/probe/web/WiFi binaries (requires checked TSR)")
     ap.add_argument("--out-manifest", type=Path, required=True)
     args = ap.parse_args()
+
+    d3_assets: dict[str, bytes] = {}
+    if args.d3_services_dir is not None:
+        if not args.tsr_experiment:
+            ap.error("D3 requires --tsr-experiment, not legacy C patch")
+        for name in ("boot.sh", "connectivity_probe.sh", "c2m-web", "c2m-wifi", "wpa_supplicant"):
+            source = args.d3_services_dir / name
+            if not source.is_file() or source.is_symlink():
+                ap.error(f"missing/nonregular D3 service {name}")
+            data = source.read_bytes()
+            if name.endswith(".sh"):
+                if b"\r" in data or not data.startswith(b"#!/bin/sh\n"):
+                    ap.error(f"D3 shell must be LF: {name}")
+            elif (len(data) < 52 or data[:6] != b"\x7fELF\x01\x01"
+                  or int.from_bytes(data[18:20], "little") != 40):
+                ap.error(f"D3 service must be ELF32 little-endian ARM: {name}")
+            d3_assets[name] = data
 
     stock = {r["path"]: r for r in
              json.loads(args.manifest.read_text(encoding="utf-8"))["entries"]}
@@ -192,6 +211,13 @@ def main() -> int:
                 "mkdir -p /mnt/mmc/C2M_DIAG",
                 "cp /tmp/c2m_tsr_status.txt /mnt/mmc/C2M_DIAG/tsr-profile-D.txt",
                 "fi"]
+        if d3_assets:
+            launch_index = next(i for i, line in enumerate(block) if line.startswith(cmd + " >"))
+            # Keep idle launch as before. D3 boot runs detached AFTER that;
+            # neither a probe nor server startup may delay the stock hook.
+            block[launch_index] = cmd + " >/dev/null 2>&1 &"
+            block[launch_index + 1:launch_index + 1] = [
+                "/bin/sh /customer/c2m/boot.sh >/dev/null 2>&1 & ) >/dev/null 2>&1 &"]
         new_text = "\n".join(hook_lines[:last_idx] + block + hook_lines[last_idx + 1:])
         mode = "insert-before-terminal-exit"
     else:
@@ -220,6 +246,18 @@ def main() -> int:
             return 1
         profile_path.write_bytes(profile_bytes)
         os.chmod(profile_path, 0o755)
+
+    d3_added = []
+    for name, data in d3_assets.items():
+        dest = args.tree / "c2m" / name
+        if dest.exists() or dest.is_symlink():
+            print(f"MUTATE-FAIL: existing D3 path {name}")
+            return 1
+        dest.write_bytes(data)
+        os.chmod(dest, 0o755)
+        d3_added.append({"path": "/c2m/" + name, "type": "reg", "mode": 0o755,
+                         "mode_oct": "0o755", "size": len(data),
+                         "sha256": hashlib.sha256(data).hexdigest()})
 
     replaced: dict[str, dict] = {}
     if args.audio_replacements is not None:
@@ -354,6 +392,9 @@ def main() -> int:
                              "mode": 0o755, "mode_oct": "0o755",
                              "size": profile_path.stat().st_size,
                              "sha256": sha_file(profile_path)})
+    if d3_added:
+        doc["d3_services"] = True
+        doc["added"].extend(d3_added)
     args.out_manifest.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     print(json.dumps(doc, indent=2))
     return 0
