@@ -7,8 +7,17 @@ is partial audio acceptance, not proof that every slot passed. FCW/HMW
 assets are unchanged. No startup greeting was heard, consistent with
 `audios.txt` mapping `calib_success` → `adas_activated.wav`, not a per-boot
 event. Owner chose to keep vendor behavior; no custom greeting planned.
-TSR, recording continuity, multi-boot persistence and C diagnostic logs
-still require separate evidence. Frozen A/B1/B2 hashes remain untouched.
+TSR, individual audio-slot completeness and long-term persistence still
+require separate evidence. Read-only recording-card capture found five
+cumulative diagnostic boot slots, including three older pre-C slots.
+Two newer slots (associated with C by flash chronology) show `marker=ok`:
+`91e64ec7` has START at uptime 7 + HB at 307; `f9150f37` has START at uptime 7.
+The 10:28–10:29 recording gap aligns with the owner-confirmed deliberate
+power cycle, not an unexpected reboot. Eight newer MP4 files (10:22–10:29)
+opened successfully; full proxy video + AAC decoding and sparse 4K samples
+passed. Daemon version is shared B/C, so logs alone cannot identify firmware.
+This is useful evidence of recording health, not a 24-hour soak or full
+primary-stream proof. Frozen A/B1/B2 hashes remain untouched.
 
 ## Content vs B4 (mount-wait)
 
@@ -23,11 +32,13 @@ still require separate evidence. Frozen A/B1/B2 hashes remain untouched.
   observed boots, not a universal claim that the script is never used.
 - `audios.txt` unchanged (byte-identical EN↔VI). Several donor wavs exceed
   listed durations; complete playback/preemption still needs testing.
-- Hook block extended with an idempotent TSR flag patch (decode device
-  `adas.flag`, flip first `--enable_tsr=false`→`true`, rewrite both flag
-  files consistently so `run.sh` sees no md5 drift; skips when absent or
-  already patched). This changes persistent device configuration, has no
-  built-in backup/disable path, and does not prove TSR reaches the display.
+- Hook block extended with a TSR flag patch: decode device `adas.flag`,
+  use `sed` to replace the first `--enable_tsr=false` occurrence on EACH
+  matching line, then rewrite both flag files. Repeated runs with `true`
+  already present do not change it, but every boot can re-enable a later
+  `false`; duplicate/comment lines are not rejected. This changes persistent
+  device configuration, has no built-in backup/disable path, and does not
+  prove TSR reaches the display.
   Idle daemon byte-identical (`fbc2c452…`).
 - Full mechanism record: `docs/firmware/C2M_AUDIO_TSR_MECHANISM.md`.
 
@@ -66,7 +77,7 @@ found). Four files staged, flushed, replaced (sysVer last), read back 4/4
 exact; volume cache flushed; final NOT dirty, Healthy. Root exactly four
 files + SVI.
 
-## Acceptance (flash reported complete; remaining checks pending)
+## Acceptance (flash reported complete; recording check partial PASS; remaining checks pending)
 
 1. Live view + recording + app connection: compare with baseline; validate
    recorded clips for gaps/corruption, not only the presence of files.
@@ -76,8 +87,11 @@ files + SVI.
 3. TSR: record speed-sign detection/display separately from traffic-light
    detection/audio. Neither output has been confirmed. Use a passenger or
    recordings for observations, never operate the app while driving.
-4. Recording-card `C2M_DIAG`: START + HB expected as before (idle unchanged);
-   those logs alone do not prove ADAS health or recording continuity.
+4. Recording-card `C2M_DIAG`: START + HB observed in one newer session and
+   START in the next (idle unchanged). Those logs alone do not prove ADAS
+   health or recording continuity. Private capture + scoped decoding evidence
+   is in `C2M_HW_20261012/04_candidate_C/acceptance.md` (gitignored); 6/6 diag
+   files were byte-identical between archive and final card read.
 
 Rollback WARNING: frozen A files are retained, but flashing A alone does
 NOT guarantee config rollback: the updater preserves `/customer/minieye/

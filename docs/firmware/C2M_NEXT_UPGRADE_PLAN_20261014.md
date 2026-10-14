@@ -23,10 +23,11 @@ nghĩa đã chạy trên máy; cờ bật không đồng nghĩa có kết quả 
 
 | Hạng mục | Bằng chứng hiện có | Phần chưa biết |
 |---|---|---|
-| Firmware C | Pipeline `38505113273` xanh; gói cuối VALID 33 kiểm tra; thẻ read-back 4/4; chủ máy báo flash thành công | Nghiệm thu nhiều boot, ghi hình dài hạn trên đúng C |
+| Firmware C | Pipeline `38505113273` xanh; gói cuối VALID 33 kiểm tra; thẻ read-back 4/4; chủ máy báo flash thành công | NAND read-back độc lập, nhiều boot/soak dài hạn |
+| Ghi hình sau C | 8 clip mới đọc metadata; full proxy H.264 + AAC decode và mẫu 4K HEVC đầu/giữa/cuối đạt; khoảng nghỉ ~18 s khớp owner tắt/bật nguồn | Chưa full-decode toàn bộ 4K hay chứng minh không gap bằng timeline hình ảnh |
 | Cảnh báo Việt | Chủ máy nghe tiếng Việt, chọn nhóm LDW/PCW/FCW | Chưa xác nhận riêng từng slot/câu, thời lượng, ưu tiên và chồng âm |
 | Câu chào | `audios.txt`: `calib_success` → `adas_activated.wav`; không nghe lúc boot thường | Chưa bắt sự kiện calib ở runtime; không cần thử lại theo lựa chọn chủ máy |
-| Daemon chẩn đoán | Binary `0.2.0-sdlog1` không đổi; B mount-wait đã có START/HB thực tế | Chưa đọc bộ log C; START/HB chỉ chứng minh daemon sống |
+| Daemon chẩn đoán | Binary `0.2.0-sdlog1` không đổi; thẻ đọc 2026-10-14 có hai boot mới theo thời điểm C: START/marker ok, một HB ở 307 s | Log dùng cùng version B/C, không định danh firmware độc lập; START/HB chỉ chứng minh daemon sống |
 | TSR | Binary stock có đường TSR; hook C có patch cờ | Giá trị hiệu lực, detector/model, lớp biển hỗ trợ, kết quả nhận diện, app/M4 |
 | Đèn giao thông | Có slot `tlr_green_on`; C thêm WAV Việt 1128 ms | Điều kiện kích hoạt và đường phát sự kiện; không suy ra từ TSR biển tốc độ |
 | Phục hồi | Giữ firmware A/B đã đóng băng | Flash A không bảo đảm hoàn nguyên cờ TSR đã ghi trong config |
@@ -37,8 +38,10 @@ SD payload `SigmastarUpgradeSD_SSC8838G.bin` là
 Đây là hash của gói đã ghi/read-back trên thẻ và được báo đã flash, không
 phải kết quả đọc lại NAND hiện thời.
 
-Giữ C làm mốc so sánh mới nhưng chỉ ghi mức **flash thành công + audio Việt
-một phần**; không nâng kết luận thành TSR PASS hay full ADAS PASS.
+Giữ C làm mốc so sánh mới với mức **flash thành công + audio Việt một phần
++ SD diagnostic/recording check một phần**; không nâng kết luận thành TSR
+PASS hay full ADAS PASS. Không cần yêu cầu chủ máy cắm lại thẻ để lấy dữ liệu
+đã có: log và catalog ngày 2026-10-14 đã được lưu riêng trên laptop.
 
 ## 3. Các vấn đề phải giải quyết trước tính năng mới
 
@@ -53,10 +56,16 @@ Hệ quả:
 - C chưa lưu bản gốc trước khi patch; snapshot lấy bây giờ là **sau C**, không
   được gọi là cấu hình trước C.
 - Nếu thiếu dòng literal, decode lỗi, có dòng lặp/comment hoặc ghi lỗi, hook
-  hiện chưa có báo cáo đủ rõ. Hai file ghi tuần tự không phải một giao dịch
-  nguyên tử; cần thiết kế phát hiện/phục hồi ghi dở.
-- Cần tìm backup trước C nếu còn. Nếu không có, chỉ thiết kế thao tác tắt cờ
-  TSR đã xác minh, không hứa khôi phục nguyên trạng toàn bộ cấu hình.
+  hiện chưa có báo cáo đủ rõ. `sed` thay occurrence đầu trên từng dòng,
+  không phải đúng một khóa trong toàn file. Redirect có thể truncate file
+  trước khi command hoàn tất; partial decode/write và return-code bị bỏ qua
+  phải có test âm. Hai file ghi tuần tự không phải giao dịch nguyên tử.
+- Hook C có thể bật lại TSR ở MỖI boot khi gặp `false`; tắt cờ rồi reboot dưới
+  C chưa phải recovery. Cần loại bỏ/chặn đường re-enable được review trước.
+- Cần tìm backup trước C nếu còn: flash-card `.bak/upgrade_config.tar.gz`
+  cùng MD5 và các archive bench. Phải xác minh backup thuộc lần flash nào,
+  không dump/public nội dung. Nếu không có, chỉ thiết kế tắt riêng cờ TSR đã
+  xác minh, không hứa khôi phục nguyên trạng toàn bộ cấu hình.
 
 **Yêu cầu bản sau:** đọc/parse có giới hạn; kiểm tra decode thành công; chỉ
 cho phép sửa đúng một khóa đã xác minh; backup riêng tư trước thay đổi;
@@ -67,6 +76,13 @@ sau ghi. Khóa vắng/lặp/mâu thuẫn phải báo trạng thái, không tự 
 kiểm chứng. Nếu phải ghi persistent, cần chủ máy chấp thuận riêng cho thao
 tác đó; không đưa reset calib/license vào recovery. Recovery cũng phải dùng
 token flash hợp lệ, khác token đang cài; giữ nguyên các gói A/B đóng băng.
+
+Recovery spec phải theo thứ tự: xác minh firmware/hook + nguồn flag stock nạp
+→ loại bỏ/chặn re-enable theo phương án owner duyệt → tắt/restore riêng khóa
+TSR qua cơ chế được phép → kiểm encoded/decoded files và trạng thái sau
+reboot. Giá trị trong file không tự chứng minh giá trị runtime hiệu lực.
+Thiếu quyền hoặc chưa xác minh đường recovery thì **D2 persistent enable/
+disable là BLOCKED**, không tự thực thi để tìm hiểu.
 
 ### 3.2. Thời lượng WAV Việt cần được nghiệm thu, không chỉnh theo suy đoán
 
@@ -106,8 +122,15 @@ Việc host cần làm trước bản mới:
   size/mtime chỉ là thông tin; danh sách con vẫn phải nằm trong allowlist.
 - Allowlist phải là hợp đồng của variant, không chỉ tin mọi path do mutation
   manifest tự khai. Chặn path traversal, symlink và đường ngoài vùng cho phép.
-- Test các lỗi cấu hình TSR: absent key/file, true sẵn, invalid base64,
-  duplicate key, comment, permission/write failure và gián đoạn giữa hai file.
+- Test các lỗi cấu hình TSR: absent key/file, true sẵn, invalid/partial base64,
+  duplicate key, comment, permission/write failure, truncate và gián đoạn
+  giữa hai file. Với hook `append-eof`, yêu cầu TSR phải được chèn đúng hoặc
+  bị chặn; không cho manifest báo `tsr_patch=true` khi không có block.
+- D1 log phải tính cap trên kích thước file thực, kể cả fallback mở append
+  qua nhiều boot; kiểm return code của `fflush`. Host tests cần mô phỏng
+  fallback đã gần/đạt cap và write/flush lỗi; không chỉ giới hạn từng process.
+- Đồng bộ release README/checklist với variant và trạng thái token gói cuối;
+  không mặc định output CI dùng stock token đã flash được trên máy hiện tại.
 - Duy trì no-op rebuild, mutated rebuild, ELF/ABI, QEMU, deep validation,
   re-extraction đúng file từ gói cuối và read-back thẻ. QEMU không kiểm được
   camera/IPU/ADAS/M4 thực tế.
@@ -119,6 +142,12 @@ Việc host cần làm trước bản mới:
 **Việc agent:** viết bảng test/công cụ đọc `C2M_DIAG` trên máy tính; phân loại
 START/HB, boot mới, log thiếu, reset khả nghi. Đối chiếu video/audio ghi lại.
 Không suy từ mất HB ra ADAS crash: thẻ/mount/log-cap cũng có thể gây mất log.
+Counter/ring ghi lượt khởi động logger, không bảo đảm tổng số reboot vật lý;
+phải đối chiếu boot-id fragment, uptime và thao tác owner. Đã đọc thẻ ngày
+2026-10-14: hai boot mới theo chronology C, một START+HB ở 307 s và một START;
+8 clip mới đã kiểm proxy/audio đầy đủ + mẫu 4K. Owner xác nhận tắt/bật nguồn
+lúc 10:28–10:29; gap ~18 s tương ứng không phải chứng cứ crash ngoài ý muốn.
+Hồ sơ riêng: `C2M_HW_20261012/04_candidate_C/acceptance.md` (gitignored).
 
 **Việc cần chủ máy cung cấp:**
 1. Thẻ ghi hình sau một phiên trên 6 phút để lấy START + ít nhất một HB.
@@ -129,8 +158,9 @@ Không suy từ mất HB ra ADAS crash: thẻ/mount/log-cap cũng có thể gây
    thông có phát “Đèn xanh” không. Không nghe cũng là kết quả cần ghi.
 
 **PASS nền:** không thấy regression mới trong các tình huống đã thử, clip
-liên tục theo hành vi stock, audio Việt nghe rõ. Soak 24 giờ ghi hình có
-nguồn ổn định là cổng sau đó trước khi gọi bản ổn định; không có UART/shell
+liên tục theo hành vi stock, audio Việt nghe rõ. Soak 24 giờ ghi hình trên
+bench/xe đỗ, nguồn phù hợp và thông thoáng (không cần chạy xe hay để động cơ
+nổ) là cổng sau đó trước khi gọi bản ổn định; không có UART/shell
 thì vẫn ghi rõ giới hạn bằng chứng.
 
 **STOP:** treo, reboot lặp, mất/gián đoạn ghi hình mới, ADAS im bất thường,
@@ -167,15 +197,25 @@ Phạm vi đề xuất:
 - Log tăng dần có giới hạn, ring/cap, rate limit; thẻ vắng/đầy/lỗi phải bỏ
   chẩn đoán mà không làm thay đổi stock. Không watchdog tự reboot/kill ADAS.
 - Chỉ ghi thư mục chẩn đoán SD và marker tạm được duyệt. **D1 không có quyền
-  sửa persistent config**; hook TSR hiện hữu của C là vấn đề riêng phải được
-  review, không ngầm mở rộng trong daemon.
+  sửa persistent config.** D1 cũng **không mang hook TSR của C**: tái dựng từ
+  EN golden với audio C và hook launch chẩn đoán mới, không dùng `--tsr-patch`.
+  Việc bỏ hook không tự hoàn nguyên giá trị TSR đã lưu trên máy; trạng thái
+  config hiện tại phải ghi `UNVERIFIED` cho tới khi có recovery/readback hợp lệ.
 - Bắt đầu chỉ có telemetry process/mount/memory; không thêm socket/web/API
   nếu chưa có yêu cầu cần thiết.
+
+D1 là candidate chẩn đoán, không phải candidate bật TSR. Nếu owner muốn giữ
+TSR hook, đó phải là variant persistent-config riêng, được chấp thuận và
+ghi rõ trong tên/README; không gọi là “D1 chỉ chẩn đoán”.
 
 **Ngân sách mục tiêu, chưa đo trên cam:** mẫu mỗi 60 s, heartbeat 5 phút;
 CPU trung bình ≤1%, RSS ≤2 MiB, tổng log ≤1 MiB. Điều chỉnh theo khả năng
 đo thực tế, ghi rõ khi không đo được. I/O best-effort không tự chứng minh
 không block: cần thử thẻ chậm/đầy trên host và đối chiếu ghi hình thực tế.
+
+Metric thiếu/không đọc được phải báo `UNAVAILABLE`, không suy ra zero hoặc
+healthy. Process tồn tại không chứng minh ADAS inference; key flag trong
+file không chứng minh output TSR.
 
 **Cổng:** test host fault injection + ABI/ELF/QEMU + deep image pass; flash
 được chủ máy xác nhận riêng; 3 cold boots, phiên 30–60 phút, clip nguyên vẹn,
@@ -235,6 +275,12 @@ cho máy đang có ADAS hoạt động.
 
 ## 6. Hợp đồng thực thi và quản lý bản build
 
+- D1 release README/checklist phải được sinh/cập nhật đồng bộ với artifact:
+  không gọi gói CI mặc định là `FLASH-READY`; chỉ gói cuối có token hợp lệ,
+  deep validation và read-back thẻ mới được đánh dấu sẵn sàng. README phải
+  ghi rõ TSR enable/output chưa xác minh, không hướng dẫn rollback A như thể
+  đã hoàn nguyên config, và yêu cầu hành khách/recording — không thao tác app
+  khi đang lái. Tham chiếu checklist A/B cũ phải được sửa cho đúng D1.
 - Mỗi candidate tái dựng từ EN golden + bộ thay đổi đã pin, không chồng patch
   không kiểm soát lên binary đã flash. So sánh cả với golden lẫn mốc C.
 - Giữ ABI ARMv7-A hard-float, VFPv3-D16, glibc ≤2.30; không tự bật NEON chỉ
@@ -243,6 +289,9 @@ cho máy đang có ADAS hoạt động.
   gửi lệnh IPC chưa được chấp thuận. Probing cam tiếp tục read-only.
 - Firmware/audio/model/config riêng tư nằm vault; public chỉ code, contract,
   hash, báo cáo đã loại dữ liệu nhạy cảm. Không đưa config gốc vào diag public.
+  Gói customer-only vẫn đi qua stock updater/destructive full-flash path;
+  không coi delta nhỏ là cập nhật nóng hay reversible userspace update. Mỗi
+  candidate phải có backup/restore đã review trước khi flash.
 - Token mới cấp khi build, phải khác stock và token đang cài; xác minh trạng
   thái máy trước flash, không tái sử dụng token recovery đã hết hiệu lực.
 - Thẻ: xác minh physical disk/partition/label **trước mọi ghi/xóa/chkdsk**,
@@ -253,14 +302,33 @@ cho máy đang có ADAS hoạt động.
 
 ## 7. Thứ tự công việc gần nhất
 
-1. Viết parser log + mẫu acceptance C trên host; lấy thẻ ghi hình khi chủ máy
-   tiện, không cần nạp bản mới chỉ để tiếp tục test audio/TSR.
+1. Hoàn thiện parser log + mẫu acceptance C trên host. Log/card catalog đã
+   capture ngày 2026-10-14; không yêu cầu cắm lại thẻ cho dữ liệu đã có. Chỉ
+   bổ sung phiên mới/test TSR khi cần, không flash chỉ để tiếp tục quan sát.
 2. Khóa asset/variant, bổ sung verifier/parser/test lỗi; chuẩn bị recovery spec.
 3. Thiết kế và test D1 chẩn đoán nhẹ; chỉ tạo gói flash sau khi cổng nền và
    recovery review đủ, rồi xin chủ máy xác nhận thao tác flash.
 4. TSR: thu bằng chứng trên C song song với việc host; quyết định cần D2 hay
    sửa display/flags sau kết quả, không bật thêm cờ vô tội vạ.
 5. Chọn một nhánh sản phẩm trong mục 5 khi ghi hình/audio/nền đã ổn định.
+
+### Giới hạn tài nguyên — không nhầm số tĩnh với dung lượng khả dụng
+
+| Thành phần | Dữ liệu đã biết | Cổng trước mở rộng |
+|---|---|---|
+| ABI | ARMv7-A LE hard-float, VFPv3-D16, glibc 2.30 | Symbol/dependency mới phải qua gate; không giả định NEON |
+| Customer | Volume script 80 MiB; image UBIFS khoảng 39.7 MB | Không suy ra còn ~40 MB trống; phải đo filesystem/reserve/growth runtime; road DB lớn nằm SD |
+| RAM | Có bootargs/reservation trong phân tích tĩnh | Chưa có headroom RAM/RSS/MMA runtime; không coi tham số boot là RAM còn dùng được |
+| IPU/model | Stock có sáu blob định dạng riêng | Matching SDK/compiler chưa được chứng minh sẵn dùng; smoke hiện skeleton, không có custom model chạy được |
+
+Mốc CPU/RSS/log của D1 là mục tiêu đo, không trần phần cứng đã xác nhận.
+Các budget AI hoặc TOPS trong tài liệu research cũng không phải bảo đảm
+triển khai. Model `tl` chỉ có vai trò LIKELY traffic-light từ bằng chứng tĩnh,
+không chứng minh đó là model TSR biển tốc độ. Tham chiếu
+`docs/research/C2M_AI_HARDWARE_FEASIBILITY_V1.md`,
+`docs/research/C2M_IPU_MODEL_FORMAT_V1.md`,
+`docs/research/C2M_SIGMASTAR_IPU_STACK_V1.md`,
+`tools/device/c2m-ipu-smoke/RUNBOOK.md`.
 
 **Ước lượng công sức, không phải lịch cam kết:** P1 khoảng 1–2 phiên làm việc;
 D1 khoảng 2–4 phiên gồm host tests/build/review; TSR phụ thuộc quyền capture,
