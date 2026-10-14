@@ -1,7 +1,11 @@
 # Candidate D-TSR experimental build — 2026-10-14
 
-**Status:** HOST-VALIDATED + SD READ-BACK 4/4 VERIFIED; READY FOR OWNER'S
-MANUAL EXPERIMENTAL FLASH, not yet device-tested. Owner explicitly requested
+**Status: SUPERSEDED — DO NOT FLASH THIS FIRST D TOKEN `20261014000003`.**
+A late review found missing-final-LF config could be normalized by awk/grep.
+Corrected D revision, token `20261014000004`, replaces this card payload; see
+`CANDIDATE_D2_TSR_LF_FIX_20261014.md`. The identities below are historical,
+not the currently prepared card. First D was host-validated/read-back 4/4,
+not device-tested. Owner explicitly requested
 an immediate D build/write for direct hardware testing. No automatic camera
 update was performed. Frozen A/B1/B2 and installed-C source artifacts stay
 unchanged. This is a configuration/warning-profile experiment, NOT proof of

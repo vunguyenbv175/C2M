@@ -1,9 +1,10 @@
 # Candidate D-TSR — fast track after C / muse.ai inputs (2026-10-14)
 
 **Plan status: direct experiment now built at owner's explicit request.**
-See `CANDIDATE_D_TSR_BUILD_20261014.md`: D profile candidate is host-validated
-and SD read-back verified, manual device flash pending. This does NOT prove
-TSR recognition/output. Owner prioritizes sign/TSR over a diagnostic-only
+See `CANDIDATE_D2_TSR_LF_FIX_20261014.md`: corrected D2 profile is
+host-validated and SD read-back verified, manual device flash pending. The
+first D token was superseded after a final-LF preservation review. This does
+NOT prove TSR recognition/output. Owner prioritizes sign/TSR over a diagnostic-only
 release; experiment permission supersedes the earlier no-build gate, not
 byte/backup/stock-preservation verification rules. Current installed package is C, token
 `20261014000002` (owner-reported flash).
