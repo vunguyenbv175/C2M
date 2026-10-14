@@ -134,6 +134,26 @@ class BrowserTests(unittest.TestCase):
                 return
         self.fail("browser navigation timed out")
 
+    def test_browser_opaque_origin_remains_rejected_without_writes(self) -> None:
+        # Simulate the original page policy in this isolated browser only.
+        # Corrected server must still reject null, not silently trust it.
+        self.events.clear()
+        self.evaluate("""(()=>{const m=document.createElement('meta');
+            m.name='referrer';m.content='no-referrer';document.head.appendChild(m);
+            const f=document.forms[0];f.elements.ssid.value='BrowserFixture';
+            f.elements.password.value='synthetic-passphrase';f.requestSubmit();
+            return 'submitted';})()""")
+        self.wait_load()
+        self.assertEqual(self.evaluate("document.body.innerText").strip(),
+                         '{"ok":false,"error":"origin_or_host_rejected"}')
+        self.assertFalse((self.http.config / "wifi.conf").exists())
+        self.assertFalse((self.http.run_dir / "connect.request").exists())
+        posts = [event["params"] for event in self.events
+                 if event.get("method") == "Network.requestWillBeSent"
+                 and event["params"].get("request", {}).get("method") == "POST"]
+        self.assertTrue(posts, "missing browser POST evidence")
+        self.assertEqual(posts[0]["request"]["headers"].get("Origin"), "null")
+
     def test_native_http_forms_preserve_origin_and_complete(self) -> None:
         self.assertEqual(self.evaluate("document.forms.length"), 3)
         # Fill the actual service-rendered form, not a scripted HTTP request.

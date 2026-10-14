@@ -59,7 +59,11 @@ new detector, M4 injection or new audio backend is included.
   `NO_HCI_OBSERVED_NOT_HARDWARE_ABSENCE`. Kernel HCI absence is inconclusive
   about physical hardware; no radio test was performed.
 - TSR recognition/display/audio of real signs remains unproven; D3 does not
-  claim to add a detector.
+  claim to add a detector. The current field diagnostic says
+  `TSR_PROFILE v=D2 status=INPUT_SIZE_BLOCK`; this is the encoded
+  `adas.flag` size guard (0 or >98,304 bytes, or an unparseable count), not a
+  frame/video input-size result. No guard widening is authorized without
+  read-only live byte count/hash evidence.
 
 ## Gates and identities
 

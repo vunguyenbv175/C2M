@@ -22,7 +22,9 @@ configuration page. Imported `feature/d3-tsr-events-20261014` through b97a531.
   association on boot. Association is not yet an Internet claim: DHCP support
   is explicitly missing in this first source checkpoint.
 - AP+STA advertisement is a permission gate, NOT successful concurrent radio
-  operation. Missing/malformed proof blocks rather than switching to STA-only.
+  operation. Missing/malformed/startup-observation proof is reported as
+  unknown and blocks rather than switching to STA-only. Only a complete valid
+  combination that lacks AP+managed capacity reports `no`.
   One-channel constraint requires upstream hotspot/router on camera AP channel.
 - EN has `sta.sh` references but no supplicant executable was found in the
   inspected rootfs/customer inventory. D3 builds its own pinned upstream

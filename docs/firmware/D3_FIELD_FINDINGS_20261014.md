@@ -49,7 +49,11 @@ or association test.
 **Source correction:** change the response policy to `same-origin`. Do not
 accept `Origin: null` or remove exact Host/Origin, CSRF, subnet, or AP validation.
 `same-origin` still suppresses referrers to different origins. The correction
-is not installed on the camera by a repository edit.
+is not installed on the camera by a repository edit. Source commit `51e905a`
+and CI run `38590340710` passed all jobs, including 14 native web tests and a
+real Chrome native Save/Connect/Forget form test on loopback with synthetic
+credentials. These are browser/server execution tests, not camera association
+or a new firmware release.
 
 Private local HTTP/browser evidence (tokens redacted):
 
@@ -84,6 +88,16 @@ query/parser/driver mismatch are possibilities, not established causes.
 
 No upstream credentials were used, and no concurrent association was tested.
 The existing association-only/DHCP-missing release limit still applies.
+
+The controller source correction separates unknown observations from a
+complete negative capability result and gives individual AP query/name/type/
+frequency errors. It retries only read-only nl80211 startup observations,
+with a maximum 30 total attempts and a 2-second scheduling interval, stopping
+on a verified result, saved configuration, any request intent, failure state,
+or ownership of association artifacts. It does not start STA, change AP,
+accept missing frequency, weaken netlink validation, or add a stock-mode
+fallback. The actual deployed `ap_not_verified` subcause still requires a
+corrected runtime observation; a source fix is not radio capability proof.
 
 ## Passive Bluetooth result
 
@@ -147,6 +161,19 @@ it is **not** `APPLIED_WAIT_STOCK_REDECODE` and not detector/sign-warning proof.
 No runtime config was read or patched in this capture. Previous persistent
 flags may still exist; the blocked status alone neither confirms nor reverses
 them. Determine the actual input state read-only before changing the guard.
+The guard is for the **encoded** `/customer/minieye/config/adas.flag`: greater
+than zero and at most 98,304 bytes, not video/frame size. All inspected D2/D3
+script copies match SHA256
+`63b7179bfd3983219f51f91159ce9c730dd84f6ec8c810d1ba31a96c2b91a37d`.
+The current status omits the actual byte count, so empty input, oversized
+input, or a failed numeric count cannot yet be distinguished. The script can
+also grow an initially near-limit input through profile insertion/base64
+wrapping without a corresponding output-size guard; this is an offline code
+hypothesis, not the established field cause. No bound was enlarged.
+
+The known stock `GET /getlog.tar.gz` returned HTTP 404 during the identity-gated
+probe; no log-generation `action=set` operation was called. A decisive live
+input-size/hash read remains unavailable through the exercised HTTP services.
 
 ## Same-card format trial result
 

@@ -169,6 +169,8 @@ jobs:
               python3 tools/fw/test_d3_connectivity.py
             )
             python3 tests/test_d3_web.py
+            python3 -m pip install websocket-client
+            C2M_REQUIRE_BROWSER_TEST=1 python3 tests/test_d3_web_browser.py
             python3 tests/test_d3_wifi_control.py
             python3 tools/fw/test_d3_mutation.py
             python3 tests/test_d3_gps.py
@@ -189,7 +191,7 @@ jobs:
           find fw/d3 -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
             -print0 | sort -z | xargs -0 sha256sum > work/d3_source.sha256
           sha256sum tools/fw/test_d3_connectivity.py tests/test_d3_web.py \
-            tests/test_d3_wifi_control.py > work/d3_test_source.sha256
+            tests/test_d3_web_browser.py tests/test_d3_wifi_control.py > work/d3_test_source.sha256
           cp work/d3-services/boot.sh work/d3_boot.sh
           cp work/d3-services/connectivity_probe.sh work/d3_connectivity_probe.sh
           cp fw/d3/build.sh work/d3_build.sh
@@ -289,9 +291,11 @@ jobs:
           token is minted here. Do NOT copy these raw CI folders to an SD card
           or assume the updater will accept them over the installed firmware.
           Verify retrieved hashes first, then perform the separately authorized,
-          fail-closed LOCAL version-only reversion for D3 to 20261014000005 using
+          fail-closed LOCAL version-only reversion using
           tools/fw/reversion_sd_package.py and exact source-member SHA-256 pins.
-          This is a reserved FUTURE LOCAL token, not a token written by CI.
+          Original D3 token 20261014000005 was already owner-flashed. Never reuse
+          that token for a corrected build. Reserve a fresh token separately;
+          CI does not mint or select an on-device update token.
           Verify its report, all four resulting files and refreshed inner MD5.
           Do not hand-edit sysVer or mix CI/reverted files. A is a stock-token
           control/reference, not an automatically usable rollback package.
@@ -320,6 +324,11 @@ jobs:
           an exclusive AP-to-STA mode switch. Host fixtures are not hardware
           proof: STA association and Internet connectivity remain UNKNOWN
           until supervised field validation on the actual camera.
+          Original D3 had a confirmed Chromium form bug: no-referrer generated
+          Origin:null. Corrected source uses same-origin referrer policy while
+          preserving strict Host/Origin and CSRF checks; real Chrome loopback
+          form tests are mandatory. Original field controller ap_not_verified
+          is unproven capability, NOT physical hardware absence.
           Saved Wi-Fi credentials/settings are private device config, not
           public evidence. No real credentials are used by synthetic CI tests.
           Bluetooth is a read-only presence inventory ONLY: HCI observation is

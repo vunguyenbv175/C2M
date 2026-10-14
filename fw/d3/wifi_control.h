@@ -11,9 +11,14 @@
  * sta.sh/ap.sh/apsta_switch, unloads modules, kills unrelated processes, or
  * brings wlan0 down. Build against the target's old glibc without time64.
  *
- * --probe only checks nl80211 capability/AP state and writes status; exit 0
- * means capability was proven, NOT that STA connected. --self-test is pure,
- * rootless and does not open a network socket or inspect hardware.
+ * --probe checks nl80211 capability/AP state and writes status; exit 0 means
+ * capability was proven, NOT that STA connected. A transient startup failure
+ * is published as unknown and --serve retries read-only observation at least
+ * 2s apart, at most 30 total attempts. Saved wifi.conf, any connect request,
+ * runtime ownership or an operation/failure state cancel the startup budget
+ * permanently; retries never auto-connect.
+ * --self-test is pure, rootless and does not open a network socket or inspect
+ * hardware.
  * Options: --status-file PATH, --supplicant /absolute/path/wpa_supplicant.
  * Default status: /tmp/c2m_wifi_status (atomic, mode 0600).
  * Config/run directories must be distinct, privately owned mode 0700, with
@@ -25,10 +30,13 @@
  * Concurrency is proven within ONE advertised interface combination, with
  * capacity for one AP and one managed interface, total >=2 and channels >=1.
  * Current wlan0 frequency is mandatory, including for one-channel hardware.
- * Missing/malformed capabilities and any existing c2msta0 fail closed. For
- * association the controller additionally refuses other interfaces on the AP
- * PHY, creates ONLY its own c2msta0, restricts scans/association to the AP's
- * frequency, and continually verifies AP ifindex/PHY/type/frequency unchanged.
+ * Missing/malformed capabilities and any existing c2msta0 fail closed and are
+ * reported as unknown, never as physical hardware absence. A complete valid
+ * combination that lacks AP+managed capacity is the only sta_supported=no
+ * result. For association the controller additionally refuses other
+ * interfaces on the AP PHY, creates ONLY its own c2msta0, restricts
+ * scans/association to the AP's frequency, and continually verifies AP
+ * ifindex/PHY/type/frequency unchanged.
  * It starts only a validated absolute wpa_supplicant executable with -B and an
  * exclusive private -P PID path; cleanup checks executable/arguments before
  * signaling that PID and removes only a verified, controller-created VIF.

@@ -394,6 +394,22 @@ class LocalhostTests(unittest.TestCase):
         self.status.symlink_to(self.config / "unrelated")
         self.assertFalse(self.status_json()["controller_status_available"])
 
+    def test_controller_observation_errors_are_explicit_not_hardware_absence(self) -> None:
+        errors = ("ap_nl80211_query_failed", "ap_name_missing_or_invalid",
+                  "ap_type_missing_or_invalid", "ap_frequency_missing_or_invalid",
+                  "capability_missing_or_malformed", "capability_nl80211_query_failed",
+                  "capability_proof_unavailable")
+        for error in errors:
+            with self.subTest(error=error):
+                self.status.write_text(f"sta_supported=unknown\nsta_state=unknown\nlast_error={error}\n")
+                state = self.status_json()
+                self.assertEqual(state["sta_supported"], "unknown")
+                self.assertEqual(state["sta_state"], "unknown")
+                self.assertEqual(state["last_error"], error)
+        self.status.write_text("sta_supported=no\nsta_state=unsupported\n"
+                               "last_error=ap_sta_combination_not_proven\n")
+        self.assertEqual(self.status_json()["sta_supported"], "no")
+
     def test_unsafe_file_and_directory_rejected_without_modification(self) -> None:
         victim = self.base / "victim"
         victim.write_text("DO NOT CHANGE")

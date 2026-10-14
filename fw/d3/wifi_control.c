@@ -27,6 +27,12 @@
 #define NL_TIMEOUT 1500
 #define MAX_LIMITS 32
 #define MAX_COMBOS 64
+#define STARTUP_PROBE_ATTEMPTS 30
+#define STARTUP_PROBE_INTERVAL 2000
+/* Negative results are missing/malformed evidence or an unenforceable extra
+ * constraint, never proof that the hardware has no AP+STA capability. */
+#define PROOF_MALFORMED (-1)
+#define PROOF_UNVERIFIED (-2)
 #define OWN_CONFIG "wifi-active.conf"
 #define OWN_PID "wifi-supplicant.pid"
 #define OWN_CTRL "wifi-ctrl"
@@ -49,7 +55,9 @@ struct worker {
     char run[PATH_MAX], supplicant[PATH_MAX], config[PATH_MAX], pidfile[PATH_MAX];
     char ctrl[PATH_MAX], client[PATH_MAX];
     const char *status, *state, *error;
-    int64_t started;
+    int64_t started, next_probe;
+    unsigned startup_probe_attempts;
+    int startup_probe_retry;
 };
 static volatile sig_atomic_t stopping;
 static void interrupted(int sig) { (void)sig; stopping = 1; }
@@ -134,22 +142,26 @@ static int parse_combo(const struct attr *outer) {
         }
     }
     if (it.bad || !hm || !hc || !hl) return -1;
-    /* Cannot enforce a peer's beacon interval: refuse this extra constraint. */
-    if (total < 2 || bi_match) return 0;
+    if (total < 2) return 0;
     for (i = 0; i < n; ++i) for (j = 0; j < n; ++j)
-        if (ls[i].ap && ls[j].sta && (i != j || ls[i].max >= 2)) return 1;
+        if (ls[i].ap && ls[j].sta && (i != j || ls[i].max >= 2))
+            /* Cannot enforce a peer's beacon interval. This is not evidence
+             * of hardware absence; it remains blocked for association. */
+            return bi_match ? PROOF_UNVERIFIED : 1;
     return 0;
 }
 static int prove_combinations(const void *p, size_t n, uint32_t frequency) {
     struct attrs it = { p, n, 0 };
     struct attr a;
-    int count = 0, supported = 0, r;
+    int count = 0, supported = 0, unverified = 0, r;
     while (next_attr(&it, &a)) {
-        if (++count > MAX_COMBOS || (r = parse_combo(&a)) < 0) return -1;
-        if (r) supported = 1;
+        if (++count > MAX_COMBOS || (r = parse_combo(&a)) == PROOF_MALFORMED) return PROOF_MALFORMED;
+        if (r == 1) supported = 1;
+        if (r == PROOF_UNVERIFIED) unverified = 1;
     }
-    if (it.bad || !count) return -1;
-    return frequency ? supported : 0;
+    if (it.bad || !count) return PROOF_MALFORMED;
+    if (!frequency) return PROOF_UNVERIFIED;
+    return supported ? 1 : unverified ? PROOF_UNVERIFIED : 0;
 }
 static void msg_init(struct msg *m, int family, int cmd, int flags, uint32_t seq) {
     struct nlmsghdr h;
@@ -259,6 +271,13 @@ static int nl_open(struct nl *nl) {
 fail:
     close(nl->fd); nl->fd = -1; return -1;
 }
+#define IFACE_NAME_INVALID (-2)
+#define IFACE_TYPE_INVALID (-3)
+#define IFACE_FREQ_INVALID (-4)
+static int iface_attr_error(unsigned bit) {
+    return bit == 16 ? IFACE_NAME_INVALID : bit == 4 ? IFACE_TYPE_INVALID :
+        bit == 8 ? IFACE_FREQ_INVALID : -1;
+}
 static int parse_iface(const void *p, size_t n, struct iface *v) {
     struct attrs it = { p, n, 0 };
     struct attr a;
@@ -273,22 +292,35 @@ static int parse_iface(const void *p, size_t n, struct iface *v) {
         if (a.type == NL80211_ATTR_WIPHY_FREQ) { value = &v->freq; bit = 8; }
         if (a.type == NL80211_ATTR_IFNAME) {
             bit = 16;
-            if (!a.n || a.n > sizeof(v->name) || a.p[a.n - 1] || memchr(a.p, 0, a.n - 1)) return -1;
+            if (!a.n || a.n > sizeof(v->name) || a.p[a.n - 1] || memchr(a.p, 0, a.n - 1))
+                return IFACE_NAME_INVALID;
             memcpy(v->name, a.p, a.n);
         }
-        if (bit && (seen & bit)) return -1;
+        if (bit && (seen & bit)) return iface_attr_error(bit);
         seen |= bit;
-        if (value && attr_u32(&a, value)) return -1;
+        if (value && attr_u32(&a, value)) return iface_attr_error(bit);
     }
-    return it.bad || (seen & 23) != 23 || !v->index ? -1 : 0;
+    if (it.bad) return -1;
+    if (!(seen & 16)) return IFACE_NAME_INVALID;
+    if (!(seen & 4)) return IFACE_TYPE_INVALID;
+    return (seen & 3) != 3 || !v->index ? -1 : 0;
 }
-struct interfaces { struct iface target; uint32_t index, phy; int count, extra, one; };
+struct interfaces {
+    struct iface target;
+    uint32_t index, phy;
+    int count, extra, one, error;
+};
 static int interface_reply(int cmd, const void *p, size_t n, void *out) {
     struct interfaces *r = out;
     struct iface v;
-    if (cmd != NL80211_CMD_NEW_INTERFACE || parse_iface(p, n, &v) || ++r->count > 128) return -1;
+    int parsed;
+    if (cmd != NL80211_CMD_NEW_INTERFACE || ++r->count > 128) {
+        r->error = -1; return -1;
+    }
+    parsed = parse_iface(p, n, &v);
+    if (parsed) { r->error = parsed; return -1; }
     if (r->one) {
-        if (r->count != 1 || v.index != r->index) return -1;
+        if (r->count != 1 || v.index != r->index) { r->error = -1; return -1; }
         r->target = v;
     } else if (v.phy == r->phy && v.index != r->index) r->extra++;
     return 0;
@@ -299,7 +331,8 @@ static int get_interface(struct nl *nl, uint32_t index, struct iface *v) {
     memset(&r, 0, sizeof(r)); r.index = index; r.one = 1;
     if (!index) return -1;
     msg_init(&m, nl->family, NL80211_CMD_GET_INTERFACE, 0, ++nl->seq);
-    if (msg_u32(&m, NL80211_ATTR_IFINDEX, index) || exchange(nl, &m, interface_reply, &r) || r.count != 1) return -1;
+    if (msg_u32(&m, NL80211_ATTR_IFINDEX, index) || exchange(nl, &m, interface_reply, &r) || r.count != 1)
+        return r.error ? r.error : -1;
     *v = r.target; return 0;
 }
 static int alone_on_phy(struct nl *nl, const struct iface *ap) {
@@ -309,40 +342,79 @@ static int alone_on_phy(struct nl *nl, const struct iface *ap) {
     msg_init(&m, nl->family, NL80211_CMD_GET_INTERFACE, NLM_F_DUMP, ++nl->seq);
     return exchange(nl, &m, interface_reply, &r) || !r.count || r.extra ? -1 : 0;
 }
-struct proof { uint32_t phy, freq; int replies, seen, supported; };
+struct proof {
+    uint32_t phy, freq;
+    int replies, seen, supported;
+    const char *error;
+};
 static int wiphy_reply(int cmd, const void *p, size_t n, void *out) {
     struct proof *r = out;
     struct attrs it = { p, n, 0 };
     struct attr a;
     uint32_t phy = 0;
     int have_phy = 0, result;
-    if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > 1) return -1;
+    if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > 1) {
+        r->error = "capability_nl80211_query_failed"; return -1;
+    }
     while (next_attr(&it, &a)) {
         if (a.type == NL80211_ATTR_WIPHY) {
-            if (have_phy++ || attr_u32(&a, &phy)) return -1;
+            if (have_phy++ || attr_u32(&a, &phy)) {
+                r->error = "capability_missing_or_malformed"; return -1;
+            }
         } else if (a.type == NL80211_ATTR_INTERFACE_COMBINATIONS) {
-            if (r->seen++ || (result = prove_combinations(a.p, a.n, r->freq)) < 0) return -1;
+            result = prove_combinations(a.p, a.n, r->freq);
+            if (r->seen++ || result == PROOF_MALFORMED) {
+                r->error = "capability_missing_or_malformed"; return -1;
+            }
+            if (result == PROOF_UNVERIFIED) {
+                r->error = "capability_proof_unavailable"; return -1;
+            }
             r->supported = result;
         }
     }
-    return it.bad || !have_phy || phy != r->phy ? -1 : 0;
+    if (it.bad || !have_phy || phy != r->phy) {
+        r->error = "capability_missing_or_malformed"; return -1;
+    }
+    return 0;
+}
+static const char *ap_probe_error(int result, const struct iface *ap) {
+    if (result == IFACE_NAME_INVALID) return "ap_name_missing_or_invalid";
+    if (result == IFACE_TYPE_INVALID) return "ap_type_missing_or_invalid";
+    if (result == IFACE_FREQ_INVALID) return "ap_frequency_missing_or_invalid";
+    if (result) return "ap_nl80211_query_failed";
+    if (!ap->name[0] || strcmp(ap->name, C2M_WIFI_AP)) return "ap_name_missing_or_invalid";
+    if (ap->type != NL80211_IFTYPE_AP) return "ap_type_missing_or_invalid";
+    if (!ap->freq) return "ap_frequency_missing_or_invalid";
+    return "";
+}
+static int capability_probe_result(struct worker *w, int query_failed, const struct proof *r) {
+    w->supported = -1;
+    if (query_failed || r->error || r->replies != 1 || r->seen != 1) {
+        w->error = r->error ? r->error : query_failed ? "capability_nl80211_query_failed" :
+            "capability_missing_or_malformed";
+        return -1;
+    }
+    if (r->supported != 0 && r->supported != 1) { w->error = "capability_proof_unavailable"; return -1; }
+    if (!r->supported) {
+        w->supported = 0; w->error = "ap_sta_combination_not_proven"; return -1;
+    }
+    w->supported = 1; w->error = ""; return 0;
 }
 static int probe(struct worker *w) {
     struct msg m;
     struct proof r;
-    w->supported = 0;
-    if (get_interface(&w->nl, if_nametoindex(C2M_WIFI_AP), &w->ap) ||
-        strcmp(w->ap.name, C2M_WIFI_AP) || w->ap.type != NL80211_IFTYPE_AP || !w->ap.freq) {
-        w->error = "ap_not_verified"; return -1;
-    }
+    int result;
+    /* A failed observation is unknown. Only a complete valid combination
+     * proof below may publish sta_supported=no. */
+    w->supported = -1;
+    result = get_interface(&w->nl, if_nametoindex(C2M_WIFI_AP), &w->ap);
+    w->error = ap_probe_error(result, &w->ap);
+    if (*w->error) return -1;
     if (if_nametoindex(C2M_WIFI_STA)) { w->error = "preexisting_vif"; return -1; }
     memset(&r, 0, sizeof(r)); r.phy = w->ap.phy; r.freq = w->ap.freq;
     msg_init(&m, w->nl.family, NL80211_CMD_GET_WIPHY, 0, ++w->nl.seq);
-    if (msg_u32(&m, NL80211_ATTR_WIPHY, r.phy) || exchange(&w->nl, &m, wiphy_reply, &r) || !r.seen) {
-        w->error = "capability_missing_or_malformed"; return -1;
-    }
-    if (!r.supported) { w->error = "ap_sta_combination_not_proven"; return -1; }
-    w->supported = 1; w->error = ""; return 0;
+    result = msg_u32(&m, NL80211_ATTR_WIPHY, r.phy) || exchange(&w->nl, &m, wiphy_reply, &r);
+    return capability_probe_result(w, result, &r);
 }
 static int ap_unchanged(struct worker *w) {
     struct iface ap;
@@ -468,6 +540,49 @@ static int read_private(int dir, const char *name, char *buf, size_t size, struc
     close(fd);
     if (used >= size || memchr(buf, 0, used)) return -1;
     buf[used] = 0; return (int)used;
+}
+static const char *probe_state(int supported) {
+    return supported < 0 ? "unknown" : supported ? "idle" : "unsupported";
+}
+/* Read-only observation: GET_INTERFACE/GET_WIPHY and (if necessary)
+ * nl80211 family discovery. Never create a VIF or enter association/cleanup. */
+static int observe_capability(struct worker *w) {
+    if (w->nl.fd < 0 && nl_open(&w->nl)) {
+        w->supported = -1; w->error = "nl80211_unavailable"; return -1;
+    }
+    return probe(w);
+}
+static void startup_probe_record(struct worker *w, int64_t now) {
+    ++w->startup_probe_attempts;
+    w->state = probe_state(w->supported);
+    w->startup_probe_retry = now >= 0 && w->supported < 0 &&
+        w->startup_probe_attempts < STARTUP_PROBE_ATTEMPTS;
+    w->next_probe = now + STARTUP_PROBE_INTERVAL;
+}
+/* Existence or an inspection error counts as intent, even for unsafe files.
+ * Do not read credentials and never consume a request in a retry path. */
+static int startup_probe_no_intent(struct worker *w) {
+    struct stat st;
+    if (fstatat(w->configfd, "wifi.conf", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT) return 0;
+    if (fstatat(w->runfd, "connect.request", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT) return 0;
+    return 1;
+}
+/* Callback is solely a read-only observer, exposed here so rootless fixtures
+ * can prove budget, cancellation and meaningful-change behavior without I/O. */
+static int startup_probe_tick(struct worker *w, int64_t now, int no_intent,
+                              int (*observe)(struct worker *)) {
+    int before;
+    const char *state, *error;
+    if (!w->startup_probe_retry) return 0;
+    if (!no_intent || w->owned || w->cfg_owned || w->ctrl_owned || w->pid_owned ||
+        strcmp(w->state, probe_state(w->supported)) || now < 0) {
+        w->startup_probe_retry = 0; return 0;
+    }
+    if (now < w->next_probe) return 0;
+    before = w->supported; state = w->state; error = w->error;
+    (void)observe(w);
+    startup_probe_record(w, now);
+    return before != w->supported || strcmp(state, w->state) || strcmp(error, w->error);
 }
 static int consume_request(struct worker *w) {
     char buf[129];
@@ -669,7 +784,7 @@ static int start_association(struct worker *w) {
     int fd = -1, n, rc = -1;
     w->error = "configuration_missing_or_invalid";
     if (read_private(w->configfd, "wifi.conf", input, sizeof(input), NULL) < 0 || parse_config(input, ssid, psk)) goto out;
-    if (probe(w)) goto out;
+    if (observe_capability(w)) goto out;
     if (geteuid() != 0) { w->error = "root_required_for_association"; goto out; }
     w->error = "private_runtime_unavailable";
     if (mkdirat(w->runfd, OWN_CTRL, 0700)) goto out;
@@ -786,7 +901,7 @@ int c2m_wifi_self_test(void) {
     char config[512], ssid[65], psk[65];
     int failures = 0;
     fixture_init(&m); fixture_combo(&m, 1, 1, 1, 0, 2, 1, 1);
-    failures += test_result("one_channel_requires_current_frequency", prove_combinations(m.data, m.n, 0), 0);
+    failures += test_result("one_channel_requires_current_frequency", prove_combinations(m.data, m.n, 0), PROOF_UNVERIFIED);
     failures += test_result("one_channel_ap_sta", prove_combinations(m.data, m.n, 2412), 1);
     fixture_init(&m); fixture_combo(&m, 1, 1, 1, 1, 2, 2, 2);
     failures += test_result("shared_limit_two", prove_combinations(m.data, m.n, 2412), 1);
@@ -809,13 +924,13 @@ int c2m_wifi_self_test(void) {
     failures += test_result("duplicate_scalar_blocked", prove_combinations(m.data, m.n, 2412), -1);
     fixture_init(&m); fixture_combo(&m, 1, 1, 1, 0, 2, 1, 1);
     (void)msg_attr(&m, NL80211_IFACE_COMB_STA_AP_BI_MATCH, NULL, 0); fixture_end(&m, 0);
-    failures += test_result("beacon_constraint_blocked", prove_combinations(m.data, m.n, 2412), 0);
+    failures += test_result("beacon_constraint_unverified", prove_combinations(m.data, m.n, 2412), PROOF_UNVERIFIED);
     fixture_init(&m);
     (void)msg_u32(&m, NL80211_ATTR_IFINDEX, 7); (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
     (void)msg_u32(&m, NL80211_ATTR_IFTYPE, NL80211_IFTYPE_AP); (void)msg_attr(&m, NL80211_ATTR_IFNAME, "wlan0", 6);
     failures += test_result("interface_missing_frequency_is_unknown", parse_iface(m.data, m.n, &v) || v.freq != 0, 0);
     (void)msg_attr(&m, NL80211_ATTR_IFNAME, "evil", 4);
-    failures += test_result("interface_bad_name_blocked", parse_iface(m.data, m.n, &v), -1);
+    failures += test_result("interface_bad_name_blocked", parse_iface(m.data, m.n, &v), IFACE_NAME_INVALID);
     snprintf(config, sizeof(config), "network={\nssid=74657374\npsk=%064d\nkey_mgmt=WPA-PSK\n}\n", 0);
     failures += test_result("private_config_subset", parse_config(config, ssid, psk), 0);
     snprintf(config, sizeof(config), "network={\nssid=74657374\npsk=%064d\n}\nctrl_interface=/tmp/public\n", 0);
@@ -853,13 +968,16 @@ int main(int argc, char **argv) {
     if (mode == 3 && prepare_paths(&w, configdir, rundir, supplicant)) {
         w.error = "private_paths_or_supplicant_unavailable"; w.state = "failed"; goto finish;
     }
-    if (nl_open(&w.nl)) { w.error = "nl80211_unavailable"; w.state = "unsupported"; goto finish; }
-    if (probe(&w)) w.state = "unsupported"; else { w.state = "idle"; rc = 0; }
+    if (!observe_capability(&w)) rc = 0;
+    startup_probe_record(&w, now_ms());
     if (status_write(&w)) { fputs("c2m-wifi: status publication failed\n", stderr); rc = 1; goto close_all; }
     if (mode == 2) goto close_all;
     rc = 0;
     while (!stopping) {
         request = consume_request(&w);
+        /* A request cancels startup observation permanently, including an
+         * invalid request that consume_request removed from the directory. */
+        if (request) w.startup_probe_retry = 0;
         if (request < 0) { w.error = "request_invalid_or_unsafe"; w.state = "failed"; (void)status_write(&w); }
         if (request > 0) {
             if (cleanup(&w)) { w.error = "cleanup_unverified_manual_recovery_required"; w.state = "failed"; }
@@ -867,6 +985,8 @@ int main(int argc, char **argv) {
             if (status_write(&w)) { rc = 1; break; }
         }
         if (w.owned) monitor(&w);
+        if (w.startup_probe_retry && startup_probe_tick(&w, now_ms(), startup_probe_no_intent(&w), observe_capability) &&
+            status_write(&w)) { rc = 1; break; }
         nanosleep(&pause, NULL);
     }
     if (cleanup(&w)) { w.state = "failed"; w.error = "cleanup_unverified_manual_recovery_required"; rc = 1; }
