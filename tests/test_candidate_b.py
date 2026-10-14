@@ -622,6 +622,32 @@ def main() -> int:
             if r.returncode != 0:
                 fails.append("verify_b_manifest replaced-shape failed: "
                              + r.stdout[-400:])
+        # 2f-dir: existing-directory size/mtime drift is a rebuild artifact
+        # (an allowlisted addition changes both) and must not BLOCK.
+        dirstock = manifest([
+            reg("/f", b"hello"),
+            {"path": "/d", "inode": 2, "type": "dir", "mode": 0o755,
+             "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+             "size": 96, "mtime": 1691062662}])
+        diractual = manifest([
+            reg("/f", b"hello"),
+            {"path": "/d", "inode": 2, "type": "dir", "mode": 0o755,
+             "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+             "size": 128, "mtime": 1791947527}])
+        (tmp / "dirstock.json").write_text(json.dumps(dirstock))
+        (tmp / "diractual.json").write_text(json.dumps(diractual))
+        (tmp / "dir_mut.json").write_text(json.dumps(
+            {"hook": "/f", "added": [],
+             "modified": [{"path": "/f", "new_sha256": sh(b"hello")}]}))
+        r = subprocess.run(
+            [sys.executable, "tools/fw/verify_b_manifest.py", "--stock",
+             str(tmp / "dirstock.json"), "--mut", str(tmp / "dir_mut.json"),
+             "--actual", str(tmp / "diractual.json")],
+            cwd=ROOT, capture_output=True, text=True)
+        if r.returncode != 0:
+            fails.append("directory size/mtime drift wrongly BLOCKED: "
+                         + r.stdout[-300:])
+
         # 2g. TSR patch LOGIC with real base64/sed/grep: run the verbatim
         # block lines with only the device prefix substituted (device paths
         # are uncreatable on the test machine). Proves decode/flip/re-encode

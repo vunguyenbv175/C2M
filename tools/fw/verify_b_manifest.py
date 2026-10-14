@@ -19,6 +19,11 @@ import json
 from pathlib import Path
 
 KEYS = ("type", "mode", "uid", "gid", "size", "sha256", "target", "mtime")
+# Directory size/mtime are rebuild artifacts (entry count and build clock),
+# not content identity: a directory gaining an allowlisted file (e.g. the
+# previously absent tlr wav) legitimately changes both. Compare only
+# identity metadata for dirs, full KEYS for everything else.
+DIR_KEYS = ("type", "mode", "uid", "gid")
 
 
 def main() -> int:
@@ -54,7 +59,7 @@ def main() -> int:
         if a is None:
             bad.append(f"REMOVED {p}")
             continue
-        for k in KEYS:
+        for k in (DIR_KEYS if s.get("type") == "dir" else KEYS):
             if s.get(k) != a.get(k):
                 bad.append(f"CHANGED {p} {k}: {s.get(k)!r} -> {a.get(k)!r}")
     for p, a in added.items():
