@@ -93,3 +93,64 @@ C2M GPS (non-consuming tap) + stock TSR (actual captured schema)
 - **UNKNOWN:** Driving Alert endpoint, true free entitlement, live sign coverage quality by route, offline cache/redistribution rights, output from a C2M physical device.
 
 No registered API key was used and no VietMap server was queried with authenticated credentials.
+
+
+## Deep dive addendum: independently confirmed official Speed Alert interfaces
+
+Two first-party, public VietMap GitHub repos provide stronger evidence that
+their standalone **Driving Alert / Speed Alert backend** exists, even though
+Trial entitlement and an authorized public wire contract are **not** granted.
+
+### 1) React Native Navigation SDK supports free-drive Speed Alert
+
+https://github.com/vietmap-company/vietmap-react-native-navigation
+
+- Documents \`VietMapNavigationController.configureAlertAPI(apiKey, apiKeyId)\`
+  using a **Speed Alert-specific API key and key ID**, separate from the
+  navigation/route key.
+- \`apiKeyAlert\` is an additional SDK property.
+- \`startSpeedAlert()\`, \`stopSpeedAlert()\`, and
+  \`isSpeedAlertActive()\` work in SDK. Its README explicitly describes
+  *manual/free-drive monitoring even when not navigating*.
+- \`configVehicleSpeedAlert\` carries type, seats and weight. SDK integration
+  thus knows vehicle class; don't invent a universal car speed limit.
+- Public CHANGELOG records speed limit alerts (v1.6.0, Sep 2025) and camera,
+  traffic-light and toll voice alerts (v1.7.0, Oct 2025). Treat claims as SDK
+  documented capabilities, **not** as evidence that free Route v4 returns signs.
+- Testable *on a licensed Android phone with granted Alert credentials*,
+  not on C2M ARM/Linux directly. A licensed phone bridge can deliver normalized
+  alert events over the camera AP, if the SDK's terms allow relay.
+
+### 2) Proprietary iOS Speed Alert SDK shows zone-oriented graph engine
+
+https://github.com/vietmap-company/vietmap_speed_alert_ios/blob/main/README.md
+
+- README is explicit: "**only for Vietmap MAPs API enterprise customers**".
+- Graph-engine setup example mentions \`ZoneNetworkManagerV2(baseUrl:
+  "https://dev.fastmap.vn/drivingalert", vehicleType:1, seats:4,
+  weights:1500)\`. This is an **example SDK base URL**, apparently
+  development-specific, **NOT** verified production endpoint or public API
+  specification. Do not guess URL suffixes, use it as an unauthenticated
+  crawling target, or substitute the normal VietMap trial Route key.
+- \`updateLocation(lat,lng)\` refreshes a zone cache when location moves;
+  \`processGps(lat,lng,bearing,speedKmh,accuracy)\` processes GPS locally.
+  The SDK emits current speed-sign bitmap, speed status, next sign+distance,
+  camera+distance, toll+distance and PCM/WAV audio callbacks.
+- That architecture closely matches proposed C2M D3: **regional prefetch
+  + offline graph/road matching + live GPS + simple output**.
+- Crucial applicability caveat: the same README says speed alerts currently
+  support **vehicleType 3,5,6 (bus/truck/trailer)**, not ordinary
+  **vehicleType 1 car**, despite the sample using 1. Request real passenger-car
+  authorization/coverage/compatibility evidence from VietMap rather than
+  promising it will work on user's car.
+- The iOS SDK is prebuilt XCFramework; its code/binaries are **not** a
+  transferable Linux ARM firmware module, regardless of the C++ core claim.
+
+### Correct next developer question
+
+Ask for a **free evaluation of Speed Alert/Driving Alert** with separate
+\`apiKey\` and \`apiKeyId\`, a validated **car (vehicle type 1)** flow, and
+their permitted **Linux headless / camera / regional-cache** integration.
+If headless API is not offered, seek a *licensed phone-app event relay*
+or fall back to Lily-style offline + OSM/Overpass. Do not put unsupported
+enterprise-only SDK into the D3 shipping path.
