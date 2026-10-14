@@ -1,10 +1,14 @@
 # Candidate C — Vietnamese ADAS audio + TSR enable (2026-10-14)
 
 **Status:** HOST-VALIDATED + SD READ-BACK VERIFIED + DEVICE-FLASHED
-2026-10-14. Field result: VI warnings confirmed by ear (LDW/PCW/FCW group);
-no startup greeting on normal boots — EXPECTED, see `audios.txt` mapping
-(`calib_success` → `adas_activated.wav`, not a per-boot event). Owner chose
-to keep the vendor calib sound; no custom per-boot greeting planned.
+2026-10-14 (owner-reported). Vietnamese warning audio was heard; the owner
+selected the LDW/PCW/FCW warning group, not an individual-slot test. This
+is partial audio acceptance, not proof that every slot passed. FCW/HMW
+assets are unchanged. No startup greeting was heard, consistent with
+`audios.txt` mapping `calib_success` → `adas_activated.wav`, not a per-boot
+event. Owner chose to keep vendor behavior; no custom greeting planned.
+TSR, recording continuity, multi-boot persistence and C diagnostic logs
+still require separate evidence. Frozen A/B1/B2 hashes remain untouched.
 
 ## Content vs B4 (mount-wait)
 
@@ -13,14 +17,18 @@ to keep the vendor calib sound; no custom per-boot greeting planned.
 - `tlr_green_on.wav` ADDED (was md5sum-listed but absent in both EN and VI):
   Google-TTS Vietnamese "Đèn xanh", 1128 ms, PCM16/mono/24 kHz, generated
   locally, hash-pinned in the private vault.
-- `md5sum.txt` refreshed for exactly the 8 touched lines; all other lines
-  (incl. vendor-stale FCW/HMW/LDW lines — stock files mismatch them too, yet
-  stock runs, proving `adas_checksum.sh` never gates boot) preserved.
-- `audios.txt` unchanged (byte-identical EN↔VI; duration field nominal).
+- `md5sum.txt` refreshed for exactly the 8 touched audio lines; untouched
+  vendor-stale FCW/HMW entries preserved. The LDW line is refreshed in C.
+  Stock running with stale entries supports a non-gating checksum path on
+  observed boots, not a universal claim that the script is never used.
+- `audios.txt` unchanged (byte-identical EN↔VI). Several donor wavs exceed
+  listed durations; complete playback/preemption still needs testing.
 - Hook block extended with an idempotent TSR flag patch (decode device
   `adas.flag`, flip first `--enable_tsr=false`→`true`, rewrite both flag
   files consistently so `run.sh` sees no md5 drift; skips when absent or
-  already patched). Idle daemon byte-identical (`fbc2c452…`).
+  already patched). This changes persistent device configuration, has no
+  built-in backup/disable path, and does not prove TSR reaches the display.
+  Idle daemon byte-identical (`fbc2c452…`).
 - Full mechanism record: `docs/firmware/C2M_AUDIO_TSR_MECHANISM.md`.
 
 ## Provenance
@@ -58,15 +66,22 @@ found). Four files staged, flushed, replaced (sysVer last), read back 4/4
 exact; volume cache flushed; final NOT dirty, Healthy. Root exactly four
 files + SVI.
 
-## Flash / acceptance (pending)
+## Acceptance (flash reported complete; remaining checks pending)
 
-Same stable-power procedure; decline format prompts. Verify in order:
-1. Live view + recording + app connection normal (no regression).
-2. Vietnamese warnings BY EAR: drive normally until LDW/PCW/FCW trigger, or
-   wait for ADAS activation greeting (`adas_activated` in Vietnamese).
-3. TSR: drive past speed-limit signs; watch app/M4 display + listen for the
-   traffic-light wav. Note hit/miss/false-positive per sign.
-4. Recording-card `C2M_DIAG`: START + HB expected as before (idle unchanged).
-Rollback: frozen A files retained; reflash A path unchanged. TSR was vendor-
-disabled for unknown reasons — treat first drives as an experiment, keep
-stock expectations; any ADAS failure → report, rollback, STOP.
+1. Live view + recording + app connection: compare with baseline; validate
+   recorded clips for gaps/corruption, not only the presence of files.
+2. Vietnamese audio: owner reports warning audio. Confirm individual slots
+   and complete speech in safe, normal operation; do not induce hazardous
+   warning scenarios or recalibrate merely to hear a prompt.
+3. TSR: record speed-sign detection/display separately from traffic-light
+   detection/audio. Neither output has been confirmed. Use a passenger or
+   recordings for observations, never operate the app while driving.
+4. Recording-card `C2M_DIAG`: START + HB expected as before (idle unchanged);
+   those logs alone do not prove ADAS health or recording continuity.
+
+Rollback WARNING: frozen A files are retained, but flashing A alone does
+NOT guarantee config rollback: the updater preserves `/customer/minieye/
+config` and C writes TSR flags there. A reviewed, separately authorized
+config recovery is required; never reset calibration/license wholesale.
+TSR was vendor-disabled for unknown reasons. Any recording/ADAS regression
+blocks further feature work. See `C2M_NEXT_UPGRADE_PLAN_20261014.md`.
