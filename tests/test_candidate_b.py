@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import os
+import shlex
 import shutil
 import struct
 import subprocess
@@ -299,8 +300,10 @@ def main() -> int:
             # stubs for stock tool names (sleep/grep) must take precedence
             # via an INNER export; unique stub names need no such help.
             # Device behavior is unchanged (fixed command names either way).
-            cmd = ("export PATH='%s:$PATH'; exec '%s'"
-                   % (sh_path(stubdir), sh_path(hook_path)))
+            # Quote fixture paths while expanding the shell's inherited PATH.
+            cmd = ('export PATH=%s:"$PATH"; exec %s'
+                   % (shlex.quote(sh_path(stubdir)),
+                      shlex.quote(sh_path(hook_path))))
             return subprocess.run([sh_bin, "-c", cmd], capture_output=True,
                                   text=True, timeout=30)
 
@@ -328,6 +331,7 @@ def main() -> int:
                 (hx_tree / "wifi").mkdir(parents=True)
                 sbytes = ("#!/bin/sh\necho hi\n" + tail).encode()
                 (hx_tree / "wifi" / "rcInsDriver.sh").write_bytes(sbytes)
+                os.chmod(hx_tree / "wifi" / "rcInsDriver.sh", 0o755)
                 sm = manifest([dict(reg("/wifi/rcInsDriver.sh", sbytes),
                                      sha256=sh(sbytes), size=len(sbytes))])
                 (execdir / f"stock{code}.json").write_text(json.dumps(sm))
@@ -361,6 +365,7 @@ def main() -> int:
             (hx_tree / "wifi").mkdir(parents=True)
             sbytes = b"#!/bin/sh\necho hi\nexit 0\n"
             (hx_tree / "wifi" / "rcInsDriver.sh").write_bytes(sbytes)
+            os.chmod(hx_tree / "wifi" / "rcInsDriver.sh", 0o755)
             sm = manifest([dict(reg("/wifi/rcInsDriver.sh", sbytes),
                                  sha256=sh(sbytes), size=len(sbytes))])
             (execdir / "stockmiss.json").write_text(json.dumps(sm))
@@ -412,6 +417,7 @@ def main() -> int:
             treeO = tmp / "treeO"
             (treeO / "wifi").mkdir(parents=True)
             (treeO / "wifi" / "rcInsDriver.sh").write_bytes(off_hook)
+            os.chmod(treeO / "wifi" / "rcInsDriver.sh", 0o755)
             stockO = manifest([dict(reg("/wifi/rcInsDriver.sh", off_hook),
                                      sha256=sh(off_hook),
                                      size=len(off_hook))])
@@ -445,10 +451,9 @@ def main() -> int:
         else:
             mdir = tmp / "mountwait"
             mdir.mkdir()
-            # NOTE: the inner PATH export mangles the inherited Windows
-            # PATH (drive-letter colons), so stubs must use shell builtins
-            # ONLY (no wc/cat/ls). The poll counter is a token dir:
-            # one empty file per grep call, counted via glob + $#.
+            # Keep stubs self-contained with shell builtins (no wc/cat/ls).
+            # The poll counter is a token dir: one empty file per grep
+            # call, counted via glob + $#.
             tokens = mdir / "tokens"
             tokens.mkdir()
             sent_m = mdir / "sent_mounted"
@@ -473,6 +478,7 @@ def main() -> int:
             (mtree / "wifi").mkdir(parents=True)
             mbytes = b"#!/bin/sh\nexit 0\n"
             (mtree / "wifi" / "rcInsDriver.sh").write_bytes(mbytes)
+            os.chmod(mtree / "wifi" / "rcInsDriver.sh", 0o755)
             mm = manifest([dict(reg("/wifi/rcInsDriver.sh", mbytes),
                                  sha256=sh(mbytes), size=len(mbytes))])
             (mdir / "stockm.json").write_text(json.dumps(mm))
@@ -517,6 +523,7 @@ def main() -> int:
             mtree2 = mdir / "hx2"
             (mtree2 / "wifi").mkdir(parents=True)
             (mtree2 / "wifi" / "rcInsDriver.sh").write_bytes(mbytes)
+            os.chmod(mtree2 / "wifi" / "rcInsDriver.sh", 0o755)
             mm2 = manifest([dict(reg("/wifi/rcInsDriver.sh", mbytes),
                                   sha256=sh(mbytes), size=len(mbytes))])
             (mdir / "stockm2.json").write_text(json.dumps(mm2))
