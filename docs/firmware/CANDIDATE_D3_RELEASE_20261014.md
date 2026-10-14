@@ -84,14 +84,20 @@ new detector, M4 injection or new audio backend is included.
 - Physical flash media: USB SM3350, disk1, MBR, 33,201,061,888 bytes;
   partition1 offset1,048,576, size33,200,013,312, FAT32 XINT13, label retained
   `C2M_FLASH_B`. Only the four updater files replaced, sysVer last.
+- Owner then requested same-card recording. Host created only
+  `Normal/F`, `Normal/R`, `Event/F`, `Event/R`, `Photo/F`, `Photo/R` and
+  parents. Existing files and D3 payload hashes remained unchanged; no
+  `.MINIEYE`/`.sstar.format` markers or format operation was performed.
+  Report: `C2M_HW_20261012/05_candidate_D/d3_same_card_layout.json`.
 
 ## Hardware use
 
 Do not copy raw CI vault files. Use only the separately locally reverted
-four-file D3 folder after checking its hashes. Keep the 32GB flash card
-separate from the 59GB recording card. Before owner-authorized flash, recheck
-physical disk identity and preserve diagnostic files. Use stable power and
-manual recovery media. After boot, check live view, recording, app/AP, ADAS
+four-file D3 folder after checking its hashes. The owner-selected same 32GB
+card now also has the ordinary recording directories; this does not prove the
+format prompt is resolved. Before owner-authorized flash, recheck physical
+disk identity and preserve diagnostic files. Use stable power and manual
+recovery media. After boot, check live view, recording, app/AP, ADAS
 Vietnamese audio, D2 profile status and reboot stability before trying Wi-Fi.
 
 For Wi-Fi: join the camera AP, open `http://<camera-AP-IP>:8099/`, save a

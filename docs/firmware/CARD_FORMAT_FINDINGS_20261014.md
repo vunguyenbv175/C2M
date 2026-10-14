@@ -48,21 +48,37 @@ Photo / IMG
 
 These are recorder-managed DCF database/free-space markers. Their exact
 contents, attributes and lifecycle are not proven safe to synthesize merely by
-creating empty files. `Normal/F`, `Event/SOS` and `Photo/IMG` are recorder
-subdirectories, not a complete independent format contract.
+creating empty files. `REC`, `SOS` and `IMG` are filename prefixes, not
+subdirectory names. The `g_sDB` table uses `F`/`R` channel directories for
+`Normal`, `Event` and `Photo`; directories alone are not a complete independent
+format contract.
 
 ## D3 decision
 
-D3 remains unchanged. It does not create or modify recording-card folders,
-`.MINIEYE`, `.sstar.format`, DCF state, or video files. This avoids a race with
-`cardv`, avoids masking a real filesystem/format problem, and preserves the
-read-only/no-format safety requirement.
+D3 firmware remains unchanged. It does not create or modify recording-card
+folders, `.MINIEYE`, `.sstar.format`, DCF state, or video files. This avoids a
+race with `cardv` and avoids masking a real filesystem/format problem.
+
+After this investigation the owner explicitly chose to use the 32GB updater
+card for recording too, to avoid swapping cards. At 18:13 +07:00 a separate
+host-side mkdir-only trial created `Normal/F`, `Normal/R`, `Event/F`,
+`Event/R`, `Photo/F`, `Photo/R` and their three parent directories on the
+positively identified `D: C2M_FLASH_B` card. No marker files were created,
+no existing files were deleted/changed, no format or filesystem repair occurred.
+The four D3 updater members and existing diagnostics remained byte/hash
+identical, cache was flushed, volume Healthy/NOT Dirty. The firmware token is
+still `20261014000005`; no rebuild or camera flash was performed.
+
+This is an owner-requested same-card recording trial, NOT a proven fix for the
+format prompt. Local report:
+`C2M_HW_20261012/05_candidate_D/d3_same_card_layout.json`.
 
 After the owner manually flashes D3, the correct test is:
 
 1. Boot with stable power and wait for live view.
-2. Insert/use the 59GB MINIEYE recording card and observe whether the official
-   recorder still asks for format.
+2. Observe whether the recorder accepts the owner-selected same 32GB card
+   without asking for format. The existing 59GB MINIEYE recording card remains
+   an unchanged comparison/control if needed.
 3. If it asks, **do not accept format**. Power down/preserve the card and read
    only its root markers, filesystem, dirty state and D3 diagnostics.
 4. If it does not ask, verify new normal recording, event/photo paths and
