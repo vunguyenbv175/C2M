@@ -419,6 +419,17 @@ static int write_all(int fd, const void *data, size_t n) {
     }
     return 0;
 }
+static int read_private(int dir, const char *name, char *buf, size_t size, struct stat *st);
+static const char *bluetooth_presence(struct worker *w) {
+    char text[16385];
+    int n = w->runfd < 0 ? -1 : read_private(w->runfd, "bluetooth.txt", text, sizeof(text), NULL);
+    if (n < 0) return "unknown";
+    if (strstr(text, "\nstatus=COMPLETE\n") &&
+        strstr(text, "\nverdict=HCI_PRESENT_NOT_RADIO_TESTED\n")) return "seen";
+    if (strstr(text, "\nstatus=COMPLETE\n") &&
+        strstr(text, "\nverdict=NO_HCI_OBSERVED_NOT_HARDWARE_ABSENCE\n")) return "not_seen";
+    return "unknown";
+}
 static int status_write(struct worker *w) {
     char path[PATH_MAX], temp[80], text[512], *base;
     struct stat st;
@@ -432,8 +443,9 @@ static int status_write(struct worker *w) {
     snprintf(temp, sizeof(temp), ".c2m-wifi-status-%ld-%u.tmp", (long)getpid(), ++serial);
     fd = openat(dir, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd < 0) goto done;
-    n = snprintf(text, sizeof(text), "sta_supported=%s\nsta_state=%s\nsta_ssid=\nsta_ipv4=\nlast_error=%s\nbt_presence=unknown\ndhcp_helper=missing\n",
-                 w->supported < 0 ? "unknown" : w->supported ? "yes" : "no", w->state, w->error);
+    n = snprintf(text, sizeof(text), "sta_supported=%s\nsta_state=%s\nsta_ssid=\nsta_ipv4=\nlast_error=%s\nbt_presence=%s\ndhcp_helper=missing\n",
+                 w->supported < 0 ? "unknown" : w->supported ? "yes" : "no", w->state,
+                 *w->error ? w->error : "none", bluetooth_presence(w));
     if (n > 0 && (size_t)n < sizeof(text) && !write_all(fd, text, (size_t)n) && !fsync(fd) &&
         !renameat(dir, temp, dir, base)) { (void)fsync(dir); rc = 0; }
     close(fd); (void)unlinkat(dir, temp, 0);
@@ -616,13 +628,22 @@ static int cleanup(struct worker *w) {
     }
     return rc;
 }
+static int trusted_supplicant(const char *path, const struct stat *st) {
+    if (!S_ISREG(st->st_mode) || (st->st_mode & 0022)) return 0;
+    if (st->st_uid == 0 || st->st_uid == geteuid()) return 1;
+    /* Rebuild preserves the EN customer UID/GID 1001. This one exact
+     * immutable-package executable is trusted like stock hostapd, not an
+     * arbitrary executable supplied by a config/web request. */
+    return st->st_uid == 1001 && st->st_gid == 1001 &&
+        (st->st_mode & 07777) == 0755 &&
+        !strcmp(path, "/customer/c2m/wpa_supplicant");
+}
 static int prepare_paths(struct worker *w, const char *configdir, const char *rundir, const char *supplicant) {
     struct stat a, b, executable;
     int fd;
     if (absolute_path(rundir, w->run, sizeof(w->run)) || strpbrk(w->run, " \t#\"\\") ||
         !realpath(supplicant, w->supplicant) || stat(w->supplicant, &executable) ||
-        !S_ISREG(executable.st_mode) || (executable.st_mode & 0022) ||
-        (executable.st_uid != 0 && executable.st_uid != geteuid()) || access(w->supplicant, X_OK)) return -1;
+        !trusted_supplicant(w->supplicant, &executable) || access(w->supplicant, X_OK)) return -1;
     w->configfd = safe_dir(configdir, 1, 1); w->runfd = safe_dir(rundir, 1, 1);
     if (w->configfd < 0 || w->runfd < 0 || fstat(w->configfd, &a) || fstat(w->runfd, &b) ||
         (a.st_dev == b.st_dev && a.st_ino == b.st_ino)) return -1;

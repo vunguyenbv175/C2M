@@ -96,6 +96,14 @@ int main(int argc, char **argv) {
     size_t i;
     int fd;
     CHECK(argc == 2);
+    /* Rebuilt package services deliberately retain vendor UID/GID 1001. */
+    memset(&st, 0, sizeof(st)); st.st_uid = st.st_gid = 1001;
+    st.st_mode = S_IFREG | 0755;
+    CHECK(trusted_supplicant("/customer/c2m/wpa_supplicant", &st));
+    st.st_mode = S_IFREG | 0775;
+    CHECK(!trusted_supplicant("/customer/c2m/wpa_supplicant", &st));
+    st.st_mode = S_IFDIR | 0755;
+    CHECK(!trusted_supplicant("/customer/c2m/wpa_supplicant", &st));
     fixture_init(&m); fixture_combo(&m, 1, 1, 1, 0, 2, 1, 1);
     memcpy(unaligned + 1, m.data, m.n);
     CHECK(prove_combinations(unaligned + 1, m.n, 2412) == 1);
@@ -133,6 +141,13 @@ int main(int argc, char **argv) {
     CHECK(symlink(path, linkpath) == 0); CHECK(safe_dir(linkpath, 1, 0) < 0);
     CHECK(fchmod(fd, 0755) == 0); CHECK(safe_dir(path, 1, 0) < 0); CHECK(fchmod(fd, 0700) == 0);
     memset(&w, 0, sizeof(w)); w.runfd = fd;
+    CHECK(!strcmp(bluetooth_presence(&w), "unknown"));
+    CHECK(make_file(fd, "bluetooth.txt", "\nstatus=COMPLETE\nverdict=HCI_PRESENT_NOT_RADIO_TESTED\n", 0600) == 0);
+    CHECK(!strcmp(bluetooth_presence(&w), "seen"));
+    CHECK(unlinkat(fd, "bluetooth.txt", 0) == 0);
+    CHECK(make_file(fd, "bluetooth.txt", "\nstatus=COMPLETE\nverdict=NO_HCI_OBSERVED_NOT_HARDWARE_ABSENCE\n", 0600) == 0);
+    CHECK(!strcmp(bluetooth_presence(&w), "not_seen"));
+    CHECK(unlinkat(fd, "bluetooth.txt", 0) == 0);
     CHECK(consume_request(&w) == 0);
     CHECK(make_file(fd, "connect.request", "version=1\naction=connect\n", 0600) == 0);
     CHECK(consume_request(&w) == 1);
