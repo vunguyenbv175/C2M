@@ -10,7 +10,7 @@ _work=/tmp/c2m_tsr_work
 _backup=$_cfg/.c2m-tsr-pre-d
 
 status() {
-    printf 'TSR_PROFILE v=D1 status=%s\n' "$1" > "$_status"
+    printf 'TSR_PROFILE v=D2 status=%s\n' "$1" > "$_status"
 }
 fail() {
     status "$1"
@@ -33,6 +33,11 @@ _bytes=$(wc -c < "$_cfg/adas.flag") || fail SIZE_READ_FAILED
 [ "$_bytes" -gt 0 ] && [ "$_bytes" -le 98304 ] || fail INPUT_SIZE_BLOCK
 cp -p "$_cfg/adas.flag" "$_work/source.flag" || fail SOURCE_COPY_FAILED
 base64 -d "$_work/source.flag" > "$_work/decoded" || fail DECODE_FAILED
+# wc -l counts LF bytes while awk NR also counts an unterminated final record.
+# Reject that input BEFORE awk/grep can normalize a byte outside TSR keys.
+_lines=$(wc -l < "$_work/decoded") || fail LF_CHECK_FAILED
+_records=$(awk 'END { print NR+0 }' "$_work/decoded") || fail LF_CHECK_FAILED
+[ "$_lines" -eq "$_records" ] || fail MISSING_FINAL_LF
 # awk implementations differ in whether `\r` is represented portably.
 # Reject CRLF before parsing so line-ending drift cannot pass the shape gate.
 if grep -q "$(printf '\r')" "$_work/decoded"; then fail CONFIG_SHAPE_BLOCK; fi

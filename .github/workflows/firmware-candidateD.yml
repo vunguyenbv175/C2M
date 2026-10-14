@@ -217,7 +217,7 @@ jobs:
           token is minted here. Do NOT copy these raw CI folders to an SD card
           or assume the updater will accept them over the installed firmware.
           Verify retrieved hashes first, then perform the separately authorized,
-          fail-closed LOCAL version-only reversion for D to 20261014000003 using
+          fail-closed LOCAL version-only reversion for D to 20261014000004 using
           tools/fw/reversion_sd_package.py and exact source-member SHA-256 pins.
           Verify its report, all four resulting files and refreshed inner MD5.
           Do not hand-edit sysVer or mix CI/reverted files. A is a stock-token

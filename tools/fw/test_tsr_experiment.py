@@ -72,6 +72,21 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual((self.cfg / 'adas.flag').read_bytes(), snapshot)
         self.assertEqual((self.cfg / '.c2m-tsr-pre-d/adas.flag').read_bytes(), original)
 
+    def test_missing_final_lf_no_write_or_backup(self):
+        for payload in (b'--enable_tsr=false\n--unrelated=stock',
+                        b'--enable_tsr=false\n# unrelated comment',
+                        b'--enable_tsr=false'):
+            with self.subTest(payload=payload):
+                self.seed(payload)
+                encoded = (self.cfg / 'adas.flag').read_bytes()
+                decoded = (self.cfg / 'adas_de.flag').read_bytes()
+                self.run_script('MISSING_FINAL_LF')
+                self.assertEqual((self.cfg / 'adas.flag').read_bytes(), encoded)
+                self.assertEqual((self.cfg / 'adas_de.flag').read_bytes(), decoded)
+                self.assertFalse((self.cfg / '.c2m-tsr-pre-d').exists())
+                self.assertFalse((self.cfg / '.c2m-tsr-adas.flag.new').exists())
+                self.assertFalse((self.root / 'work').exists())
+
     def test_invalid_base64_no_write(self):
         self.cfg.joinpath('adas.flag').write_bytes(b'not-valid-%base64')
         self.run_script('DECODE_FAILED')
