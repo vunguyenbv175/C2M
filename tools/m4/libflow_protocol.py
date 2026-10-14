@@ -13,8 +13,11 @@ from dataclasses import dataclass
 from typing import Any
 import msgpack
 
-KNOWN_TOPICS={"vehicle","ped","lane"}
-KNOWN_KEYS={"vehicleWarning","vehicleMeasure","pedestrians","laneWarningRes"}
+KNOWN_TOPICS={"vehicle","ped","lane","tsr"}
+# TSR key/topic names are static evidence only. Do NOT assign a complete
+# SCHEMAS entry or infer speed units/enums before a runtime frame is captured.
+STATIC_TSR_KEYS={"tsr_trace_res_list","tsr_warning"}
+KNOWN_KEYS={"vehicleWarning","vehicleMeasure","pedestrians","laneWarningRes"} | STATIC_TSR_KEYS
 
 SCHEMAS={
  "vehicleWarning":{"vehicle_id","headway","warning_level","fcw","headway_warning","vb_warning","sag_warning"},
@@ -74,6 +77,8 @@ def decode_ws_binary(payload:bytes) -> DecodeResult:
                 missing=expected-set(body); extra=set(body)-expected
                 if missing:warnings.append(f"{key} missing: {sorted(missing)}")
                 if extra:warnings.append(f"{key} extra: {sorted(extra)}")
+        elif key in STATIC_TSR_KEYS:
+            warnings.append("TSR key statically known; payload schema/units runtime-unverified")
         elif key is not None:
             warnings.append(f"unknown inner key: {key}")
     return DecodeResult(outer,inner,warnings)

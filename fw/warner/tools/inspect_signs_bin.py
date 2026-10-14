@@ -92,6 +92,10 @@ def main() -> int:
     ap.add_argument("--directional-out", type=Path, help="PRIVATE filtered DB output, new path only")
     args = ap.parse_args()
     try:
+        source_path = args.source.resolve()
+        outputs = [p.resolve() for p in (args.report, args.directional_out) if p]
+        if source_path in outputs or len(outputs) != len(set(outputs)):
+            raise ValueError("input/output aliases are forbidden")
         # Prevent unbounded read of corrupt/misidentified files.
         if args.source.stat().st_size > 12 + MAX_RECORDS * RECORD.size:
             raise ValueError("oversized DB")

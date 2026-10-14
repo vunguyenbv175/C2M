@@ -2,6 +2,8 @@
 """Synthetic DB generation/filter guards; never uses owner data or devices."""
 import hashlib
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -47,6 +49,17 @@ class SignToolsTests(unittest.TestCase):
                 self.assertEqual(out.read_bytes(), b"keep-original")
             with self.assertRaises(ValueError):
                 write_signs([], out)
+
+    def test_report_does_not_overwrite_source(self):
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td) / 'source.bin'
+            write_signs([(10, 106, 90, 'R.420', 'test')], source)
+            before = source.read_bytes()
+            command = [sys.executable, str(Path(__file__).with_name('inspect_signs_bin.py')),
+                       str(source), '--report', str(source)]
+            run = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertEqual(source.read_bytes(), before)
 
     def test_integrity_and_unreviewed_speed(self):
         header = b'C2MSDB01' + struct.pack('<I', 1)

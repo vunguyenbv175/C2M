@@ -20,6 +20,12 @@ def main():
     r=decode_ws_binary(msgpack.packb(outer,use_bin_type=True))
     assert r.inner==inner
     assert not r.warnings,r.warnings
+    tsr_inner={'frame_id': 2, 'time': 3, 'key': 'tsr_warning', 'data': {'opaque': True}}
+    tsr_outer={'time': 4, 'source': 'AdasCollectService', 'topic': 'tsr',
+                'data': msgpack.packb(tsr_inner, use_bin_type=True)}
+    tsr=decode_ws_binary(msgpack.packb(tsr_outer, use_bin_type=True))
+    assert tsr.inner == tsr_inner
+    assert any('runtime-unverified' in warning for warning in tsr.warnings)
     print('synthetic protocol smoke: OK')
 
 if __name__=='__main__':main()
