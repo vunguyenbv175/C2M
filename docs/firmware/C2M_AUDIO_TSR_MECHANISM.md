@@ -17,9 +17,13 @@ shell was used; no firmware built yet.
   24000 Hz. Replacements must use the same encoding.
 - Integrity: `adas_checksum.sh` (`md5sum -c md5sum.txt`) has NO caller in
   the boot path (stock boots fine despite the missing tlr wav), so it is
-  treated as legacy/dead — but any wav/audios.txt change must still update
-  `md5sum.txt` for consistency (`md5sum.txt` lists run.sh, audios.txt and
-  all wavs, but not itself). `adas_checksize.sh` checks SIZES from
+  treated as legacy/dead — PROVEN further 2026-10-14: stock `md5sum.txt`
+  lines for FCW/HMW/LDW do not match the shipped file bytes either
+  (e.g. FCW listed `08998a0f…`, file md5 `c61c15d8…`, byte-identical across
+  EN/B4/C images), yet stock ADAS runs. Any wav/audios.txt change must still
+  update `md5sum.txt` for consistency (`md5sum.txt` lists run.sh, audios.txt
+  and all wavs, but not itself); vendor-stale lines for untouched files are
+  preserved verbatim. `adas_checksize.sh` checks SIZES from
   `filesize.txt`, which lists `run.sh` (1584 B) but NO wavs/audios.txt —
   so wav swaps need no size bookkeeping, while any `run.sh` edit MUST
   update `filesize.txt` too.
