@@ -6,7 +6,23 @@ tải từ Google Drive do user cung cấp, **SHA-256 khớp**
 `f28cad04…b081b8d3cfa`. Binary `adas` trích xuất bằng tool UBIFS của repo,
 **SHA-256 khớp** `997b71c2…95527d1`.
 
-## Kết luận nhanh
+## Đính chính sau đối chiếu bằng chứng repo (2026-10-14)
+
+Các mô tả `m0`/model và phạm vi “giống hệt” bên dưới là ghi chép ban đầu,
+không dùng làm hợp đồng triển khai. Bằng chứng đã tái tạo tại
+`docs/reverse/ADAS_PACKAGE_LOADER_V1.md` xác minh `--m0` là **directory mã hóa
+AES của offset/size sáu blob**, KHÔNG phải sáu SHA256 fingerprint. Cả sáu
+embedded model blobs EN/VI byte-identical; offsets thay đổi và `m0` được cập
+nhật tương ứng. `model.img` riêng không thay thế bằng chứng embedded blobs.
+
+Cùng symbol/strings/flag surface TSR không chứng minh mọi lệnh máy/nhánh
+runtime giống hệt, cũng không đủ loại trừ TSR là nguyên nhân regression.
+Không đổi VI binary để mong có nhận diện biển mới. Audio donor thực tế gồm
+7 WAV thay đổi; C đã dùng donor và owner nghe cảnh báo Việt (không chỉ hai
+file LDW/PCW). Giữ EN chạy tốt làm nền, xem
+`docs/firmware/CANDIDATE_D_TSR_FAST_TRACK.md` cho phạm vi bản kế tiếp.
+
+## Kết luận nhanh (ghi chép ban đầu; xem đính chính trên)
 
 1. **TSR trên bản VI giống hệt bản EN** — cùng pipeline, cùng 8 flags,
    cùng mặc định `--enable_tsr=false`. Không có cải tiến hay cắt giảm TSR.

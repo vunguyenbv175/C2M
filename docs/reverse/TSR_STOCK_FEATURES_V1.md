@@ -11,6 +11,18 @@ Quy ước nhãn:
 - **UNVERIFIED**: chưa có bằng chứng runtime trên thiết bị thật.
 - **HYPOTHESIS**: suy luận hợp lý, cần kiểm chứng.
 
+## Evidence caveats cho triển khai (2026-10-14)
+
+Báo cáo dưới là tĩnh: có symbol/debug fields không chứng minh class nào
+nhận diện được ngoài đường, output tới app/M4 hay audio hoạt động. C chứa
+hook sửa flag, nhưng giá trị hiệu lực trên máy chưa được đọc; không dùng
+“đã bật flag” để báo TSR PASS. Cảnh báo Việt owner chọn nhóm LDW/PCW/FCW,
+không phải phép thử từng slot; FCW/HMW không đổi trong C.
+
+Mọi phép thử phải tuân thủ luật giao thông; không vượt tốc độ hoặc gây nguy
+hiểm để ép warning. Hành khách/video quan sát thay người lái thao tác app.
+Plan hiện hành: `docs/firmware/CANDIDATE_D_TSR_FAST_TRACK.md`.
+
 ## Kết luận nhanh
 
 1. Firmware gốc **có sẵn pipeline TSR thật** (không phải strings chết).

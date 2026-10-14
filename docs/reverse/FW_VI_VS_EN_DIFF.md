@@ -5,7 +5,24 @@ EN: `V2023.08.03.1` (SHA-256 `3a703522…`, từ vault).
 VI: `V2023.09.20.1` (SHA-256 `f28cad04…`, từ Google Drive do user cung cấp).
 Cả hai đều đã verify hash và trích xuất đầy đủ (customer UBIFS + rootfs).
 
-## Kết luận nhanh
+## Đính chính evidence (2026-10-14)
+
+- Không tìm thấy tên lớp R.420/R.421 là bằng chứng âm tính tĩnh, không đủ
+  chứng minh tuyệt đối detector không hỗ trợ hoặc kết luận quảng cáo sai.
+  Khả năng nhận diện những biển này vẫn cần runtime/model class evidence.
+- `--m0` KHÔNG là hashes/fingerprint model: đây là directory AES offset/size.
+  Sáu embedded blobs byte-identical EN/VI theo
+  `docs/reverse/ADAS_PACKAGE_LOADER_V1.md`; “model nhúng khác” bên dưới bị rút.
+- “Diff rỗng” chỉ surface strings được so, không toàn bộ customer tree/code.
+  Repo đã chứng minh khác biệt binary/metadata/cardv/system audio.
+- Có 7 ADAS WAV đổi, FCW/HMW không đổi. C đã dùng donor Việt; không cần
+  thay model/VI binary để Việt hóa âm. oneed_cust cũng có asset khác thực sự.
+- R.420 không tự đồng nghĩa “60 km/h cho mọi xe”; cần loại xe/đường/quy định.
+  Dữ liệu GPS mới có 12,708 điểm R.420/R.421 có hướng, nhưng heading semantics,
+  cùng tuyến và input/output chưa kiểm chứng. Xem
+  `docs/firmware/CANDIDATE_D_TSR_FAST_TRACK.md` trước mọi deploy.
+
+## Kết luận nhanh (ghi chép ban đầu; xem đính chính trên)
 
 1. **Bản VI KHÔNG có thêm tính năng báo biển khu dân cư (R.420/R.421).**
    Không có chuỗi "khu dân cư"/"R.420"/"residential" nào trong `adas`,

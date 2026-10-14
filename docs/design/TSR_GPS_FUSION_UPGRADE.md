@@ -110,6 +110,14 @@ Ba vòng kết hợp, triển khai dần:
 
 ## 7. PHÁT HIỆN MỚI (2026-10-14): stock `edog` engine trong cardv
 
+**Đính chính:** `/edogs` chỉ xuất hiện trong chuỗi diagnostic
+`Unsupport gps/edogs module!!`, KHÔNG chứng minh đó là file database.
+Static default/config CGI có `Camera.Menu.Edog=ON`, `setEdog()` ghi nvconf
+và FIFO `edog 1`/`edog 0`; vì vậy không đúng khi nói không có switch/menu.
+Default ON vẫn không chứng minh module/data/runtime tồn tại. `edog_audio`
+pack chưa có trong ảnh, còn âm hệ thống bình thường có, không chỉ `.gitkeep`.
+Giữ các đoạn dưới như ghi chép ban đầu, không dùng `/edogs` làm đường deploy.
+
 Phân tích binary `cardv` (rootfs gốc) phát hiện một **hệ thống cảnh báo tốc
 độ bằng GPS đã có sẵn trong firmware** — "edog" (electronic dog, 电子狗):
 
