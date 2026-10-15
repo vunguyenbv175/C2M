@@ -48,7 +48,8 @@ struct TpmsView {
 };
 
 struct CameraView {
-  std::string mode = "3D";  // 3D|live (stock ScreenModeSet theme)
+  std::string mode = "3D";  // Desired 3D|live view; stock mode-switch mapping unverified.
+                          // ScreenModeSet/theme is day/night, NOT a proven 2D/3D switch.
 };
 
 struct SystemView {

@@ -1,53 +1,127 @@
 # M4 vehicle-speed request — first live boundary finding — 2026-10-15
 
-Owner specifically requested actual vehicle-speed display on the **M4**, not
-substitution by the D4 browser page. Owner says M4 has **no speed region/box**,
-and authorized stationary read-only observation with M4 powered on.
+Owner requested actual vehicle-speed display on the M4, not substitution by
+the D4 browser page, and authorized stationary observation with M4 powered on.
+
+**Owner clarification:** M4 has two modes: **2D live video already shows vehicle
+speed; 3D ADAS has no speed region.** The actual feature request is to retain/show
+vehicle speed in the 3D ADAS layout. Earlier generic wording “M4 has no speed
+region” was incomplete and must not be read as a failure of the 2D mode.
+
+This narrows the missing behavior to the 3D presentation path, but does not by
+itself prove which process draws the 2D digits. They may be camera-burned video
+OSD or a native M4 overlay. Do not assume the 2D speed proves M4's 3D receiver
+has a usable speed model. Preserve the working 2D and all ADAS layers.
 
 ## Confirmed live observation
 
-After the laptop rejoined the expected camera AP, its camera-facing IPv4 was
+After the laptop joined the expected camera AP, its camera-facing IPv4 was
 explicitly bound for HTTP/WS. The authorized stock UUID was verified before
-any other camera operation. Native :8099 page/status returned HTTP200 and
-`Referrer-Policy:same-origin`, consistent with corrected D3.1 behavior, but
-not an exact installed-image token attestation.
+other camera operations. Native :8099 returned HTTP200 and corrected D3.1
+same-origin policy; this is not exact installed-token attestation.
 
-A bounded18-second passive `minieye-websocket` connection to `:8080/`
-received **17 stock `GPSSpeed` frames** (type1601) among21 JSON frames. Frame
-shapes were exactly `type`, `uuid`, `speed`; observed raw values1..5.
-No text/binary speed/setting/warning command was sent. Handshake and WS
-protocol close/control only. A receive-only client observing data is not
-proof the M4 receives/renders the same channel.
+A bounded 18-second passive `minieye-websocket` connection to `:8080/`
+received 17 stock `GPSSpeed` frames (type1601) among21 JSON frames. Frame
+shapes were exactly `type`, `uuid`, `speed`; observed raw values1..5. No text/
+binary speed/setting/warning command was sent. Stock speed-unit CGI returned
+`KM/H`. The GPS monitor getter returned `no this key`; HTTP200 alone is not
+success. Stationary values1..5 may reflect GPS drift or another source/rounding
+artifact, not proof of moving vehicle speed.
 
-The stock read-only speed-unit CGI returned `KM/H`. This setting is context,
-not an independent calibration of the wire integer or proof of M4 scaling.
-The `Camera.Menu.GPSMonitor` getter returned `no this key`; HTTP200 alone
-is not success. Stationary values1..5 may reflect GPS drift or another
-source/rounding artifact; they must not be asserted as actual car motion.
-
-Other live status: `ap_active=true`, `config_saved=true`, `connect_pending=false`,
-`sta_supported=unknown`, `sta_state=unknown`,
-`last_error=capability_missing_or_malformed`, `bt_presence=not_seen`.
-No saved credential bytes were read or written, and STA association was not
-requested. Saved configuration does not prove AP+STA or Internet.
+**Important observer correction:** static analysis shows EN `cardv` uses one
+global WebSocket client pointer. A second observer connection can overwrite
+the native M4 client pointer; when the observer closes, cardv can clear that
+pointer without comparing the closing connection. Therefore this capture is
+valid evidence that cardv emits speed to *a* client, but it is not proof the
+M4 received it, and the observer may have temporarily disrupted the M4 stream.
+The observer was closed and must not be run again with M4 attached. Reconnect
+M4 itself while stationary before further correlation.
 
 Private sanitized capture:
 `C2M_HW_20261012/06_candidate_D4/live_m4_speed_20261015_173255/capture.json`.
+No camera settings, M4 payload, UART, FIFO or warning injection was performed.
 
-## Meaning for implementation
+## Static native sender proof
 
-The stock system **already emits GPS-speed messages**. Adding another
-producer or relaying the laptop-observed feed back into cardv is not a fix
-for an absent M4 widget, can create competing/stale values, and is not
-justified. No M4 policy was relaxed; `GPSSpeed` injection remains denied.
+Read-only analysis of EN production `cardv` SHA256
+`344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c`
+shows the native path:
 
-Need determine the actual M4 receiver/render path and whether a stock layout
-or supported setting exposes the speed field. A speed-bearing JSON template
-or VI-only sender symbol alone cannot prove this. If the M4 UI lacks a
-supported renderer/setting, modifying only the Linux camera service cannot
-create a new widget; M4 firmware/UI support will be required.
+```text
+GPS parser/cache -> GpsSetInfo2Chunk()
+-> DeviceSendMsgToScreenTask() at about 1 Hz
+-> SendGPSInfoToScreen()
+-> WSSetGPSSpeed()
+-> cardv WebSocket server -> connected client
+```
 
-Preserve stock ADAS/video/warning channels. Do not repaint scene/speed fields,
-repurpose warning-distance slots, open occupied UARTs, guessed CGI sets or
-send semantic M4 data as an experiment. D4 browser advisory scope remains
-separate and is not reported as fulfillment of this M4 request.
+The JSON template is `{"type":1601,"uuid":"GPSSpeed","speed":%d}`.
+The sender is stock outbound cardv→client traffic; cardv has no verified
+inbound 1601 setter/relay. It uses one global client pointer and the runtime
+M4 peer/path/interface remain unverified. On invalid GPS cardv maps cached
+65535 to0; the JSON has no validity/timestamp, so speed0 cannot distinguish
+stationary from invalid GPS. For normal RMC input the cached value is integer
+km/h after knots×1.852 conversion, though the M4 render/unit behavior remains
+unknown.
+
+No verified stock “show speed” setting was found. `GPSMonitor` gates UDP GPS
+telemetry, not the native speed sender. `ScreenModeSet` is day/night theme,
+not a proven speed-layout switch. Do not infer that changing SpeedUnit or
+sending another GPSSpeed JSON creates an M4 widget.
+
+## Camera OSD capability is separate from the 3D layout
+
+Static EN `cardv` analysis also proves a GPS-speed-to-text-to-RGN canvas path:
+`OSD_DrawVideoStamp()` reads the GPS chunk speed, applies the configured speed
+unit, formats `" %d%s"`, and calls `mid_OSD_UpdateTextWidget_Rgn()` for speed at
+code VA `0x67136`. This is separate from the outbound WebSocket message path.
+
+Corrected menu-table mapping: `SpeedStamp` is index44/config `+0xb0`;
+`SpeedUnit` is index59/config `+0xec`. These table mappings do **not** prove
+that SpeedStamp gates that drawing function or that its canvas is attached
+to the owner's 2D view or any 3D composition. The earlier draft's identical
+`+0xec` offsets and timestamp draw-call attribution are not retained as proof.
+
+The camera-side renderer could explain why speed is visible on live video
+but absent from 3D. It is not proof of the actual hardware composition.
+Do not add an OSD attachment or change a display buffer on this evidence.
+
+## Missing implementation prerequisite
+
+Local search found no identified M4 receiver/renderer source, M4 firmware dump
+or update package, 3D layout assets, or documented speed-in-3D control. The
+camera firmware and host-side `M4Adapter` scaffold are not M4 UI firmware.
+`C2M_HW_20261012/07_m4/` has no physical-link capture; synthetic fixtures do
+not count as one. The actual component rendering 3D remains unverified.
+
+Needed next: identify the physical M4 model/firmware and obtain either a
+verified stock layout control, or the matching renderer image/source with a
+safe update/recovery path. Photos of the same screen in 2D and 3D plus its
+model/version information are the lowest-risk first evidence. A comparison
+with an existing recorded clip can help distinguish video-burned OSD from a
+screen-only overlay; no moving-vehicle test or live connection is required.
+
+Owner has disconnected camera Wi-Fi and asked to be notified before it is
+needed again. Continue offline; no further camera probes until explicitly
+requested and identity/source binding is re-established.
+
+## Decision
+
+No code has been added to transmit another speed packet. The existing M4
+policy remains default-deny for semantic `GPSSpeed`; no UART/FIFO/M4 injection,
+cardv command, guessed CGI set, or second :8080 observer is authorized.
+
+Safe next hardware correlation, only with owner control and camera/M4
+stationary:
+
+1. Reconnect/reboot the M4 alone so its native connection is restored.
+2. Use only an already-proven native capture mechanism that cannot create a
+   second cardv client, or observe the physical M4 while cardv naturally emits
+   its own frames. Do not attach a second WS client to :8080.
+3. If native speed reaches the proven M4 path but no digits appear, missing
+   capability is M4 receiver/layout firmware, not C2M GPS production.
+4. If native frames remain zero/invalid, resolve genuine camera GPS fix first.
+
+D4 remains a separate offline GPS nearby-area advisory displayed in `/signs`
+with optional phone/browser beep; it does not claim M4 speed or camera-speaker
+output.

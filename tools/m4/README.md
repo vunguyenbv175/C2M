@@ -96,10 +96,14 @@ websocket-client
 Static server port: `8080`  
 WebSocket subprotocol: `minieye-websocket`
 
-Passive receive:
+**Not a non-interfering observer:** EN `cardv` keeps one global WebSocket
+client pointer. A second client can steal the M4 status stream, and closing
+that observer can clear the pointer. Do not connect while M4 is attached.
+Only with M4 physically disconnected, in an owner-approved stationary test:
 
 ```sh
-python3 tools/m4/cardv_status_client.py 192.168.x.x
+python3 tools/m4/cardv_status_client.py --confirm-m4-disconnected 192.168.x.x
 ```
 
-Do not inject safety warnings or modify M4 firmware during discovery.
+No-client observation does not prove physical M4 delivery/rendering. Do not
+inject safety warnings or modify M4 firmware during discovery.

@@ -2,6 +2,17 @@
 
 **Safety:** passive observation `READ_ONLY`. pcap only on verified interface, finite, no filter bypass. L3/L4 `BLOCKED`. L2 only per gate table below.
 
+**2026-10-15 correction:** do not open a second WebSocket client to cardv
+`:8080` with M4 attached. Stock EN cardv holds one global client pointer;
+connecting and later closing even a receive-only observer can steal/clear the
+M4 status stream. Decode existing captures instead. The CLI observer now
+requires `--confirm-m4-disconnected` and is not a physical M4 delivery test.
+
+**Current feature target:** owner reports speed is already visible in 2D live
+video but there is no speed region in 3D ADAS. Preserve the working 2D/GPS and
+ADAS behavior. Identify the actual renderer/layout before attempting any
+3D speed change; camera OSD capability alone does not prove a 3D overlay.
+
 ## 0. Collect (READ_ONLY)
 
 ```sh

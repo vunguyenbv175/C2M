@@ -47,6 +47,7 @@ jobs:
           python3 tools/m4/test_tsr_event_lab.py
           python3 tools/m4/test_normalize_adas.py
           python3 tools/m4/test_m4_policy.py
+          python3 tools/m4/test_cardv_status_client.py
           python3 tools/m4/make_fixture.py
           python3 tools/m4/test_real_data_path.py
           python3 tools/road/osm_preprocess.py --out /tmp/roads_ci.sqlite
