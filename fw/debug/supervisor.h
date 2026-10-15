@@ -31,10 +31,10 @@
  *   prints unsupported on _WIN32.
  *
  * Dropbear build requirement (parent build agent, NOT this file):
- *   compile Dropbear 2026.94 with DROPBEAR_SVR_MULTIUSER=0 so only the
- *   server UID (root) can authenticate. Without it, -D <rundir> would let
- *   the root authorized_keys authorize every local account because the
- *   pre-auth process runs as root and could read the root-only directory.
+ *   keep DROPBEAR_SVR_MULTIUSER=1 (normal Linux kernel support), and apply
+ *   tools/fw/patch_debug_dropbear.py to restrict logins to the server UID
+ *   (root). Without that restrictive patch, -D <rundir> could authorize
+ *   the owner key for other accounts. No account/key checks are bypassed.
  *   Also disable forwarding in the Dropbear build (no -j/-k reliance alone)
  *   and ship key-only auth (runtime still passes -s -j -k for depth).
  *   Requires a valid root passwd entry/shell (read-only, never modified).

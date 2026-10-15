@@ -6,7 +6,7 @@ No exact deploy; parent deploys to `/customer/c2m` separately.
 Run this script after the D4 build; parent assembles all assets.
 
 Root-only: supervisor serves root only; Dropbear is compiled
-`DROPBEAR_SVR_MULTIUSER=0` so only the server UID (root) can authenticate.
+`DROPBEAR_SVR_MULTIUSER=1` plus the reviewed same-UID source patch so only the server UID (root) can authenticate.
 
 ## Pin
 
@@ -91,11 +91,12 @@ Off: `SVR_PASSWORD_AUTH`, `SVR_PAM_AUTH`, `SVR_SHADOW_AUTH`,
 On: `SVR_PUBKEY_AUTH`, `ED25519`, `ECDSA`, `ECDH`, `CURVE25519`,
 `CHACHA20POLY1305`, `AES128/256`, `SHA2_256_HMAC`, `DH_GROUP14_SHA256`.
 
-Root-only: `SVR_MULTIUSER 0` (same-UID server). Without it the `-D <run
-dir>` authorized_keys file would authorize every local account, because
-the pre-auth process runs as root and could read the root-only keydir.
-`SVR_DROP_PRIVS` follows `MULTIUSER` (0). A valid root passwd entry/shell
-is still required (read-only, never modified).
+Root-only: keep `SVR_MULTIUSER 1` (normal Linux kernel support), then apply
+`tools/fw/patch_debug_dropbear.py`. Its one-line restriction removes root's
+permission to authenticate as other UIDs; account, shell, key/signature and
+privilege-dropping checks remain intact. Without it, root-run `-D <run dir>`
+could authorize the owner key for other accounts. `SVR_DROP_PRIVS` remains on.
+A valid root passwd entry/shell is still required (read-only, never modified).
 
 No auth bypass, no default keys.
 
@@ -117,13 +118,13 @@ computed values, so `-dM` output is what the compiler will see. The script
 records sanitized snapshots (`reports/dropbear-macros-full.txt`,
 `reports/dropbear-macros.txt` = `DROPBEAR_*` lines only) and asserts:
 
-- `0`: `SVR_PASSWORD_AUTH`, `SVR_PAM_AUTH`, `SVR_MULTIUSER`,
+- `0`: `SVR_PASSWORD_AUTH`, `SVR_PAM_AUTH`,
   `SVR/CLI_AGENTFWD`, `X11FWD`, `SVR/CLI_LOCALTCPFWD`,
   `SVR/CLI_REMOTETCPFWD`, `SVR_LOCALSTREAMFWD`, `SVR_REMOTESTREAMFWD`,
   `CLI_PROXYCMD`, `CLI_NETCAT`, `SFTPSERVER`;
-- `1`: `SVR_PUBKEY_AUTH`, `ED25519`, `CHACHA20POLY1305`;
+- `1`: `SVR_PUBKEY_AUTH`, `SVR_MULTIUSER`, `ED25519`, `CHACHA20POLY1305`;
 - negative controls reject `SVR_PASSWORD_AUTH 1`, `SVR_PAM_AUTH 1`,
-  `SVR_MULTIUSER 1`.
+  `SVR_MULTIUSER 0`; source gate also requires `C2M_DEBUG_SAME_UID_ONLY`.
 
 Any mismatch fails the build before `make`. Password-roundtrip rejection
 on live targets is covered separately by parent CI native tests.

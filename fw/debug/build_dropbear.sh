@@ -10,8 +10,8 @@
 #          Supervisor uses the fw/d4/build.sh wrapper pattern (headers before
 #          compat.h, own TU, plain start.S link, --self-test gate, no serve).
 # Safety: official localoptions.h disables ONLY (password/PAM, forwarding,
-#          proxy/netcat) + MULTIUSER=0 (root-only same-UID; otherwise the
-#          root-run -D keydir would authorize every local account).
+#          proxy/netcat). MULTIUSER stays enabled for normal Linux; a
+#          one-line restrictive auth patch allows only the server UID.
 #          No auth bypass, no default keys. getrandom (GLIBC_2.25) kept; gate
 #          caps max need at 2.30, no SIMPLERANDOM override.
 # Fail-closed logging: no cmd|tee pipes anywhere; every capture is
@@ -69,6 +69,7 @@ fetch dropbear-$VER.tar.bz2 "$URL" "$SHA"
 # worktrees are never touched (work/dropbear-upstream holds fetch+build only).
 rm -rf "$src"
 tar -C "$work" -xf "$work/dropbear-$VER.tar.bz2"
+python3 tools/fw/patch_debug_dropbear.py --source "$src"
 
 # Compile prefix: libc headers BEFORE compat header (proven supplicant order).
 cat > "$work/compat_prefix.h" <<EOF
@@ -102,10 +103,10 @@ arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
 arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
     -c fw/d3/init_arrays.c -o "$work/init_arrays.o"
 
-# Official feature selection only. Pubkey stays on (needs -D). Root-only
-# same-UID server: MULTIUSER=0 so -D <run dir> cannot authorize other
-# accounts (pre-auth runs as root and could read the root-only keydir).
-# DROP_PRIVS follows MULTIUSER (0). No bypass.
+# Pubkey stays on (needs -D). MULTIUSER=1 is required on a normal Linux
+# kernel; it is NOT a root-only authentication switch. The reviewed source
+# patch above restricts logins to the server UID. Account, shell, key and
+# privilege-dropping checks remain enabled; no authentication bypass.
 cat > "$src/localoptions.h" <<'EOF'
 #ifndef DROPBEAR_LOCALOPTIONS_H
 #define DROPBEAR_LOCALOPTIONS_H
@@ -164,7 +165,7 @@ cat > "$src/localoptions.h" <<'EOF'
 #undef DROPBEAR_SVR_PUBKEY_AUTH
 #define DROPBEAR_SVR_PUBKEY_AUTH 1
 #undef DROPBEAR_SVR_MULTIUSER
-#define DROPBEAR_SVR_MULTIUSER 0
+#define DROPBEAR_SVR_MULTIUSER 1
 #endif
 EOF
 
@@ -235,7 +236,7 @@ EOF
     }
     assert_macro DROPBEAR_SVR_PASSWORD_AUTH 0
     assert_macro DROPBEAR_SVR_PAM_AUTH 0
-    assert_macro DROPBEAR_SVR_MULTIUSER 0
+    assert_macro DROPBEAR_SVR_MULTIUSER 1
     assert_macro DROPBEAR_SVR_AGENTFWD 0
     assert_macro DROPBEAR_CLI_AGENTFWD 0
     assert_macro DROPBEAR_X11FWD 0
@@ -253,8 +254,9 @@ EOF
     assert_macro DROPBEAR_CHACHA20POLY1305 1
     reject_macro DROPBEAR_SVR_PASSWORD_AUTH 1
     reject_macro DROPBEAR_SVR_PAM_AUTH 1
-    reject_macro DROPBEAR_SVR_MULTIUSER 1
-    echo 'macro proof: OK (password/pam/multiuser/forwarding off, pubkey on)'
+    reject_macro DROPBEAR_SVR_MULTIUSER 0
+    grep -Fq 'if (uid != ses.authstate.pw_uid) { /* C2M_DEBUG_SAME_UID_ONLY */' src/svr-auth.c
+    echo 'macro proof: OK (password/pam/forwarding off; normal-kernel multiuser and same-UID auth narrowing on)'
 )
 
 # Build server+key only. LDFLAGS pins custom start, stock loader, no-exec-stack.

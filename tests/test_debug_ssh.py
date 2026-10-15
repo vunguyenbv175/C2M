@@ -98,7 +98,7 @@ REQUIRED_DEFINES = {
     "DROPBEAR_CLI_NETCAT": "0",
     "DROPBEAR_SFTPSERVER": "0",
     "DROPBEAR_SVR_PUBKEY_AUTH": "1",
-    "DROPBEAR_SVR_MULTIUSER": "0",
+    "DROPBEAR_SVR_MULTIUSER": "1",
     "DROPBEAR_ED25519": "1",
 }
 SSH_OUTPUT_LIMIT = 256 * 1024
@@ -306,6 +306,25 @@ class DebugSshPolicyTests(unittest.TestCase):
         self.assertTrue(BUILD_SCRIPT.is_file(), "fw/debug/build_dropbear.sh missing")
         block = extract_localoptions_block()
         assert_policy_block(block)
+        self.assertIn('tools/fw/patch_debug_dropbear.py --source',
+                      BUILD_SCRIPT.read_text(encoding="utf-8"))
+
+    def test_same_uid_patch_only_narrows_root_privilege(self) -> None:
+        import importlib.util
+        patch_file = ROOT / "tools/fw/patch_debug_dropbear.py"
+        spec = importlib.util.spec_from_file_location("same_uid_patch", patch_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            (source / "src").mkdir()
+            target = source / "src/svr-auth.c"
+            target.write_text("before\n" + module.OLD + "\nafter\n", encoding="ascii")
+            module.apply(source)
+            self.assertEqual(target.read_text(encoding="ascii"),
+                             "before\n" + module.NEW + "\nafter\n")
+            with self.assertRaises(ValueError):
+                module.apply(source)
 
     def test_require_flag_semantics_documented(self) -> None:
         # Validates the Windows-skip vs required-CI-fail contract in pure
@@ -383,6 +402,9 @@ class DebugSshNativeTests(unittest.TestCase):
         assert_policy_block(block)
         unpack = base / "upstream"
         src = safe_extract(tarball, unpack)
+        sys.path.insert(0, str(ROOT / "tools/fw"))
+        from patch_debug_dropbear import apply as restrict_server_uid
+        restrict_server_uid(src)
         (src / "localoptions.h").write_text(block, encoding="utf-8")
         assert native_cc is not None
         help_proc = subprocess.run(
@@ -600,6 +622,8 @@ class DebugSshNativeTests(unittest.TestCase):
     def test_wrong_key_rejected(self) -> None:
         result = self.run_ssh(self.ssh_args(self.wrong_key, "printf no"))
         self.assertNotEqual(result.returncode, 0, "wrong client key must not login")
+        self.assertIn(b"permission denied", result.stderr.lower(),
+                      result.stderr.decode("utf-8", "replace") + self.server_diagnostics())
 
     def test_no_key_or_password_cannot_login(self) -> None:
         # Pubkey disabled client-side: nothing to offer, must fail.
@@ -996,6 +1020,8 @@ class DebugSshArmTests(unittest.TestCase):
     def test_wrong_key_rejected(self) -> None:
         result = self.run_ssh(self.ssh_args(self.wrong_key, "printf no"))
         self.assertNotEqual(result.returncode, 0, "wrong client key must not login")
+        self.assertIn(b"permission denied", result.stderr.lower(),
+                      result.stderr.decode("utf-8", "replace") + self.server_diagnostics())
 
     def test_no_key_or_password_cannot_login(self) -> None:
         # Pubkey disabled client-side: nothing to offer, must fail.

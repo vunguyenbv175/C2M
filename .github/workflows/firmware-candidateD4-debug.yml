@@ -624,7 +624,8 @@ jobs:
           done
           test -f "$R/OPEN_SOURCE/dropbear.LICENSE" || test -f "$R/OPEN_SOURCE/dropbear.COPYING"
           cp work/debug-build/dropbear_SOURCE.json fw/debug/build_dropbear.sh \
-            fw/debug/supervisor.h fw/debug/supervisor.c fw/debug/debug_boot.sh "$R/OPEN_SOURCE/"
+            fw/debug/supervisor.h fw/debug/supervisor.c fw/debug/debug_boot.sh \
+            tools/fw/patch_debug_dropbear.py "$R/OPEN_SOURCE/"
           cp work/customer_geometry.json work/customer_manifest.json work/tree_report.json \
             work/rebuild_noop.json work/rebuild_noop.compare.txt \
             work/rebuild_D4.json work/rebuild_D4.compare.txt work/rebuild_D4.bmanifest.json \
