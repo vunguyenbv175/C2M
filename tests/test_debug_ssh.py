@@ -17,6 +17,9 @@ Modes (same file, parent workflow runs it twice):
     userspace data, never a hardware proof.
 
 Env (exact names expected by parent workflow):
+  C2M_DEBUG_SSH_NSS_DIR: ARM-only absolute directory containing the exact
+    pinned stock libnss_files.so.2. ARM fixtures run as root (stock passwd
+    entry), with a root-owned0755 QEMU prefix root. Host /etc is untouched.
   C2M_DEBUG_UPSTREAM_TARBALL: path to pinned
     work/dropbear-upstream/dropbear-2026.94.tar.bz2. When unset the test
     falls back to <repo>/work/dropbear-upstream/dropbear-2026.94.tar.bz2.
@@ -629,6 +632,18 @@ class DebugSshNativeTests(unittest.TestCase):
         self.assertIn(b"permission denied", result.stderr.lower(),
                       result.stderr.decode("utf-8", "replace") + self.server_diagnostics())
 
+    def test_other_uid_rejected_even_with_owner_key(self) -> None:
+        import pwd
+        other = next((entry.pw_name for entry in pwd.getpwall()
+                      if entry.pw_uid != os.geteuid() and entry.pw_name != self.username), None)
+        self.assertIsNotNone(other, "fixture needs an existing different UID")
+        args = self.ssh_args(self.client_key, "printf must-not-run")
+        args[args.index(f"{self.username}@127.0.0.1")] = f"{other}@127.0.0.1"
+        result = self.run_ssh(args)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"permission denied", result.stderr.lower(), self.server_diagnostics())
+        self.assertNotIn(b"must-not-run", result.stdout)
+
     def test_no_key_or_password_cannot_login(self) -> None:
         # Pubkey disabled client-side: nothing to offer, must fail.
         nopub = ["ssh", "-F", "/dev/null",
@@ -1031,6 +1046,18 @@ class DebugSshArmTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, "wrong client key must not login")
         self.assertIn(b"permission denied", result.stderr.lower(),
                       result.stderr.decode("utf-8", "replace") + self.server_diagnostics())
+
+    def test_other_uid_rejected_even_with_owner_key(self) -> None:
+        import pwd
+        other = next((entry.pw_name for entry in pwd.getpwall()
+                      if entry.pw_uid != os.geteuid() and entry.pw_name != self.username), None)
+        self.assertIsNotNone(other, "fixture needs an existing different UID")
+        args = self.ssh_args(self.client_key, "printf must-not-run")
+        args[args.index(f"{self.username}@127.0.0.1")] = f"{other}@127.0.0.1"
+        result = self.run_ssh(args)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"permission denied", result.stderr.lower(), self.server_diagnostics())
+        self.assertNotIn(b"must-not-run", result.stdout)
 
     def test_no_key_or_password_cannot_login(self) -> None:
         # Pubkey disabled client-side: nothing to offer, must fail.
