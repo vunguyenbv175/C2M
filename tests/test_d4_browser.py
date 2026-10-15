@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import unittest
+import urllib.request
 
 import test_d3_web_browser as browser_tests
 import test_d3_web as web_tests
@@ -29,6 +31,17 @@ class SignBrowserTests(unittest.TestCase):
         self.command("Page.navigate", {"url": self.http.origin + path})
         self.wait_load()
 
+    def api_snapshot(self):
+        # Live server-side snapshot age for failure diagnostics only. Never
+        # used to synchronize the test; the browser's rendered DOM is the
+        # verdict. Loopback synthetic fixture traffic only.
+        try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(self.http.origin + "/api/signs", timeout=2) as response:
+                return repr(response.read(512).decode("utf-8", "replace"))
+        except Exception as exc:
+            return "unavailable:" + repr(exc)
+
     def wait_js(self, expression, timeout=5):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -49,13 +62,13 @@ class SignBrowserTests(unittest.TestCase):
         errors = [event["params"] for event in self.events
                   if event.get("method") in ("Runtime.exceptionThrown", "Network.loadingFailed")]
         self.fail("browser state did not converge: " + expression + "; state=" + repr(diagnostic)
+                  + "; api_snapshot=" + self.api_snapshot()
                   + "; browser_errors=" + repr(errors[-5:]))
 
-    def publish(self, event=1, active=1, state="ready", fresh=1):
-        self.publisher_sequence += 1
+    def _write_snapshot(self, sequence, event, active, state, fresh, distance):
         payload = signs_tests.snapshot(
-            code="residential_start", speed_kmh=0, distance_m=self.publisher_sequence,
-            monotonic_ms=int(time.monotonic()*1000), sequence=self.publisher_sequence,
+            code="residential_start", speed_kmh=0, distance_m=distance,
+            monotonic_ms=int(time.monotonic()*1000), sequence=sequence,
             event_id=event, active=active, state=state, gps_fresh=fresh)
         # The server may read while a poll is in progress. Replace a complete,
         # mode-correct snapshot instead of exposing write_bytes' truncation gap.
@@ -67,6 +80,66 @@ class SignBrowserTests(unittest.TestCase):
         finally:
             if temporary.exists():
                 temporary.unlink()
+
+    def _publish_once(self):
+        with self._hb_lock:
+            self.publisher_sequence += 1
+            params = dict(self._hb_params)
+            sequence = self.publisher_sequence
+        self._write_snapshot(sequence=sequence, **params)
+
+    def _heartbeat_loop(self):
+        try:
+            while not self._hb_stop.wait(self._hb_interval):
+                self._publish_once()
+        except Exception as exc:
+            self._hb_error.append(exc)
+
+    def start_heartbeat(self, interval=0.5):
+        # Continuous synthetic producer: a fresh monotonic snapshot every
+        # interval so every browser poll observes age well under the native
+        # 3s TTL even when CI fetch latency spikes. Frozen explicitly only
+        # for the expiry portion via stop_heartbeat.
+        self._hb_lock = threading.Lock()
+        self._hb_params = {"event": 1, "active": 1, "state": "ready",
+                           "fresh": 1, "distance": 0}
+        self._hb_stop = threading.Event()
+        self._hb_error = []
+        self._hb_interval = interval
+        self._hb_thread = None
+        self._publish_once()
+        self._hb_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self._hb_thread.start()
+        self.addCleanup(self.stop_heartbeat)
+
+    def stop_heartbeat(self):
+        # Freeze the producer so the snapshot ages out genuinely: both the
+        # native status TTL and the browser timer must then clear the warning.
+        thread = getattr(self, "_hb_thread", None)
+        if thread is None:
+            return
+        self._hb_thread = None
+        if getattr(self, "_hb_stop", None) is not None:
+            self._hb_stop.set()
+        thread.join(timeout=5)
+        if thread.is_alive():
+            self.fail("sign heartbeat thread did not stop")
+        if getattr(self, "_hb_error", []):
+            self.fail("sign heartbeat failed: " + repr(self._hb_error[0]))
+
+    def set_producer(self, **changes):
+        # Mutate heartbeat payload under the lock; the next 500ms tick
+        # publishes the change with a fresh monotonic timestamp.
+        with self._hb_lock:
+            self._hb_params.update(changes)
+
+    def next_distance(self):
+        # Advance the stable generation marker the baseline waits on. The
+        # heartbeat keeps republishing this marker, so the render converges
+        # deterministically instead of racing a one-shot sequence number.
+        with self._hb_lock:
+            self._hb_params["distance"] += 1
+            return self._hb_params["distance"]
 
     def configure_sign_server(self):
         self.http.stop()
@@ -99,11 +172,15 @@ class SignBrowserTests(unittest.TestCase):
                     oscillator.start=function(...args){window.__beeps++;return start(...args);};return oscillator;};
             })();
         """})
+        # Start the synthetic producer after instrumentation but before
+        # navigation, so the page's immediate first poll already observes a
+        # fresh snapshot; the 500ms heartbeats then keep every later poll
+        # under the 3s TTL.
+        self.start_heartbeat()
         self.navigate("/signs")
-        # Start the synthetic producer only after navigation/instrumentation. A
-        # pre-navigation one-shot snapshot can expire before Chrome's first poll.
-        self.publish()
-        self.wait_js("!document.getElementById('warning').hidden")
+        # Heartbeats keep refreshing, so this asserts a genuine fresh render
+        # in a bounded 6s rather than a race against one snapshot's 3s TTL.
+        self.wait_js("!document.getElementById('warning').hidden", timeout=6)
         self.assertIn("GPS", self.evaluate("document.body.innerText"))
         self.assertEqual(self.evaluate("window.__beeps"), 0)
         self.assertEqual(self.evaluate("document.getElementById('sound').getAttribute('aria-pressed')"), "false")
@@ -112,24 +189,26 @@ class SignBrowserTests(unittest.TestCase):
         self.assertEqual(self.evaluate("window.__beeps"), 0, "enable is not replay")
         # One request may have started before the gesture. Observe two distinct
         # rendered heartbeats of the same event: the second necessarily comes
-        # from a post-enable poll and establishes the silent baseline. Using the
-        # displayed distance marker does not interfere with native fetch/JSON.
+        # from a post-enable poll and establishes the silent baseline. The
+        # heartbeat keeps republishing the marker, so each bump converges
+        # without racing a one-shot sequence number or touching fetch/JSON.
         for _ in range(2):
-            self.publish(event=1)
-            marker = json.dumps(f"Khoảng cách trong dữ liệu: {self.publisher_sequence} m")
-            self.wait_js(f"document.getElementById('distance').textContent==={marker}")
+            marker = self.next_distance()
+            self.wait_js(f"document.getElementById('distance').textContent==={json.dumps(f'Khoảng cách trong dữ liệu: {marker} m')}")
         self.assertEqual(self.evaluate("window.__beeps"), 0, "baseline is silent")
-        self.publish(event=2)
+        self.set_producer(event=2)
         self.wait_js("window.__beeps===1")
-        self.publish(event=2)
+        # Heartbeats keep refreshing the same event: never a repeated sound.
         time.sleep(1.2)
         self.assertEqual(self.evaluate("window.__beeps"), 1, "heartbeat never repeats sound")
-        self.publish(event=2, active=0)
+        self.set_producer(active=0)
         self.wait_js("document.getElementById('warning').hidden")
-        self.publish(event=3)
+        self.set_producer(event=3, active=1)
         self.wait_js("!document.getElementById('warning').hidden")
         self.wait_js("window.__beeps===2")
-        # No publisher heartbeat: both native status TTL and browser timer clear.
+        # Freeze the producer explicitly only here: both native status TTL
+        # and browser timer must then clear a genuinely expiring warning.
+        self.stop_heartbeat()
         self.wait_js("document.getElementById('warning').hidden", timeout=5)
         self.assertEqual(self.evaluate("window.__beeps"), 2)
         # Disconnect native status producer: never preserve previous warning.
