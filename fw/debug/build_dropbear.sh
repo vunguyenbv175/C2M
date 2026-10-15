@@ -174,16 +174,20 @@ EOF
     cd "$src"
     ./configure --help > "$out/reports/configure-help.txt" 2>&1
     cfg="--host=arm-linux-gnueabihf --disable-harden --disable-zlib --enable-bundled-libtom"
-    for o in syslog shadow lastlog utmp utmpx wtmp wtmpx loginfunc pututline pututxline openpty; do
+    for o in shadow lastlog utmp utmpx wtmp wtmpx loginfunc pututline pututxline openpty; do
         if grep -q -- "--disable-$o" "$out/reports/configure-help.txt"; then
             cfg="$cfg --disable-$o"
         fi
     done
     grep -q -- "--enable-bundled-libtom" "$out/reports/configure-help.txt" || { echo 'bundled-libtom option missing' >&2; exit 1; }
     printf '%s\n' "$cfg" > "$out/reports/configure-opts.txt"
+    # Keep syslog compiled so -E is a valid runtime option (logs still go only
+    # to stderr, which the supervisor discards). Use bundled strlcpy/strlcat:
+    # host libc has these only since 2.38, newer than the stock 2.30 ABI.
     # No host crypt: password auth is compiled out, do not detect/link -lcrypt.
     # shellcheck disable=SC2086
     ac_cv_func_crypt=no ac_cv_lib_crypt_crypt=no \
+        ac_cv_func_strlcpy=no ac_cv_func_strlcat=no \
         CC=arm-linux-gnueabihf-gcc AR=arm-linux-gnueabihf-ar RANLIB=arm-linux-gnueabihf-ranlib \
         CFLAGS="$flags" LTM_CFLAGS="$flags -O2 -funroll-loops -fomit-frame-pointer" \
         ./configure $cfg > "$out/reports/configure.log" 2>&1 || { cat "$out/reports/configure.log"; exit 1; }
