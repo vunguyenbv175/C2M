@@ -68,6 +68,8 @@ jobs:
           python3 tests/test_d4_web.py
           python3 tests/test_d4_advisory.py
           python3 tools/fw/test_d4_mutation.py
+          python3 tests/test_debug_supervisor.py
+          python3 tools/fw/test_debug_mutation.py
           python3 tools/fw/test_reversion_sd_package.py
       - name: D3 real-browser loopback form regression (no device access)
         env:

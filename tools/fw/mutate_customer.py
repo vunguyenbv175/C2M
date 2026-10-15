@@ -74,6 +74,16 @@ D4_MAX_BYTES = 12 + 40000 * D4_RECORD.size
 # A reviewed 12,708-record subset fits; never stage the whole source DB.
 D4_MAX_OUTPUT_BYTES = 1_300_000
 D4_MODES = {"c2m-signs": 0o755, "d4_boot.sh": 0o755, "signs-d4.bin": 0o644}
+DEBUG_MODES = {"c2m-debug": 0o755, "dropbear": 0o755,
+               "dropbearkey": 0o755, "debug_boot.sh": 0o755,
+               "debug_owner.pub": 0o644}
+DEBUG_NAMES = ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh")
+DEBUG_ELF_NAMES = ("c2m-debug", "dropbear", "dropbearkey")
+DEBUG_MAX_SUPERVISOR = 256 * 1024
+DEBUG_MAX_DROPBEAR = 2 * 1024 * 1024
+DEBUG_MAX_SHELL = 64 * 1024
+DEBUG_OWNER_COMMENT = "c2m-debug-owner"
+DEBUG_OWNER_MAX_BYTES = 1024
 
 
 def has_symlink(path: Path) -> bool:
@@ -133,6 +143,53 @@ def sha_file(p: Path) -> str:
     return h.hexdigest()
 
 
+def check_debug_owner_key(data: bytes, expected_sha256: str) -> dict:
+    """Gate the AP-only debug owner Ed25519 public key; never echo key bytes."""
+    import base64 as _b64
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256):
+        raise ValueError("Debug owner key needs an exact 64-hex SHA256 pin")
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != expected_sha256.lower():
+        raise ValueError("Debug owner key SHA256 mismatch")
+    if len(data) == 0 or len(data) > DEBUG_OWNER_MAX_BYTES:
+        raise ValueError("invalid debug owner key length")
+    if b"\r" in data:
+        raise ValueError("invalid debug owner key line ending")
+    if not data.endswith(b"\n") or data.count(b"\n") != 1:
+        raise ValueError("debug owner key must be exactly one line")
+    try:
+        text = data.decode("ascii", "strict")
+    except UnicodeError:
+        raise ValueError("debug owner key must be ASCII") from None
+    if any(ord(c) < 32 or ord(c) == 127 for c in text if c != "\n"):
+        raise ValueError("control character in debug owner key")
+    body = text[:-1]
+    parts = body.split(" ")
+    if len(parts) != 3 or any(not p for p in parts):
+        raise ValueError("debug owner key must be one OpenSSH line without options")
+    keytype, b64, comment = parts
+    if keytype != "ssh-ed25519":
+        raise ValueError("debug owner key must be ssh-ed25519")
+    if comment != DEBUG_OWNER_COMMENT:
+        raise ValueError("invalid debug owner key comment")
+    if "PRIVATE" in body or "BEGIN" in body:
+        raise ValueError("private key material rejected")
+    if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", b64):
+        raise ValueError("noncanonical debug owner key base64")
+    try:
+        blob = _b64.b64decode(b64, validate=True)
+    except Exception:
+        raise ValueError("noncanonical debug owner key base64") from None
+    if _b64.b64encode(blob).decode("ascii") != b64:
+        raise ValueError("noncanonical debug owner key base64")
+    if len(blob) != 51:
+        raise ValueError("truncated debug owner key blob")
+    if (int.from_bytes(blob[0:4], "big") != 11 or blob[4:15] != b"ssh-ed25519"
+            or int.from_bytes(blob[15:19], "big") != 32 or len(blob[19:]) != 32):
+        raise ValueError("invalid debug owner key blob")
+    return {"sha256": digest}
+
+
 def md5_bytes(d: bytes) -> str:
     return hashlib.md5(d).hexdigest()
 
@@ -190,6 +247,12 @@ def main() -> int:
                     help="private, prefiltered directional R.420/R.421 database")
     ap.add_argument("--d4-database-sha256",
                     help="mandatory exact 64-hex SHA256 of the D4 database")
+    ap.add_argument("--debug-services-dir", type=Path,
+                    help="debug supervisor/dropbear/boot (requires D3 and checked TSR)")
+    ap.add_argument("--debug-owner-key", type=Path,
+                    help="AP-only Ed25519 owner public key OpenSSH line")
+    ap.add_argument("--debug-owner-key-sha256",
+                    help="mandatory exact 64-hex SHA256 of the owner public key")
     ap.add_argument("--out-manifest", type=Path, required=True)
     args = ap.parse_args()
 
@@ -254,6 +317,63 @@ def main() -> int:
                   or int.from_bytes(data[18:20], "little") != 40):
                 ap.error(f"D3 service must be ELF32 little-endian ARM: {name}")
             d3_assets[name] = data
+
+    debug_assets: dict[str, bytes] = {}
+    debug_owner_bytes = b""
+    debug_owner = None
+    if any(value is not None for value in
+           (args.debug_services_dir, args.debug_owner_key, args.debug_owner_key_sha256)):
+        if any(value is None for value in
+               (args.debug_services_dir, args.debug_owner_key, args.debug_owner_key_sha256)):
+            ap.error("Debug requires --debug-services-dir, --debug-owner-key "
+                     "and --debug-owner-key-sha256 together")
+        if args.d3_services_dir is None or not args.tsr_experiment:
+            ap.error("Debug requires --d3-services-dir and --tsr-experiment")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", args.debug_owner_key_sha256 or ""):
+            ap.error("Debug owner key needs an exact 64-hex SHA256 pin")
+        try:
+            services = args.debug_services_dir
+            if has_symlink(services) or not services.is_dir():
+                raise ValueError("Debug services must be a nonsymlink directory")
+            if {p.name for p in services.iterdir()} != set(DEBUG_NAMES):
+                raise ValueError("Debug services must contain exactly c2m-debug, "
+                                 "dropbear, dropbearkey and debug_boot.sh")
+            for name in DEBUG_NAMES:
+                source = services / name
+                if has_symlink(source) or not source.is_file():
+                    raise ValueError(f"missing/nonregular debug service {name}")
+                if source.stat().st_size == 0:
+                    raise ValueError(f"empty debug service {name}")
+                data = source.read_bytes()
+                if name.endswith(".sh"):
+                    if len(data) > DEBUG_MAX_SHELL:
+                        raise ValueError("debug shell exceeds size bound: debug_boot.sh")
+                    if b"\r" in data or not data.startswith(b"#!/bin/sh\n"):
+                        raise ValueError("debug shell must be LF: debug_boot.sh")
+                else:
+                    bound = (DEBUG_MAX_SUPERVISOR if name == "c2m-debug"
+                             else DEBUG_MAX_DROPBEAR)
+                    if len(data) > bound:
+                        raise ValueError(f"debug service exceeds size bound: {name}")
+                    if (len(data) < 52 or data[:6] != b"\x7fELF\x01\x01"
+                            or int.from_bytes(data[18:20], "little") != 40):
+                        raise ValueError(
+                            f"debug service must be ELF32 little-endian ARM: {name}")
+                debug_assets[name] = data
+            key_path = args.debug_owner_key
+            if has_symlink(key_path) or not key_path.is_file():
+                raise ValueError("Debug owner key must be a nonsymlink regular file")
+            if key_path.stat().st_size > DEBUG_OWNER_MAX_BYTES:
+                raise ValueError("invalid debug owner key length")
+            with key_path.open("rb") as stream:
+                key_data = stream.read(DEBUG_OWNER_MAX_BYTES + 1)
+            debug_owner = check_debug_owner_key(key_data, args.debug_owner_key_sha256)
+            debug_owner_bytes = key_data
+            debug_assets["debug_owner.pub"] = key_data
+        except OSError:
+            ap.error("cannot read Debug inputs")
+        except ValueError as exc:
+            ap.error(str(exc))
 
     stock = {r["path"]: r for r in
              json.loads(args.manifest.read_text(encoding="utf-8"))["entries"]}
@@ -337,12 +457,20 @@ def main() -> int:
             launch_index = next(i for i, line in enumerate(block) if line.startswith(cmd + " >"))
             # Keep idle launch as before. D3 boot runs detached AFTER that;
             # neither a probe nor server startup may delay the stock hook.
+            # Debug boot runs detached after D3 (and D4 when present) inside
+            # the same bounded background mount-wait block; D3 boot is
+            # never altered. Standalone D3+debug (no D4) is supported.
             block[launch_index] = cmd + " >/dev/null 2>&1 &"
             boots = ["/bin/sh /customer/c2m/boot.sh >/dev/null 2>&1 &"]
             if d4_assets:
                 boots.append("/bin/sh /customer/c2m/d4_boot.sh >/dev/null 2>&1 &")
+            if debug_assets:
+                boots.append("/bin/sh /customer/c2m/debug_boot.sh >/dev/null 2>&1 &")
             boots[-1] += " ) >/dev/null 2>&1 &"
             block[launch_index + 1:launch_index + 1] = boots
+        elif debug_assets:
+            print("MUTATE-FAIL: Debug requires D3 services")
+            return 1
         new_text = "\n".join(hook_lines[:last_idx] + block + hook_lines[last_idx + 1:])
         mode = "insert-before-terminal-exit"
     else:
@@ -353,7 +481,7 @@ def main() -> int:
         mode = "append-eof"
 
     # Stage all inputs and check every new destination before tree mutation,
-    # including legacy idle/profile/D3 inputs when combined with D4.
+    # including legacy idle/profile/D3/D4/debug inputs when combined.
     idle = args.tree / "c2m" / "c2m-idle"
     profile_path = None
     try:
@@ -371,17 +499,18 @@ def main() -> int:
             assets["tsr_profile_boot.sh"] = (profile_bytes, 0o755)
         assets.update({name: (data, 0o755) for name, data in d3_assets.items()})
         assets.update({name: (data, D4_MODES[name]) for name, data in d4_assets.items()})
+        assets.update({name: (data, DEBUG_MODES[name]) for name, data in debug_assets.items()})
         if has_symlink(idle.parent) or (idle.parent.exists() and not idle.parent.is_dir()):
             raise ValueError("c2m must be a nonsymlink directory")
         for name in assets:
             dest = idle.parent / name
             if dest.exists() or dest.is_symlink() or "/c2m/" + name in stock:
                 raise ValueError(f"existing asset path c2m/{name}")
-        if d4_assets:
+        if d4_assets or debug_assets:
             report = args.out_manifest
             if (has_symlink(report) or report.exists() or not report.parent.is_dir()
                     or report.resolve().is_relative_to(args.tree.resolve())):
-                raise ValueError("D4 report must be a new path outside the tree")
+                raise ValueError("D4/debug report must be a new path outside the tree")
     except OSError:
         print("MUTATE-FAIL: cannot read mutation inputs")
         return 1
@@ -537,6 +666,10 @@ def main() -> int:
                  "mode_oct": oct(D4_MODES[name]), "uid": 1001, "gid": 1001,
                  "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
                 for name, data in d4_assets.items()]
+    debug_added = [{"path": "/c2m/" + name, "type": "reg", "mode": DEBUG_MODES[name],
+                    "mode_oct": oct(DEBUG_MODES[name]), "uid": 1001, "gid": 1001,
+                    "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                   for name, data in debug_assets.items()]
     doc = {"hook": hook_img_path,
            "hook_line": args.hook_line,
            "hook_mode": mode,
@@ -566,7 +699,11 @@ def main() -> int:
         doc["d4_services"] = True
         doc["d4_database"] = d4_database
         doc["added"].extend(d4_added)
-    if d4_added:
+    if debug_added:
+        doc["debug_services"] = True
+        doc["debug_owner_key_sha256"] = debug_owner["sha256"]
+        doc["added"].extend(debug_added)
+    if d4_added or debug_added:
         with args.out_manifest.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(doc, indent=2))
     else:
