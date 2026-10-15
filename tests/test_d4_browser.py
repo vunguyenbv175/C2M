@@ -66,7 +66,13 @@ class SignBrowserTests(unittest.TestCase):
         # Add instrumentation before the first page JS; actual browser audio
         # constructor/autoplay policy stays intact. Counts scheduling, not hearing.
         self.command("Page.addScriptToEvaluateOnNewDocument", {"source": """
-            window.__beeps=0;
+            window.__beeps=0;window.__signRequests=0;window.__signResponses=0;
+            const originalFetch=window.fetch;
+            window.fetch=async function(...args){
+                const request=++window.__signRequests,response=await originalFetch.apply(this,args);
+                const json=response.json.bind(response);
+                response.json=async function(){const value=await json();window.__signResponses=request;return value;};
+                return response;};
             const original=AudioContext.prototype.createOscillator;
             AudioContext.prototype.createOscillator=function(){
                 const oscillator=original.call(this),start=oscillator.start.bind(oscillator);
@@ -80,6 +86,12 @@ class SignBrowserTests(unittest.TestCase):
         self.click_sound()
         self.wait_js("document.getElementById('sound').getAttribute('aria-pressed')==='true'")
         self.assertEqual(self.evaluate("window.__beeps"), 0, "enable is not replay")
+        # A poll already in flight at the gesture cannot arm audio. Let a fresh
+        # post-enable response establish the intentionally conservative baseline.
+        target = self.evaluate("window.__signRequests+1")
+        self.publish(event=1)
+        self.wait_js(f"window.__signResponses>={target}")
+        self.assertEqual(self.evaluate("window.__beeps"), 0, "baseline is silent")
         self.publish(event=2)
         self.wait_js("window.__beeps===1")
         self.publish(event=2)

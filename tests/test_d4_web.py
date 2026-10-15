@@ -282,6 +282,85 @@ status=fresh();vm.runInNewContext(SCRIPT,context);
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("mock browser: OK", result.stdout)
 
+    @unittest.skipUnless(shutil.which("node"), "Node unavailable; mock browser execution skipped")
+    def test_deferred_fetch_enable_resume_and_reenable_are_silent(self) -> None:
+        # Execute the exact emitted resource with independently deferred fetch and
+        # resume promises. No timers, network, browser audio or device are used.
+        runner = r'''
+const vm = require('node:vm'), assert = require('node:assert/strict');
+const deferred = () => {let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+const fresh = id => ({version:1,source:'gps_offline',status_available:true,state:'ready',gps_fresh:true,
+  active:true,sequence:id,event_id:id,code:'speed_limit',speed_kmh:50,distance_m:100,
+  monotonic_ms:10000,expires_in_ms:3000});
+const tick = async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+function harness() {
+  let beeps=0, resumeGate=null;
+  const elements=new Map(), events={}, intervals=[], requests=[];
+  const element=id=>{if(!elements.has(id))elements.set(id,{hidden:id==='warning',textContent:'',
+    setAttribute(k,v){this[k]=v;},addEventListener(k,v){this[k]=v;}});return elements.get(id);};
+  const document={hidden:false,getElementById:element,addEventListener(k,v){events[k]=v;}};
+  class Audio {
+    constructor(){this.state='suspended';this.currentTime=0;this.destination={};}
+    async resume(){if(resumeGate)await resumeGate.promise;this.state='running';}
+    async suspend(){this.state='suspended';}
+    createOscillator(){return {frequency:{},connect(){},disconnect(){},start(){beeps++;},stop(){}};}
+    createGain(){return {gain:{setValueAtTime(){},linearRampToValueAtTime(){}},connect(){},disconnect(){}};}
+  }
+  const context={window:{AudioContext:Audio,addEventListener(){}},document,AbortController,
+    performance:{now:()=>10000},Date:{now:()=>10000},setTimeout(){return 1;},clearTimeout(){},
+    setInterval(fn,ms){if(ms===1000)intervals.push(fn);},
+    fetch(){const d=deferred();requests.push(d);return d.promise;}};
+  vm.runInNewContext(SCRIPT,context);
+  const respond=async id=>{assert.ok(requests.length,'request pending');requests.shift().resolve({ok:true,
+    headers:{get:()=> 'application/json'},json:async()=>fresh(id)});await tick();};
+  return {element,document,events,respond,poll:()=>intervals[0](),beeps:()=>beeps,
+    delayResume(){resumeGate=deferred();return resumeGate;}};
+}
+(async()=>{
+  for(const foreground of [false,true]) {
+    const h=harness();
+    if(foreground) {
+      await h.respond(1);
+      h.document.hidden=true;h.events.visibilitychange();
+      h.document.hidden=false;h.events.visibilitychange(); // foreground fetch pending
+    }
+    await h.element('sound').click();
+    await h.respond(2);
+    assert.equal(h.element('warning').hidden,false,'pre-enable response still renders');
+    assert.equal(h.beeps(),0,'pending initial/foreground response must never replay');
+    let p=h.poll();await h.respond(3);await p;
+    assert.equal(h.beeps(),0,'first post-enable response establishes silent baseline');
+    p=h.poll();await h.respond(3);await p;assert.equal(h.beeps(),0,'baseline never repeats');
+    p=h.poll();await h.respond(4);await p;assert.equal(h.beeps(),1,'next genuinely new event beeps');
+    await h.element('sound').click(); // muted, event changes without an intervening response
+    p=h.poll();await h.element('sound').click();await h.respond(5);await p;
+    assert.equal(h.beeps(),1,'pending muted response cannot replay on re-enable');
+    p=h.poll();await h.respond(6);await p;assert.equal(h.beeps(),1,'changed muted ID silently baselines');
+    p=h.poll();await h.respond(7);await p;assert.equal(h.beeps(),2,'new event after re-enable beeps');
+  }
+  for(const resolveBeforeResume of [false,true]) {
+    const h=harness(), gate=h.delayResume(), enabling=h.element('sound').click();
+    if(resolveBeforeResume)await h.respond(10);
+    else { // Start another poll while resume is awaiting, after the initial poll completes.
+      await h.respond(10);h.poll();
+    }
+    gate.resolve();await enabling;
+    if(!resolveBeforeResume)await h.respond(11);
+    assert.equal(h.beeps(),0,'responses spanning resume are silent');
+    let p=h.poll();await h.respond(12);await p;assert.equal(h.beeps(),0,'resume requires silent baseline');
+    p=h.poll();await h.respond(13);await p;assert.equal(h.beeps(),1);
+  }
+  console.log('deferred browser: OK');
+})().catch(e=>{console.error(e);process.exitCode=1;});
+'''.replace("SCRIPT", json.dumps(static_string("script"), ensure_ascii=True))
+        with tempfile.TemporaryDirectory(prefix="c2m-d4-deferred-") as tmp:
+            path = Path(tmp) / "browser.cjs"
+            path.write_text(runner, encoding="utf-8")
+            result = subprocess.run([shutil.which("node"), str(path)], capture_output=True,
+                                    text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("deferred browser: OK", result.stdout)
+
 
 @unittest.skipUnless(d3.LINUX, "Linux-only HTTP/safe-file checks; portable D4 parser and JS tested above")
 class LocalhostSignTests(unittest.TestCase):
