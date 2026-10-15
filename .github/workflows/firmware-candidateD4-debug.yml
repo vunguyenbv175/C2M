@@ -371,6 +371,7 @@ jobs:
             test -x work/debug-services/dropbearkey
             test -x work/debug-services/debug_boot.sh
             cmp -s fw/debug/debug_boot.sh work/debug-services/debug_boot.sh
+            export C2M_TEST_SYSROOT="$PWD/work/sysroot"
             "$PWD/work/stock-sh" -n work/debug-services/debug_boot.sh
             python3 fw/device_minimal/check_elf.py work/debug-services/c2m-debug --allow-dynamic
             python3 fw/device_minimal/check_elf.py work/debug-services/dropbear --allow-dynamic
