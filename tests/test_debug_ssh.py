@@ -320,9 +320,13 @@ class DebugSshPolicyTests(unittest.TestCase):
             (source / "src").mkdir()
             target = source / "src/svr-auth.c"
             target.write_text("before\n" + module.OLD + "\nafter\n", encoding="ascii")
+            (source / "src/svr-authpubkey.c").write_text(
+                module.PERM_OLD + "\n" + module.OWNER_OLD, encoding="ascii")
             module.apply(source)
             self.assertEqual(target.read_text(encoding="ascii"),
                              "before\n" + module.NEW + "\nafter\n")
+            pubkey = (source / "src/svr-authpubkey.c").read_text(encoding="ascii")
+            self.assertIn("C2M_DEBUG_TMP_ANCESTOR", pubkey)
             with self.assertRaises(ValueError):
                 module.apply(source)
 
@@ -738,7 +742,8 @@ class DebugSshArmTests(unittest.TestCase):
     @classmethod
     def binary_cmd(cls, binary: Path, *args: str) -> list[str]:
         return [cls.qemu, "-L", str(cls.sysroot), "-E",
-                f"LD_LIBRARY_PATH={cls.nss_dir}:/lib", str(binary), *args]
+                f"LD_LIBRARY_PATH={cls.nss_dir}:/lib", "-E",
+                f"QEMU_LD_PREFIX={cls.sysroot}", str(binary), *args]
 
     @classmethod
     def setUpClass(cls) -> None:

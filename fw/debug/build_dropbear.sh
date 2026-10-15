@@ -256,6 +256,7 @@ EOF
     reject_macro DROPBEAR_SVR_PAM_AUTH 1
     reject_macro DROPBEAR_SVR_MULTIUSER 0
     grep -Fq 'if (uid != ses.authstate.pw_uid) { /* C2M_DEBUG_SAME_UID_ONLY */' src/svr-auth.c
+    grep -Fq 'C2M_DEBUG_TMP_ANCESTOR' src/svr-authpubkey.c
     echo 'macro proof: OK (password/pam/forwarding off; normal-kernel multiuser and same-UID auth narrowing on)'
 )
 
