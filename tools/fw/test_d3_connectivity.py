@@ -20,9 +20,12 @@ SCRIPT = ROOT / "fw" / "d3" / "connectivity_probe.sh"
 PRESENT = "HCI_PRESENT_NOT_RADIO_TESTED"
 ABSENT = "NO_HCI_OBSERVED_NOT_HARDWARE_ABSENCE"
 OUTPUT_LIMIT = 16384
+# Windows MSYS and stock-QEMU shells are occasionally slower than 5s on the
+# bounded inventory; keep every wait finite but allow the slower host more.
+PROBE_TIMEOUT = 15 if os.name == "nt" else 5
 FORBIDDEN_COMMANDS = (
     "hciconfig", "hcitool", "bluetoothctl", "btmgmt", "rfkill", "iw", "ip",
-    "ifconfig", "hciattach", "rtk_hciattach", "insmod", "modprobe", "rmmod",
+    "ifconfig", "hciattach", "rtk_hciattach", "btattach", "insmod", "modprobe", "rmmod",
     "stty", "dd", "cat", "tee", "touch", "mkdir", "rm", "mv", "cp", "mount",
     "umount", "wget", "curl", "nc", "ping", "sleep", "ps", "dmesg",
 )
@@ -52,7 +55,7 @@ def shell_path(path, command):
         return str(path)
     converted = subprocess.run(
         command + ["-c", 'cygpath -u -- "$1"', "path-converter", str(path)],
-        capture_output=True, text=True, timeout=5, check=True,
+        capture_output=True, text=True, timeout=PROBE_TIMEOUT, check=True,
     )
     return converted.stdout.strip()
 
@@ -116,7 +119,7 @@ class D3ConnectivityTests(unittest.TestCase):
             command = self.shell + ["-c", 'PATH=$1; export PATH; . "$2"',
                                     "fixture-probe", path, self.script_path]
         result = subprocess.run(
-            command, env=env, capture_output=True, text=True, timeout=5,
+            command, env=env, capture_output=True, text=True, timeout=PROBE_TIMEOUT,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(result.stderr, "")
@@ -214,12 +217,14 @@ class D3ConnectivityTests(unittest.TestCase):
         if os.name == "nt":
             # Request the shell's already translated PATH, not native Windows PATH.
             current = subprocess.run(self.shell + ["-c", 'printf "%s" "$PATH"'],
-                                     capture_output=True, text=True, timeout=5, check=True).stdout
+                                     capture_output=True, text=True, timeout=PROBE_TIMEOUT, check=True).stdout
         else:
             current = os.environ.get("PATH", "")
         output = self.probe(path=bin_path + sep + current)
         for tool in ("hciconfig", "hcitool", "bluetoothctl", "btmgmt", "rfkill"):
             self.assertIn("tool=" + tool + " present_not_executed", output)
+        for helper in ("hciattach", "rtk_hciattach", "btattach"):
+            self.assertIn("bt_helper=" + helper + " present_not_executed", output)
         self.assertFalse(marker.exists(), "probe executed a forbidden command")
         self.assert_verdict(output, ABSENT)
 
@@ -285,24 +290,265 @@ class D3ConnectivityTests(unittest.TestCase):
         self.assert_verdict(output, PRESENT)
         self.assertIn("sysfs_operstate=not_reported", output)
 
+    def test_wifi_interfaces_allowlisted_and_redacted(self):
+        self.put("sys/class/net/wlan0/operstate", "up\n")
+        self.put("sys/class/net/wlan0/address", "AA:BB:CC:DD:EE:FF PRIVATE_SSID\n")
+        self.put("sys/class/net/c2msta0/operstate", "down\n")
+        self.put("sys/class/net/c2msta0/address", "11:22:33:44:55:66 PRIVATE\n")
+        self.directory("sys/class/net/eth0")
+        self.put("sys/class/net/eth0/operstate", "up\n")
+        self.directory("sys/class/net/wlan1")
+        self.put("sys/class/net/wlan1/operstate", "up\n")
+        output = self.probe()
+        self.assertIn("wifi_interface=wlan0 sysfs_operstate=up", output)
+        self.assertIn("wifi_interface=c2msta0 sysfs_operstate=down", output)
+        self.assertIn("wifi_interface_context=allowlisted_interface_observed", output)
+        self.assertNotIn("eth0", output)
+        self.assertNotIn("wlan1", output)
+        self.assertNotIn("PRIVATE", output)
+        self.assertNotIn("AA:BB", output)
+        self.assertNotIn("11:22", output)
+        # Wi-Fi alone never proves HCI; verdict stays inconclusive.
+        self.assert_verdict(output, ABSENT)
+
+    def test_wifi_interfaces_malformed_operstate_is_not_reported(self):
+        self.put("sys/class/net/wlan0/operstate", "PRIVATE_UPPER_SECRET\n")
+        self.directory("sys/class/net/c2msta0")
+        output = self.probe()
+        self.assertIn("wifi_interface=wlan0 sysfs_operstate=not_reported", output)
+        self.assertIn("wifi_interface=c2msta0 sysfs_operstate=not_reported", output)
+        self.assertNotIn("PRIVATE", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_wifi_driver_modules_are_context_not_verdict(self):
+        self.directory("sys/module/8821cs")
+        self.directory("sys/module/cfg80211")
+        self.put("proc/modules", "8821cs 1234 0 - Live 0xPRIVATE\n"
+                 "cfg80211 5678 1 - Live 0xPRIVATE\n"
+                 "private_wifi_module 42 0 - Live 0xPRIVATE\n")
+        output = self.probe()
+        self.assertIn("sysfs_module=8821cs", output)
+        self.assertIn("sysfs_module=cfg80211", output)
+        self.assertIn("loaded_module=8821cs", output)
+        self.assertIn("loaded_module=cfg80211", output)
+        self.assertNotIn("PRIVATE", output)
+        self.assertNotIn("private_wifi_module", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_rtl8821cs_bundled_module_presence_only_and_redacted(self):
+        secret = "PRIVATE_FIRMWARE_BYTES_HCI_DUMP"
+        self.put("customer/wifi/lib/8821cs.ko", secret + "\n")
+        output = self.probe()
+        self.assertIn("bundled_module_present=/customer/wifi/lib/8821cs.ko", output)
+        self.assertIn("bundled_module_not_observed=/wifi/lib/8821cs.ko", output)
+        self.assertIn("bundled_module_not_observed=/lib/modules/8821cs.ko", output)
+        self.assertIn("rtl8821cs_module=bundled_present", output)
+        self.assertNotIn("PRIVATE", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_rtl8821cs_bundled_module_absent_is_not_hardware_absence(self):
+        output = self.probe()
+        self.assertIn("bundled_module_not_observed=/customer/wifi/lib/8821cs.ko", output)
+        self.assertIn("rtl8821cs_module=not_observed", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_sdio_context_names_only_bounded_and_redacted(self):
+        # On-device SDIO names use colons (mmc1:0001:1); fixtures use dashes
+        # because Windows forbids colons in file names. The probe accepts the
+        # dash alias ONLY in fixture mode; production requires colon numeric.
+        secret = "PRIVATE_SDIO_MODALIAS_VENDOR"
+        self.put("sys/bus/sdio/devices/mmc1-0001-1/modalias", "sdio:" + secret + "\n")
+        self.put("sys/bus/sdio/devices/mmc1-0001-1/uevent", secret + "\n")
+        self.put("sys/bus/sdio/devices/mmc1-0001-1/vendor", secret + "\n")
+        self.put("sys/bus/sdio/devices/mmc1-0001-1/device", secret + "\n")
+        self.directory("sys/bus/sdio/devices/private-device")
+        self.directory("sys/bus/sdio/devices/mmcg-0001-1")
+        self.directory("sys/bus/sdio/devices/mmc2-0002-1")
+        output = self.probe()
+        self.assertIn("sdio_bus=present", output)
+        self.assertIn("sdio_devices_dir=present", output)
+        self.assertIn("sdio_device=mmc1-0001-1 vendor=not_reported device=not_reported", output)
+        self.assertIn("sdio_device=mmc2-0002-1 vendor=not_reported device=not_reported", output)
+        self.assertIn("sdio_context=devices_observed_context_only", output)
+        self.assertIn("rtl8821cs_sdio_hint=no_known_id_matched_context_only", output)
+        self.assertNotIn("private-device", output)
+        self.assertNotIn("mmcg", output)
+        self.assertNotIn("PRIVATE", output)
+        self.assertNotIn("modalias", output)
+        self.assertNotIn("uevent", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_sdio_vendor_device_positive_and_hint(self):
+        self.put("sys/bus/sdio/devices/mmc1-0001-1/vendor", "0x024c\n")
+        self.put("sys/bus/sdio/devices/mmc1-0001-1/device", "0xc821\n")
+        output = self.probe()
+        self.assertIn("sdio_device=mmc1-0001-1 vendor=0x024c device=0xc821", output)
+        self.assertIn("rtl8821cs_sdio_hint=driver_supported_id_not_physical_bt_proof", output)
+        self.assertIn("sdio_context=devices_observed_context_only", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_sdio_vendor_device_family_variants_and_case(self):
+        for device in ("0xb821", "0xC80C", "0X8733"):
+            with self.subTest(device=device):
+                sub = self.base / ("sub-" + device.replace("0", "d").replace("x", "y").replace("X", "Y"))
+                sub.mkdir()
+                fixture = sub / "fixture"
+                fixture.mkdir()
+                (fixture / "sys/bus/sdio/devices/mmc1-0001-1").mkdir(parents=True)
+                (fixture / "sys/bus/sdio/devices/mmc1-0001-1/vendor").write_bytes(b"0x024C\n")
+                (fixture / "sys/bus/sdio/devices/mmc1-0001-1/device").write_bytes((device + "\n").encode("ascii"))
+                output = self.probe(override=shell_path(fixture, self.shell))
+                self.assertIn("vendor=0x024C device=" + device, output)
+                self.assertIn("rtl8821cs_sdio_hint=driver_supported_id_not_physical_bt_proof", output)
+                self.assert_verdict(output, ABSENT)
+
+    def test_sdio_vendor_device_malformed_is_not_reported(self):
+        for bad in ("PRIVATE_0x024c", "0x24c", "0x024cc", "0x02 4c", "024c", "0xZZZZ", "0x024c\nEXTRA"):
+            with self.subTest(bad=bad):
+                sub = self.base / ("bad-" + str(abs(hash(bad)) % 100000))
+                sub.mkdir(exist_ok=True)
+                fixture = sub / "fixture"
+                if not fixture.is_dir():
+                    fixture.mkdir()
+                dev = fixture / "sys/bus/sdio/devices/mmc1-0001-1"
+                dev.mkdir(parents=True, exist_ok=True)
+                (dev / "vendor").write_bytes((bad + "\n").encode("ascii"))
+                (dev / "device").write_bytes((bad + "\n").encode("ascii"))
+                output = self.probe(override=shell_path(fixture, self.shell))
+                self.assertIn("vendor=not_reported device=not_reported", output)
+                self.assertIn("rtl8821cs_sdio_hint=no_known_id_matched_context_only", output)
+                self.assertNotIn("PRIVATE", output)
+                self.assertNotIn("EXTRA", output)
+                self.assert_verdict(output, ABSENT)
+
+    def test_sdio_non_numeric_names_are_ignored(self):
+        names = ["private-device", "mmc1-000g-1", "mmc1-0001-x", "mmcX-0001-1",
+                 "mmc1-0001-1-extra-long-name-beyond-limit-99"]
+        if os.name != "nt":
+            # Colon fixtures cannot be created on Windows; Linux covers them.
+            names += ["mmc1:0001-1", "mmc1-0001:1", "mmc1:000G:1"]
+        for name in names:
+            self.directory("sys/bus/sdio/devices/" + name)
+        output = self.probe()
+        self.assertIn("sdio_context=none_observed_context_only", output)
+        self.assertIn("rtl8821cs_sdio_hint=no_known_id_matched_context_only", output)
+        self.assertNotIn("sdio_device=", output)
+        self.assertNotIn("private", output)
+        self.assert_verdict(output, ABSENT)
+
+    @unittest.skipIf(os.name == "nt", "Linux colon production shape needs colon file names")
+    def test_sdio_colon_production_shape_linux_only(self):
+        self.put("sys/bus/sdio/devices/mmc1:0001:1/vendor", "0x024c\n")
+        self.put("sys/bus/sdio/devices/mmc1:0001:1/device", "0xb821\n")
+        output = self.probe()
+        self.assertIn("sdio_device=mmc1:0001:1 vendor=0x024c device=0xb821", output)
+        self.assertIn("rtl8821cs_sdio_hint=driver_supported_id_not_physical_bt_proof", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_sdio_inventory_is_bounded(self):
+        for number in range(40):
+            self.directory(f"sys/bus/sdio/devices/mmc1-{number:04d}-1")
+        output = self.probe()
+        self.assertEqual(output.count("sdio_device=mmc1-"), 16)
+        self.assertIn("sdio_inventory=truncated_at_16", output)
+        self.assertIn("sdio_context=devices_observed_context_only", output)
+        self.assertIn("rtl8821cs_sdio_hint=no_known_id_matched_context_only", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_sdio_absent_is_context_only(self):
+        output = self.probe()
+        self.assertIn("sdio_bus=not_observed", output)
+        self.assertIn("sdio_devices_dir=not_observed", output)
+        self.assertIn("sdio_context=none_observed_context_only", output)
+        self.assertIn("rtl8821cs_sdio_hint=no_known_id_matched_context_only", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_bt_transport_firmware_presence_only_and_redacted(self):
+        secret = "PRIVATE_BT_FIRMWARE_HCD_BYTES"
+        self.put("lib/firmware/rtl_bt/rtl8821c_fw.bin", secret + "\n")
+        output = self.probe()
+        self.assertIn("bt_firmware_present=/lib/firmware/rtl_bt/rtl8821c_fw.bin", output)
+        self.assertIn("bt_firmware_not_observed=/lib/firmware/rtl_bt/rtl8821c_config.bin", output)
+        self.assertIn("bt_transport_context=firmware_or_helper_observed_context_only", output)
+        self.assertNotIn("PRIVATE", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_bt_transport_absent_is_context_only(self):
+        output = self.probe()
+        self.assertIn("bt_firmware_not_observed=/lib/firmware/rtl_bt/rtl8821c_fw.bin", output)
+        # Host PATH varies; only the isolated empty-PATH run can pin the
+        # none-observed summary without host-tool flakiness.
+        empty_bin = self.base / "empty-bin-bt"
+        empty_bin.mkdir()
+        output = self.probe(path=shell_path(empty_bin, self.shell))
+        self.assertIn("bt_helper=hciattach not_found", output)
+        self.assertIn("bt_helper=rtk_hciattach not_found", output)
+        self.assertIn("bt_helper=btattach not_found", output)
+        self.assertIn("bt_transport_context=none_observed_context_only", output)
+        self.assert_verdict(output, ABSENT)
+
+    def test_new_combo_context_never_changes_hci_verdict_semantics(self):
+        self.put("sys/class/net/wlan0/operstate", "up\n")
+        self.directory("sys/module/8821cs")
+        self.put("customer/wifi/lib/8821cs.ko", "bundled\n")
+        self.directory("sys/bus/sdio/devices/mmc1-0001-1")
+        self.put("lib/firmware/rtl_bt/rtl8821c_fw.bin", "firmware\n")
+        output = self.probe()
+        self.assertIn("rtl8821cs_module=bundled_present", output)
+        self.assertIn("sdio_context=devices_observed_context_only", output)
+        self.assertIn("bt_transport_context=firmware_or_helper_observed_context_only", output)
+        # Full combo context without HCI is still inconclusive, not absence.
+        self.assert_verdict(output, ABSENT)
+        self.put("sys/class/bluetooth/hci0/operstate", "down\n")
+        output = self.probe()
+        self.assertIn("hci=hci0 sysfs_operstate=down", output)
+        self.assert_verdict(output, PRESENT)
+
     def test_lf_posix_syntax_and_no_mutation_or_uart_code(self):
         source = SCRIPT.read_bytes()
         self.assertNotIn(b"\r", source, "deploy script must have LF-only bytes")
         self.assertTrue(source.startswith(b"#!/bin/sh\n"))
         self.assertTrue(source.endswith(b"\n"))
         syntax = subprocess.run(self.shell + ["-n", self.script_path],
-                                capture_output=True, text=True, timeout=5)
+                                capture_output=True, text=True, timeout=PROBE_TIMEOUT)
         self.assertEqual(syntax.returncode, 0, syntax.stderr)
         text = source.decode("ascii")
         self.assertNotIn("/dev/", text.replace("/dev/null", ""))
-        for unsafe in ("hciattach", "insmod", "modprobe", "hciconfig -",
+        # Attach helpers (hciattach/rtk_hciattach/btattach) are allowed ONLY as
+        # passive presence names via `command -v`; execution is proven absent by
+        # test_command_presence_never_executes_tools. Other loaders stay banned.
+        for unsafe in ("insmod", "modprobe", "hciconfig -",
                        "hcitool -", "eval ", "exec ", "set -e", "tee ", "touch ",
                        "mount ", "sleep ", "while true", ">>"):
             self.assertNotIn(unsafe, text)
-        for line in text.splitlines():
-            if not line.lstrip().startswith("#"):
-                self.assertNotRegex(line, r"(?<![0-9&])>(?!/dev/null|&|gt)")
-                self.assertNotRegex(line, r"^\s*(?:bluetoothctl|hciconfig|hcitool|btmgmt|rfkill|iw|ip)\s")
+        code_lines = [line for line in text.splitlines()
+                      if not line.lstrip().startswith("#")]
+        code_text = "\n".join(code_lines)
+        self.assertNotIn("readlink", code_text)
+        for private_path in ("/address", "/modalias", "/uevent", "/tty",
+                             "ttyS", "ttyAMA", "ttyUSB"):
+            self.assertNotIn(private_path, code_text)
+        # Vendor/device numeric IDs are the ONLY per-device file reads allowed
+        # in SDIO context (bounded head + exact 0x+4hex sanitizer). Modalias and
+        # uevent content must never be referenced as file paths.
+        self.assertIn("/vendor", code_text)
+        self.assertIn("/device", code_text)
+        for line in code_lines:
+            self.assertNotRegex(line, r"(?<![0-9&])>(?!/dev/null|&|gt)")
+            self.assertNotRegex(line, r"^\s*(?:bluetoothctl|hciconfig|hcitool|btmgmt|rfkill|iw|ip|hciattach|rtk_hciattach|btattach)\s")
+            stripped = line.lstrip()
+            if stripped.startswith("printf"):
+                # Fixed single-quoted format plus sanitized %s args only; never
+                # printf a variable as the format string (private free string).
+                self.assertIn("printf '", line)
+                self.assertNotIn('printf "$', line)
+                self.assertNotRegex(line, r"printf\s+\$")
+        # Literal helper names may appear only in the allowlist definition;
+        # the runtime check itself uses `command -v "$btool"` generically.
+        for line in code_lines:
+            if "hciattach" in line or "btattach" in line:
+                self.assertTrue(line.lstrip().startswith("for btool"),
+                                "attach helper must only appear in allowlist definition")
 
 
 if __name__ == "__main__":

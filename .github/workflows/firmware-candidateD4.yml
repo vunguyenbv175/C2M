@@ -199,6 +199,8 @@ jobs:
             export C2M_TEST_SYSROOT="$PWD/work/sysroot"
             "$PWD/work/stock-sh" -n work/d3-services/boot.sh
             "$PWD/work/stock-sh" -n work/d3-services/connectivity_probe.sh
+            cmp -s fw/d3/connectivity_probe.sh work/d3-services/connectivity_probe.sh
+            grep -q 'probe=C2M_D3_PASSIVE_BLUETOOTH_V2' work/d3-services/connectivity_probe.sh
             (
               export C2M_PROBE_SHELL="$(python3 -c 'import json, os; print(json.dumps([os.path.abspath("work/stock-sh")]))')"
               export PATH="$PWD/work/stock-applets:$PATH"

@@ -3,6 +3,8 @@
 # No radio activation, pairing, module loading, network commands or UART access.
 # Run once; do not infer hardware absence from missing kernel exposure.
 # POSIX / BusyBox. Only bounded reads of known procfs/sysfs files are performed.
+# V2 adds allowlisted Wi-Fi/SDIO/BT-transport context for RTL8821CS triage;
+# still presence-only, no device nodes, no UART, no link resolution, no tool execution.
 
 LC_ALL=C
 export LC_ALL
@@ -51,7 +53,31 @@ flag_value() {
     printf 'unknown'
 }
 
-printf 'probe=C2M_D3_PASSIVE_BLUETOOTH_V1\n'
+# Bounded numeric SDIO vendor/device sanitizer. Linux sysfs exposes these as
+# small public numeric chip identities (for example 0x024c), not credentials.
+# Accept only exact 0x/0X plus 4 hexadecimal digits; anything else becomes
+# not_reported. Never used for modalias or uevent content.
+sdio_hex4() {
+    if safe_file "$1"; then
+        sdio_result=$(head -c 16 "$1" 2>/dev/null) || sdio_result=
+        case "$sdio_result" in
+            0[xX]????)
+                sdio_suffix=${sdio_result#0?}
+                case "$sdio_suffix" in
+                    ????)
+                        case "$sdio_suffix" in
+                            *[!0-9a-fA-F]*) ;;
+                            *) printf '%s' "$sdio_result"; return ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+    printf 'not_reported'
+}
+
+printf 'probe=C2M_D3_PASSIVE_BLUETOOTH_V2\n'
 printf 'radio_test=NOT_PERFORMED\nstate_changes=NONE\n'
 printf 'scope=kernel_exposure_only_not_physical_or_RF_verification\n'
 
@@ -115,7 +141,7 @@ if [ "$fixture_mode" = 0 ]; then
 else
     printf 'kernel_family=fixture_not_queried\n'
 fi
-for module in bluetooth btusb hci_uart hci_vhci btrtl btbcm btintel btmtk btsdio rtk_bt rtk_btusb; do
+for module in bluetooth btusb hci_uart hci_vhci btrtl btbcm btintel btmtk btsdio rtk_bt rtk_btusb 8821cs cfg80211 mac80211; do
     if safe_dir "$probe_root/sys/module/$module"; then
         printf 'sysfs_module=%s\n' "$module"
     fi
@@ -125,7 +151,7 @@ if safe_file "$probe_root/proc/modules"; then
     head -c 32768 "$probe_root/proc/modules" 2>/dev/null |
     while read -r module remainder; do
         case "$module" in
-            bluetooth|btusb|hci_uart|hci_vhci|btrtl|btbcm|btintel|btmtk|btsdio|rtk_bt|rtk_btusb)
+            bluetooth|btusb|hci_uart|hci_vhci|btrtl|btbcm|btintel|btmtk|btsdio|rtk_bt|rtk_btusb|8821cs|cfg80211|mac80211)
                 module_count=$((${module_count:-0} + 1))
                 [ "$module_count" -le 32 ] || break
                 printf 'loaded_module=%s\n' "$module"
@@ -193,6 +219,170 @@ if [ -n "$dt_base" ]; then
     fi
 else
     printf 'device_tree=unavailable\n'
+fi
+
+printf '\n[wifi_interface_context_only]\n'
+wifi_seen=0
+for wname in wlan0 c2msta0; do
+    wentry="$probe_root/sys/class/net/$wname"
+    if safe_dir "$wentry"; then
+        wifi_seen=1
+        wstate=not_reported
+        if safe_file "$wentry/operstate"; then
+            wcandidate=$(head -c 32 "$wentry/operstate" 2>/dev/null) || wcandidate=
+            case "$wcandidate" in
+                up|down|unknown|dormant|notpresent|lowerlayerdown|testing) wstate=$wcandidate ;;
+            esac
+        fi
+        printf 'wifi_interface=%s sysfs_operstate=%s\n' "$wname" "$wstate"
+    fi
+done
+if [ "$wifi_seen" = 1 ]; then
+    printf 'wifi_interface_context=allowlisted_interface_observed\n'
+else
+    printf 'wifi_interface=none_observed_allowlisted_only\n'
+    printf 'wifi_interface_context=none_observed_allowlisted_only\n'
+fi
+
+printf '\n[rtl8821cs_bundled_module_context_only]\n'
+rtl_seen=0
+for modpath in /customer/wifi/lib/8821cs.ko /wifi/lib/8821cs.ko /lib/modules/8821cs.ko; do
+    if safe_file "$probe_root$modpath"; then
+        printf 'bundled_module_present=%s\n' "$modpath"
+        rtl_seen=1
+    else
+        printf 'bundled_module_not_observed=%s\n' "$modpath"
+    fi
+done
+if [ "$rtl_seen" = 1 ]; then
+    printf 'rtl8821cs_module=bundled_present\n'
+else
+    printf 'rtl8821cs_module=not_observed\n'
+fi
+
+printf '\n[sdio_context_only]\n'
+if safe_dir "$probe_root/sys/bus/sdio"; then
+    printf 'sdio_bus=present\n'
+else
+    printf 'sdio_bus=not_observed\n'
+fi
+sdio_count=0
+sdio_scanned=0
+sdio_known_seen=0
+if safe_dir "$probe_root/sys/bus/sdio/devices"; then
+    printf 'sdio_devices_dir=present\n'
+    for sentry in "$probe_root"/sys/bus/sdio/devices/*; do
+        sname=${sentry##*/}
+        case "$sname" in '*'|.*) continue ;; esac
+        safe_dir "$sentry" || continue
+        # Production shape is strict numeric mmc bus/address/function with
+        # colons (for example mmc1:0001:1). The dash form exists ONLY so
+        # Windows-forbidden colons can be fixture-tested; live production
+        # never accepts dashes.
+        case "$sname" in
+            mmc*:*:*) ;;
+            mmc*-*-*)
+                if [ "$fixture_mode" != 1 ]; then continue; fi
+                ;;
+            *) continue ;;
+        esac
+        # Reject any overlong or lettered private-looking name beyond hex.
+        # The fixed "mmc" prefix needs m/M besides hex digits.
+        case "$sname" in *[!0-9a-fA-FmM:._-]*) continue ;; esac
+        if [ "${#sname}" -gt 24 ]; then continue; fi
+        case "$sname" in
+            *:*:*:*|*-*-*-*) continue ;;
+        esac
+        # Numeric bus/address/function validation. Address is 4 hex digits;
+        # bus and function are decimal digits. No free-string names survive.
+        sbody=${sname#mmc}
+        case "$sname" in *:*:*) ssep=: ;; *-*-*) ssep=- ;; *) continue ;; esac
+        case "$ssep" in
+            :)
+                case "$sbody" in *:*|*) ;; *) continue ;; esac
+                sbus=${sbody%%:*}
+                srest=${sbody#*:}
+                case "$srest" in *:*|*) ;; *) continue ;; esac
+                saddr=${srest%%:*}
+                sfunc=${srest#*:}
+                ;;
+            *)
+                case "$sbody" in *-*|*) ;; *) continue ;; esac
+                sbus=${sbody%%-*}
+                srest=${sbody#*-}
+                case "$srest" in *-*|*) ;; *) continue ;; esac
+                saddr=${srest%%-*}
+                sfunc=${srest#*-}
+                ;;
+        esac
+        case "$sbus" in ''|*[!0-9]*) continue ;; esac
+        case "$saddr" in ????) ;; *) continue ;; esac
+        case "$saddr" in *[!0-9a-fA-F]*) continue ;; esac
+        case "$sfunc" in ''|*[!0-9]*) continue ;; esac
+        case "$sbus$saddr$sfunc" in *:*|*-*|*.*|*_* ) continue ;; esac
+        sdio_scanned=$((sdio_scanned + 1))
+        if [ "$sdio_scanned" -gt 64 ]; then
+            printf 'sdio_scan=truncated_at_64_entries\n'
+            break
+        fi
+        sdio_count=$((sdio_count + 1))
+        if [ "$sdio_count" -gt 16 ]; then
+            printf 'sdio_inventory=truncated_at_16\n'
+            break
+        fi
+        # Never read modalias or uevent. Vendor/device are bounded numeric
+        # chip identities only, sanitized to exact 0x plus 4 hex digits.
+        sdiv_vendor=$(sdio_hex4 "$sentry/vendor")
+        sdiv_device=$(sdio_hex4 "$sentry/device")
+        printf 'sdio_device=%s vendor=%s device=%s present_context_only\n' \
+            "$sname" "$sdiv_vendor" "$sdiv_device"
+        case "$sdiv_vendor" in
+            0[xX]024[cC])
+                case "$sdiv_device" in
+                    0[xX][cC]821|0[xX][bB]821|0[xX][cC]80[cC]|0[xX]8733)
+                        sdio_known_seen=1
+                        ;;
+                esac
+                ;;
+        esac
+    done
+else
+    printf 'sdio_devices_dir=not_observed\n'
+fi
+if [ "$sdio_count" -gt 0 ]; then
+    printf 'sdio_context=devices_observed_context_only\n'
+else
+    printf 'sdio_context=none_observed_context_only\n'
+fi
+if [ "$sdio_known_seen" = 1 ]; then
+    printf 'rtl8821cs_sdio_hint=driver_supported_id_not_physical_bt_proof\n'
+else
+    printf 'rtl8821cs_sdio_hint=no_known_id_matched_context_only\n'
+fi
+
+printf '\n[bt_transport_context_only]\n'
+bt_fw_seen=0
+for fwpath in /lib/firmware/rtl_bt/rtl8821c_fw.bin /lib/firmware/rtl_bt/rtl8821c_config.bin /lib/firmware/rtl_bt/rtl8821cs_fw.bin /lib/firmware/rtl_bt/rtl8821cs_config.bin; do
+    if safe_file "$probe_root$fwpath"; then
+        printf 'bt_firmware_present=%s\n' "$fwpath"
+        bt_fw_seen=1
+    else
+        printf 'bt_firmware_not_observed=%s\n' "$fwpath"
+    fi
+done
+bt_helper_seen=0
+for btool in hciattach rtk_hciattach btattach; do
+    if command -v "$btool" >/dev/null 2>&1; then
+        printf 'bt_helper=%s present_not_executed\n' "$btool"
+        bt_helper_seen=1
+    else
+        printf 'bt_helper=%s not_found\n' "$btool"
+    fi
+done
+if [ "$bt_fw_seen" = 1 ] || [ "$bt_helper_seen" = 1 ]; then
+    printf 'bt_transport_context=firmware_or_helper_observed_context_only\n'
+else
+    printf 'bt_transport_context=none_observed_context_only\n'
 fi
 
 printf '\n[command_presence_context_only]\n'

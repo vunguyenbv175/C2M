@@ -41,6 +41,14 @@ class D3MutationTest(unittest.TestCase):
             self.assertEqual(added, {'/c2m', '/c2m/c2m-idle', '/c2m/tsr_profile_boot.sh',
                 '/c2m/boot.sh', '/c2m/connectivity_probe.sh', '/c2m/c2m-web', '/c2m/c2m-wifi',
                 '/c2m/wpa_supplicant'})
+            # The next-flash Bluetooth probe must be the exact reviewed source,
+            # not an older bundled report/probe silently left in the image.
+            self.assertEqual((tree / 'c2m/connectivity_probe.sh').read_bytes(),
+                             (ROOT / 'fw/d3/connectivity_probe.sh').read_bytes())
+            boot = (tree / 'c2m/boot.sh').read_text()
+            self.assertIn('/bin/sh /customer/c2m/connectivity_probe.sh', boot)
+            self.assertIn('$_run/bluetooth.txt', boot)
+            self.assertIn('$_log/bluetooth-D3.txt', boot)
             text = (tree / 'wifi/rcInsDriver.sh').read_text()
             self.assertEqual(text.count('/bin/sh /customer/c2m/boot.sh'), 1)
             self.assertLess(text.index('tsr_profile_boot.sh'), text.index('( _c2m_n=0'))

@@ -104,6 +104,14 @@ Manual private-only workflow: `firmware-candidateD4.yml`. Required build
 outputs `c2m-signs` and `d4_boot.sh`; exact private DB installed in customer
 under a fixed `/c2m` path. No writes to MINIEYE recording card for firmware.
 
+Owner additionally requested Bluetooth investigation at the next flash because
+no board photos/documents are available. The next D4 build must include the
+reviewed `C2M_D3_PASSIVE_BLUETOOTH_V2` boot probe (bounded SDIO/driver/transport
+context, unchanged no-RF/no-UART-access behavior), not merely the earlier V1
+probe. This remains a passive capability investigation, not working Bluetooth
+or a reason for a standalone diagnostic flash. See
+`BLUETOOTH_CAPABILITY_FINDINGS_20261015.md` for acceptance and limitations.
+
 Promotion requires host pure/hostile-input/lifecycle tests, exact stock ARM
 loader/glibc/QEMU executable proof, actual Chrome renderer/beep scheduling/
 expiry and full synthetic GPS->producer->HTTP->browser route tests; mutation
