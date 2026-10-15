@@ -390,7 +390,7 @@ class DebugSshNativeTests(unittest.TestCase):
         if "--enable-bundled-libtom" not in help_proc.stdout:
             raise AssertionError("bundled-libtom option missing")
         cfg = ["--disable-harden", "--disable-zlib", "--enable-bundled-libtom"]
-        for opt in ("syslog", "shadow", "lastlog", "utmp", "utmpx",
+        for opt in ("shadow", "lastlog", "utmp", "utmpx",
                     "wtmp", "wtmpx", "loginfunc", "pututline",
                     "pututxline", "openpty"):
             if f"--disable-{opt}" in help_proc.stdout:

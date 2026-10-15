@@ -61,7 +61,7 @@ Script greps `./configure --help` and uses only found options:
 
 - Required: `--host=arm-linux-gnueabihf --disable-harden --disable-zlib`
   `--enable-bundled-libtom`.
-- Optional if present: `--disable-syslog --disable-shadow`
+- Optional if present: `--disable-shadow` (keep syslog compiled so `-E` is accepted).
   `--disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp`
   `--disable-wtmpx --disable-loginfunc --disable-pututline`
   `--disable-pututxline --disable-openpty`.
@@ -139,7 +139,7 @@ target files to exist, and the CFLAGS check is a pipe-free `awk` scan
 
 QEMU exit policy (rc recorded next to each log): `dropbear -V` must exit
 0 and print `2026.94`; `dropbear -h` must exit 0 or 1 and list `-D`
-plus `-l`; `dropbearkey -h` must exit 1 (expected usage failure);
+plus `-l`; `dropbearkey -h` must exit 0 (successful help);
 keygen/`-y`/`--self-test` must exit 0. No `|| true` suppression.
 
 ## Random
@@ -179,7 +179,7 @@ gate caps max `GLIBC_*` need at 2.30.
   `$ROOT/lib/ld-linux-armhf.so.3`):
   `dropbear -V` exits 0 and contains `2026.94`; `dropbear -h` exits 0/1
   and contains `-D` (authorized_keys dir, 2025.89+) and `-l` (bind device,
-  e.g. `wlan0`); `dropbearkey -h` exits 1 (expected usage failure);
+  e.g. `wlan0`); `dropbearkey -h` exits 0 (successful help);
   `dropbearkey -t ed25519 -f tmp` then `-f tmp -y` yields `ssh-ed25519`;
   `c2m-debug --self-test` exits 0 and prints `PASS ...` /
   `c2m-debug self-test: OK` (pure, no I/O fixtures, no `--serve` in build).

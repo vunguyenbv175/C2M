@@ -18,7 +18,7 @@
 #          redirect-or-fail (>report 2>&1 || { cat report; exit 1; }) so set -e
 #          sees the real status. Compiled macro proof (gcc -dM -E on
 #          options.h) runs before make; QEMU -V must exit 0, -h exits are
-#          asserted (dropbear 0/1, dropbearkey 1).
+#          asserted (dropbear 0/1, dropbearkey 0).
 # Run from repo root: sh fw/debug/build_dropbear.sh --out DIR --sysroot ROOT
 set -eu
 out=
@@ -306,7 +306,7 @@ arm-linux-gnueabihf-readelf -V "$out/dropbearkey" > "$out/objects/dropbearkey.ve
 
 # QEMU smoke on stock sysroot: version/help, -D/-l presence, keygen -y proof.
 # Exit policy (rc recorded per command): -V must exit 0; -h may exit 0 or 1
-# (usage printers vary); dropbearkey -h is expected to fail (exit 1).
+# (usage printers vary); pinned dropbearkey -h exits successfully (exit 0).
 timeout 20 qemu-arm-static -L "$sysroot" "$out/dropbear" -V > "$out/reports/dropbear-V.txt" 2>&1 \
     || { cat "$out/reports/dropbear-V.txt"; exit 1; }
 cat "$out/reports/dropbear-V.txt"
@@ -322,7 +322,7 @@ rc=0
 timeout 20 qemu-arm-static -L "$sysroot" "$out/dropbearkey" -h > "$out/reports/dropbearkey-h.txt" 2>&1 || rc=$?
 printf 'exit=%s\n' "$rc" > "$out/reports/dropbearkey-h-rc.txt"
 cat "$out/reports/dropbearkey-h.txt"
-[ "$rc" = 1 ] || { echo "dropbearkey -h expected exit 1, got $rc" >&2; exit 1; }
+[ "$rc" = 0 ] || { echo "dropbearkey -h expected exit 0, got $rc" >&2; exit 1; }
 rm -rf "$work/smoke-keys"
 mkdir -p "$work/smoke-keys"
 timeout 20 qemu-arm-static -L "$sysroot" "$out/dropbearkey" -t ed25519 -f "$work/smoke-keys/host_ed25519" \
