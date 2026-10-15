@@ -31,6 +31,13 @@ Mutation (exactly):
      consistently (so `run.sh` observes no md5 drift), using only
      base64/grep/sed/rm already present on device. Skips silently when the
      flag file is absent or already patched.
+  6. (optional `--d3-services-dir`, requires `--tsr-experiment`): install
+     isolated D3 services; launch boot.sh detached after the idle daemon.
+  7. (optional D4, requires D3 + checked TSR): install exactly c2m-signs,
+     d4_boot.sh and SHA256-pinned private signs-d4.bin; only directional
+     R.420/R.421 records are permitted. Launch d4_boot.sh detached after
+     D3 boot in the same bounded background mount-wait block. Database
+     reports contain only count/hash, never coordinates, labels or bytes.
 
 Fail-closed guards:
   - --manifest (stock manifest JSON) REQUIRED: hook file content must hash
@@ -53,11 +60,69 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
+import stat
+import struct
+import unicodedata
 from pathlib import Path
 
 DEFAULT_HOOK_LINE = "/customer/c2m/c2m-idle &"
+D4_RECORD = struct.Struct("<ddf16s64s")
+D4_MAX_BYTES = 12 + 40000 * D4_RECORD.size
+# A reviewed 12,708-record subset fits; never stage the whole source DB.
+D4_MAX_OUTPUT_BYTES = 1_300_000
+D4_MODES = {"c2m-signs": 0o755, "d4_boot.sh": 0o755, "signs-d4.bin": 0o644}
+
+
+def has_symlink(path: Path) -> bool:
+    # Check parents too: a regular leaf reached through a link is not a safe
+    # source or destination. Do not resolve first (that would hide the link).
+    absolute = path.absolute()
+    return any(p.is_symlink() or (getattr(p, "is_junction", lambda: False)())
+               for p in (absolute, *absolute.parents))
+
+
+def check_d4_database(data: bytes, expected_sha256: str) -> dict:
+    """Gate an already filtered private subset; never echo records or labels."""
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256):
+        raise ValueError("D4 database needs an exact 64-hex SHA256 pin")
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != expected_sha256.lower():
+        raise ValueError("D4 database SHA256 mismatch")
+    if len(data) < 12 or len(data) > D4_MAX_BYTES or data[:8] != b"C2MSDB01":
+        raise ValueError("invalid D4 database header/size")
+    count = struct.unpack_from("<I", data, 8)[0]
+    if not 1 <= count <= 40000 or len(data) != 12 + count * D4_RECORD.size:
+        raise ValueError("invalid D4 database count/length")
+
+    def text_field(raw: bytes) -> str:
+        prefix, separator, padding = raw.partition(b"\0")
+        if not separator or any(padding):
+            raise ValueError("noncanonical D4 database string")
+        try:
+            value = prefix.decode("utf-8", "strict")
+        except UnicodeError:
+            raise ValueError("invalid D4 database UTF-8") from None
+        if any(unicodedata.category(c) == "Cc" for c in value):
+            raise ValueError("control character in D4 database string")
+        return value
+
+    for offset in range(12, len(data), D4_RECORD.size):
+        lat, lon, heading, kind_raw, label_raw = D4_RECORD.unpack_from(data, offset)
+        if not all(math.isfinite(v) for v in (lat, lon, heading)):
+            raise ValueError("nonfinite D4 database number")
+        if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+            raise ValueError("D4 database coordinate outside range")
+        # The producer may normalize 360 to zero; the install gate must not
+        # silently repair an unreviewed input, nor accept unknown headings.
+        if not 0 <= heading < 360:
+            raise ValueError("D4 database requires known heading in [0, 360)")
+        if text_field(kind_raw) not in ("R.420", "R.421"):
+            raise ValueError("D4 database permits only R.420/R.421")
+        text_field(label_raw)
+    return {"count": count, "sha256": digest}
 
 
 def sha_file(p: Path) -> str:
@@ -78,7 +143,6 @@ def md5_bytes(d: bytes) -> str:
 def check_wav(data: bytes, what: str) -> None:
     if not (len(data) > 44 and data[0:4] == b"RIFF" and data[8:12] == b"WAVE"):
         raise ValueError(f"wav rejected (not RIFF/WAVE): {what}")
-    import struct
     fmt, ch, rate, bits = (struct.unpack("<H", data[20:22])[0],
                            struct.unpack("<H", data[22:24])[0],
                            struct.unpack("<I", data[24:28])[0],
@@ -120,8 +184,59 @@ def main() -> int:
                      help="D experimental checked TSR profile + private backup/status")
     ap.add_argument("--d3-services-dir", type=Path,
                     help="D3 isolated boot/probe/web/WiFi binaries (requires checked TSR)")
+    ap.add_argument("--d4-services-dir", type=Path,
+                    help="D4 c2m-signs + d4_boot.sh only (requires D3 and checked TSR)")
+    ap.add_argument("--d4-database", type=Path,
+                    help="private, prefiltered directional R.420/R.421 database")
+    ap.add_argument("--d4-database-sha256",
+                    help="mandatory exact 64-hex SHA256 of the D4 database")
     ap.add_argument("--out-manifest", type=Path, required=True)
     args = ap.parse_args()
+
+    d4_assets: dict[str, bytes] = {}
+    d4_database = None
+    if any(value is not None for value in
+           (args.d4_services_dir, args.d4_database, args.d4_database_sha256)):
+        if any(value is None for value in
+               (args.d4_services_dir, args.d4_database, args.d4_database_sha256)):
+            ap.error("D4 requires --d4-services-dir, --d4-database and --d4-database-sha256 together")
+        if args.d3_services_dir is None or not args.tsr_experiment:
+            ap.error("D4 requires --d3-services-dir and --tsr-experiment")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", args.d4_database_sha256):
+            ap.error("D4 database needs an exact 64-hex SHA256 pin")
+        try:
+            services = args.d4_services_dir
+            if has_symlink(services) or not services.is_dir():
+                raise ValueError("D4 services must be a nonsymlink directory")
+            if {p.name for p in services.iterdir()} != {"c2m-signs", "d4_boot.sh"}:
+                raise ValueError("D4 services must contain exactly c2m-signs and d4_boot.sh")
+            for name in ("c2m-signs", "d4_boot.sh"):
+                source = services / name
+                if has_symlink(source) or not source.is_file():
+                    raise ValueError(f"missing/nonregular D4 service {name}")
+                data = source.read_bytes()
+                if name.endswith(".sh"):
+                    if b"\r" in data or not data.startswith(b"#!/bin/sh\n"):
+                        raise ValueError("D4 shell must be LF: d4_boot.sh")
+                elif (len(data) < 52 or data[:6] != b"\x7fELF\x01\x01"
+                      or int.from_bytes(data[18:20], "little") != 40):
+                    raise ValueError("D4 service must be ELF32 little-endian ARM: c2m-signs")
+                d4_assets[name] = data
+            database = args.d4_database
+            if has_symlink(database) or not database.is_file():
+                raise ValueError("D4 database must be a nonsymlink regular file")
+            if database.stat().st_size > D4_MAX_BYTES:
+                raise ValueError("D4 database exceeds size bound")
+            with database.open("rb") as stream:
+                data = stream.read(D4_MAX_BYTES + 1)
+            d4_database = check_d4_database(data, args.d4_database_sha256)
+            if len(data) > D4_MAX_OUTPUT_BYTES:
+                raise ValueError("D4 database exceeds private subset output bound")
+            d4_assets["signs-d4.bin"] = data
+        except OSError:
+            ap.error("cannot read D4 inputs")
+        except ValueError as exc:
+            ap.error(str(exc))
 
     d3_assets: dict[str, bytes] = {}
     if args.d3_services_dir is not None:
@@ -129,7 +244,7 @@ def main() -> int:
             ap.error("D3 requires --tsr-experiment, not legacy C patch")
         for name in ("boot.sh", "connectivity_probe.sh", "c2m-web", "c2m-wifi", "wpa_supplicant"):
             source = args.d3_services_dir / name
-            if not source.is_file() or source.is_symlink():
+            if not source.is_file() or has_symlink(source):
                 ap.error(f"missing/nonregular D3 service {name}")
             data = source.read_bytes()
             if name.endswith(".sh"):
@@ -143,12 +258,19 @@ def main() -> int:
     stock = {r["path"]: r for r in
              json.loads(args.manifest.read_text(encoding="utf-8"))["entries"]}
     hook_rel = args.hook.lstrip("/")
+    if (not hook_rel or any(part in ("", ".", "..") for part in hook_rel.split("/"))
+            or "\\" in hook_rel or ":" in hook_rel or Path(hook_rel).is_absolute()):
+        print("MUTATE-FAIL: invalid image-relative hook path")
+        return 1
     hook_img_path = "/" + hook_rel
     if hook_img_path not in stock or stock[hook_img_path]["type"] != "reg":
         print(f"MUTATE-FAIL: hook {hook_img_path} not a stock regular file")
         return 1
 
     hook = args.tree / hook_rel
+    if has_symlink(hook):
+        print("MUTATE-FAIL: linked tree/hook path")
+        return 1
     if not hook.is_file() or sha_file(hook) != stock[hook_img_path]["sha256"]:
         print(f"MUTATE-FAIL: hook tree content != stock manifest "
               f"(tree={sha_file(hook) if hook.is_file() else 'MISSING'} "
@@ -216,8 +338,11 @@ def main() -> int:
             # Keep idle launch as before. D3 boot runs detached AFTER that;
             # neither a probe nor server startup may delay the stock hook.
             block[launch_index] = cmd + " >/dev/null 2>&1 &"
-            block[launch_index + 1:launch_index + 1] = [
-                "/bin/sh /customer/c2m/boot.sh >/dev/null 2>&1 & ) >/dev/null 2>&1 &"]
+            boots = ["/bin/sh /customer/c2m/boot.sh >/dev/null 2>&1 &"]
+            if d4_assets:
+                boots.append("/bin/sh /customer/c2m/d4_boot.sh >/dev/null 2>&1 &")
+            boots[-1] += " ) >/dev/null 2>&1 &"
+            block[launch_index + 1:launch_index + 1] = boots
         new_text = "\n".join(hook_lines[:last_idx] + block + hook_lines[last_idx + 1:])
         mode = "insert-before-terminal-exit"
     else:
@@ -227,39 +352,45 @@ def main() -> int:
         new_text = text + args.hook_line + "\n"
         mode = "append-eof"
 
+    # Stage all inputs and check every new destination before tree mutation,
+    # including legacy idle/profile/D3 inputs when combined with D4.
     idle = args.tree / "c2m" / "c2m-idle"
-    if idle.exists():
-        print("MUTATE-FAIL: c2m/c2m-idle already exists in tree")
-        return 1
-    idle.parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(idle.parent, 0o755)
-    idle.write_bytes(args.idle_bin.read_bytes())
-    os.chmod(idle, 0o755)
-
     profile_path = None
-    if args.tsr_experiment:
-        profile_source = Path(__file__).resolve().parents[2] / "fw/tsr/tsr_profile_boot.sh"
-        profile_path = args.tree / "c2m/tsr_profile_boot.sh"
-        profile_bytes = profile_source.read_bytes()
-        if b"\r" in profile_bytes or not profile_bytes.startswith(b"#!/bin/sh\n"):
-            print("MUTATE-FAIL: D profile script must be LF shell")
-            return 1
-        profile_path.write_bytes(profile_bytes)
-        os.chmod(profile_path, 0o755)
-
-    d3_added = []
-    for name, data in d3_assets.items():
-        dest = args.tree / "c2m" / name
-        if dest.exists() or dest.is_symlink():
-            print(f"MUTATE-FAIL: existing D3 path {name}")
-            return 1
-        dest.write_bytes(data)
-        os.chmod(dest, 0o755)
-        d3_added.append({"path": "/c2m/" + name, "type": "reg", "mode": 0o755,
-                         "mode_oct": "0o755", "size": len(data),
-                         "sha256": hashlib.sha256(data).hexdigest()})
+    try:
+        if not args.idle_bin.is_file() or has_symlink(args.idle_bin):
+            raise ValueError("idle input must be a nonsymlink regular file")
+        assets = {"c2m-idle": (args.idle_bin.read_bytes(), 0o755)}
+        if args.tsr_experiment:
+            profile_source = Path(__file__).resolve().parents[2] / "fw/tsr/tsr_profile_boot.sh"
+            profile_path = args.tree / "c2m/tsr_profile_boot.sh"
+            if has_symlink(profile_source) or not profile_source.is_file():
+                raise ValueError("D profile must be a nonsymlink regular file")
+            profile_bytes = profile_source.read_bytes()
+            if b"\r" in profile_bytes or not profile_bytes.startswith(b"#!/bin/sh\n"):
+                raise ValueError("D profile script must be LF shell")
+            assets["tsr_profile_boot.sh"] = (profile_bytes, 0o755)
+        assets.update({name: (data, 0o755) for name, data in d3_assets.items()})
+        assets.update({name: (data, D4_MODES[name]) for name, data in d4_assets.items()})
+        if has_symlink(idle.parent) or (idle.parent.exists() and not idle.parent.is_dir()):
+            raise ValueError("c2m must be a nonsymlink directory")
+        for name in assets:
+            dest = idle.parent / name
+            if dest.exists() or dest.is_symlink() or "/c2m/" + name in stock:
+                raise ValueError(f"existing asset path c2m/{name}")
+        if d4_assets:
+            report = args.out_manifest
+            if (has_symlink(report) or report.exists() or not report.parent.is_dir()
+                    or report.resolve().is_relative_to(args.tree.resolve())):
+                raise ValueError("D4 report must be a new path outside the tree")
+    except OSError:
+        print("MUTATE-FAIL: cannot read mutation inputs")
+        return 1
+    except ValueError as exc:
+        print(f"MUTATE-FAIL: {exc}")
+        return 1
 
     replaced: dict[str, dict] = {}
+    audio_writes: list[tuple[Path, bytes, int]] = []
     if args.audio_replacements is not None:
         try:
             specs = json.loads(args.audio_replacements.read_text(encoding="utf-8"))
@@ -275,8 +406,8 @@ def main() -> int:
             print("MUTATE-FAIL: md5sum.txt not a stock regular file")
             return 1
         md5_file = args.tree / md5_rel
-        if not md5_file.is_file():
-            print("MUTATE-FAIL: md5sum.txt missing in tree")
+        if not md5_file.is_file() or has_symlink(md5_file):
+            print("MUTATE-FAIL: md5sum.txt missing/linked in tree")
             return 1
         md5_text = md5_file.read_bytes().decode("ascii")
         if hashlib.sha256(md5_text.encode("ascii")).hexdigest() != stock[md5_img_path]["sha256"]:
@@ -292,8 +423,14 @@ def main() -> int:
                 print("MUTATE-FAIL: audio spec must be an object")
                 return 1
             img_path, local = spec.get("path"), spec.get("file")
-            if not img_path or not local or not img_path.startswith("/"):
-                print(f"MUTATE-FAIL: bad audio spec: {spec!r}")
+            if (not isinstance(img_path, str) or not isinstance(local, str)
+                    or not local or not img_path.startswith("/minieye/adas/")):
+                print("MUTATE-FAIL: bad audio spec/outside /minieye/adas")
+                return 1
+            rel = img_path[len("/minieye/adas/"):]
+            if (any(part in ("", ".", "..") for part in rel.split("/"))
+                    or "\\" in rel or ":" in rel):
+                print("MUTATE-FAIL: invalid audio target path")
                 return 1
             if img_path in seen:
                 print(f"MUTATE-FAIL: duplicate audio target: {img_path}")
@@ -309,9 +446,12 @@ def main() -> int:
         for spec in sorted(specs, key=_spec_key):
             img_path, local = spec["path"], spec["file"]
             try:
-                wav = Path(local).read_bytes()
-            except OSError as exc:
-                print(f"MUTATE-FAIL: cannot read {local}: {exc}")
+                source = Path(local)
+                if has_symlink(source) or not source.is_file():
+                    raise OSError("not a nonsymlink regular file")
+                wav = source.read_bytes()
+            except OSError:
+                print("MUTATE-FAIL: cannot read audio input")
                 return 1
             try:
                 check_wav(wav, img_path)
@@ -329,6 +469,9 @@ def main() -> int:
                 print(f"MUTATE-FAIL: md5sum.txt has {len(hits)} lines for {rel}")
                 return 1
             target = args.tree / "minieye/adas" / rel
+            if has_symlink(target) or (target.exists() and not target.is_file()):
+                print("MUTATE-FAIL: linked/nonregular audio target")
+                return 1
             if target.is_file():
                 if img_path not in stock or stock[img_path]["type"] != "reg":
                     print(f"MUTATE-FAIL: {img_path} not a stock regular file")
@@ -339,20 +482,18 @@ def main() -> int:
                     return 1
                 old_sha = stock[img_path]["sha256"]
                 old_size = stock[img_path]["size"]
+                target_mode = stat.S_IMODE(target.stat().st_mode)
             else:
                 # md5sum-listed but absent from the image (e.g. tlr wav):
                 # create with a sibling wav's mode.
                 sibs = sorted(target.parent.glob("*.wav")) if target.parent.is_dir() else []
-                sib = next((s for s in sibs if s.is_file()), None)
+                sib = next((s for s in sibs if s.is_file() and not has_symlink(s)), None)
                 if sib is None:
                     print("MUTATE-FAIL: no sibling wav for new-file mode")
                     return 1
-                import stat as _stat
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.touch()
-                os.chmod(target, _stat.S_IMODE(os.stat(sib).st_mode))
+                target_mode = stat.S_IMODE(sib.stat().st_mode)
                 old_sha, old_size = "(absent-in-image)", 0
-            target.write_bytes(wav)
+            audio_writes.append((target, wav, target_mode))
             md5_lines[hits[0]] = md5_bytes(wav) + md5_lines[hits[0]][32:]
             replaced[img_path] = {"old_sha256": old_sha, "old_size": old_size,
                                   "new_sha256": hashlib.sha256(wav).hexdigest(),
@@ -361,15 +502,41 @@ def main() -> int:
         if not new_md5.endswith("\n"):
             print("MUTATE-FAIL: md5sum.txt lost trailing newline")
             return 1
-        md5_file.write_bytes(new_md5.encode("ascii"))
+        audio_writes.append((md5_file, new_md5.encode("ascii"),
+                             stat.S_IMODE(md5_file.stat().st_mode)))
         replaced[md5_img_path] = {
             "old_sha256": stock[md5_img_path]["sha256"],
             "old_size": stock[md5_img_path]["size"],
             "new_sha256": hashlib.sha256(new_md5.encode("ascii")).hexdigest(),
             "new_size": len(new_md5)}
 
+    # Validation is complete. Only explicit allowlisted assets are installed;
+    # ownership is set to stock 1001:1001 by rebuild_customer.sh, not host chown.
+    idle.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(idle.parent, 0o755)
+    for name, (data, asset_mode) in assets.items():
+        dest = idle.parent / name
+        with dest.open("xb") as stream:
+            stream.write(data)
+        os.chmod(dest, asset_mode)
+    for target, data, target_mode in audio_writes:
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("xb") as stream:
+                stream.write(data)
+        else:
+            target.write_bytes(data)
+        os.chmod(target, target_mode)
     hook.write_bytes(new_text.encode("utf-8"))
 
+    d3_added = [{"path": "/c2m/" + name, "type": "reg", "mode": 0o755,
+                 "mode_oct": "0o755", "size": len(data),
+                 "sha256": hashlib.sha256(data).hexdigest()}
+                for name, data in d3_assets.items()]
+    d4_added = [{"path": "/c2m/" + name, "type": "reg", "mode": D4_MODES[name],
+                 "mode_oct": oct(D4_MODES[name]), "uid": 1001, "gid": 1001,
+                 "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                for name, data in d4_assets.items()]
     doc = {"hook": hook_img_path,
            "hook_line": args.hook_line,
            "hook_mode": mode,
@@ -395,7 +562,15 @@ def main() -> int:
     if d3_added:
         doc["d3_services"] = True
         doc["added"].extend(d3_added)
-    args.out_manifest.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    if d4_added:
+        doc["d4_services"] = True
+        doc["d4_database"] = d4_database
+        doc["added"].extend(d4_added)
+    if d4_added:
+        with args.out_manifest.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(doc, indent=2))
+    else:
+        args.out_manifest.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     print(json.dumps(doc, indent=2))
     return 0
 

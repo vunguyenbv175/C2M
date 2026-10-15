@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +57,19 @@ struct form {
     size_t ssid_len, password_len;
     unsigned fields;
 };
+enum sign_state { SIGN_WAITING, SIGN_WARMING, SIGN_READY, SIGN_STALE,
+                  SIGN_NO_DATABASE, SIGN_DISABLED, SIGN_ERROR };
+enum sign_code { SIGN_NONE, SIGN_SPEED, SIGN_RESIDENTIAL_START, SIGN_RESIDENTIAL_END };
+static const char *const sign_states[] = {"waiting_gps", "warming_up", "ready", "stale",
+                                        "no_database", "disabled", "error"};
+static const char *const sign_codes[] = {"none", "speed_limit", "residential_start", "residential_end"};
+struct sign_status {
+    enum sign_state state;
+    enum sign_code code;
+    unsigned gps_fresh, active, available, speed, distance, expires;
+    uint32_t sequence, event_id;
+    uint64_t monotonic_ms;
+};
 #ifndef C2M_WEB_CORE_ONLY
 struct status {
     char supported[16], state[24], ssid[129], ipv4[INET_ADDRSTRLEN];
@@ -68,7 +82,7 @@ struct service {
     struct in_addr address, mask;
     char address_text[INET_ADDRSTRLEN], host[80], origin[96];
     char token[TOKEN_HEX + 1];
-    const char *status_path;
+    const char *status_path, *sign_status_path;
 };
 static volatile sig_atomic_t stopped;
 #endif
@@ -184,6 +198,95 @@ static int hex_value(unsigned char c)
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
     return -1;
+}
+/* D4 accepts only this closed schema, never controller strings/coordinates.
+ * Portable parser takes an explicit monotonic time for deterministic tests. */
+static int sign_number(const char *text, uint64_t max, uint64_t *out)
+{
+    uint64_t value = 0;
+    const unsigned char *p = (const unsigned char *)text;
+    if (!*p || (p[0] == '0' && p[1])) return -1;
+    for (; *p; p++) {
+        unsigned digit;
+        if (*p < '0' || *p > '9') return -1;
+        digit = *p - '0';
+        if (value > max / 10 || (value == max / 10 && digit > max % 10)) return -1;
+        value = value * 10 + digit;
+    }
+    *out = value; return 0;
+}
+static void sign_unavailable(struct sign_status *out)
+{
+    memset(out, 0, sizeof(*out)); out->state = SIGN_ERROR;
+}
+static int parse_sign_status(char *text, size_t n, uint64_t now, struct sign_status *out)
+{
+    static const char *const keys[] = {"version", "source", "state", "gps_fresh", "active",
+        "sequence", "code", "speed_kmh", "distance_m", "event_id", "monotonic_ms"};
+    struct sign_status parsed;
+    size_t i, start = 0;
+    unsigned seen = 0;
+    uint64_t age;
+    sign_unavailable(out); memset(&parsed, 0, sizeof(parsed));
+    if (!n || n > C2M_WEB_MAX_BODY || text[n-1] != '\n') return -1;
+    for (i = 0; i < n; i++)
+        if (text[i] != '\n' && ((unsigned char)text[i] < 0x21 || (unsigned char)text[i] > 0x7e)) return -1;
+    while (start < n) {
+        size_t end = start;
+        unsigned key, value_index;
+        char *eq, *value;
+        uint64_t number;
+        while (end < n && text[end] != '\n') end++;
+        if (end == start || end - start > 80) return -1;
+        text[end] = 0;
+        eq = strchr(text+start, '=');
+        if (!eq || !eq[1]) return -1;
+        *eq = 0; value = eq+1;
+        for (key = 0; key < sizeof(keys)/sizeof(keys[0]); key++)
+            if (!strcmp(text+start, keys[key])) break;
+        if (key == sizeof(keys)/sizeof(keys[0]) || (seen & (1U << key))) return -1;
+        seen |= 1U << key;
+        switch (key) {
+        case 0: if (strcmp(value, "1")) return -1; break;
+        case 1: if (strcmp(value, "gps_offline")) return -1; break;
+        case 2:
+            for (value_index = 0; value_index < sizeof(sign_states)/sizeof(sign_states[0]); value_index++)
+                if (!strcmp(value, sign_states[value_index])) break;
+            if (value_index == sizeof(sign_states)/sizeof(sign_states[0])) return -1;
+            parsed.state = (enum sign_state)value_index; break;
+        case 6:
+            for (value_index = 0; value_index < sizeof(sign_codes)/sizeof(sign_codes[0]); value_index++)
+                if (!strcmp(value, sign_codes[value_index])) break;
+            if (value_index == sizeof(sign_codes)/sizeof(sign_codes[0])) return -1;
+            parsed.code = (enum sign_code)value_index; break;
+        default:
+            if (sign_number(value, key == 10 ? UINT64_MAX : UINT32_MAX, &number) < 0) return -1;
+            switch (key) {
+            case 3: if (number > 1) return -1; parsed.gps_fresh = (unsigned)number; break;
+            case 4: if (number > 1) return -1; parsed.active = (unsigned)number; break;
+            case 5: parsed.sequence = (uint32_t)number; break;
+            case 7:
+                if (number && (number < 10 || number > 130)) return -1;
+                parsed.speed = (unsigned)number; break;
+            case 8: if (number > 2000) return -1; parsed.distance = (unsigned)number; break;
+            case 9: parsed.event_id = (uint32_t)number; break;
+            case 10: parsed.monotonic_ms = number; break;
+            }
+        }
+        start = end+1;
+    }
+    if (seen != (1U << (sizeof(keys)/sizeof(keys[0]))) - 1) return -1;
+    if (parsed.monotonic_ms > now && parsed.monotonic_ms - now > C2M_WEB_SIGN_FUTURE_MS) return -1;
+    age = now > parsed.monotonic_ms ? now - parsed.monotonic_ms : 0;
+    parsed.available = 1;
+    if (age >= C2M_WEB_SIGN_MAX_AGE_MS) parsed.state = SIGN_STALE;
+    else parsed.expires = C2M_WEB_SIGN_MAX_AGE_MS - (unsigned)age;
+    if (parsed.state == SIGN_STALE) parsed.gps_fresh = 0;
+    if (parsed.state != SIGN_READY || !parsed.gps_fresh || parsed.code == SIGN_NONE
+        || (parsed.code == SIGN_SPEED && !parsed.speed)) parsed.active = 0;
+    if (!parsed.active) { parsed.code = SIGN_NONE; parsed.speed = parsed.distance = 0; }
+    else if (parsed.code != SIGN_SPEED) parsed.speed = 0;
+    *out = parsed; return 0;
 }
 #ifndef C2M_WEB_CORE_ONLY
 static int random_bytes(unsigned char *p, size_t n)
@@ -447,6 +550,35 @@ static int64_t now_ms(void)
     if (clock_gettime(CLOCK_MONOTONIC, &t) < 0) return -1;
     return (int64_t)t.tv_sec * 1000 + t.tv_nsec / 1000000;
 }
+static int read_sign_status(const struct service *s, struct sign_status *status)
+{
+    char text[C2M_WEB_MAX_BODY + 1];
+    size_t used = 0;
+    int fd;
+    int64_t current;
+    sign_unavailable(status);
+    fd = open_status(s->sign_status_path);
+    if (fd < 0) return -1;
+    while (used < C2M_WEB_MAX_BODY) {
+        ssize_t n = read(fd, text + used, C2M_WEB_MAX_BODY - used);
+        if (n < 0 && errno == EINTR) continue;
+        if (n < 0) { close(fd); erase(text, sizeof(text)); return -1; }
+        if (!n) break;
+        used += (size_t)n;
+    }
+    {
+        char extra;
+        ssize_t n = read(fd, &extra, 1);
+        close(fd);
+        if (n != 0 || memchr(text, 0, used)) { erase(text, sizeof(text)); return -1; }
+    }
+    text[used] = 0;
+    current = now_ms();
+    if (current < 0 || parse_sign_status(text, used, (uint64_t)current, status) < 0) {
+        erase(text, sizeof(text)); sign_unavailable(status); return -1;
+    }
+    erase(text, sizeof(text)); return 0;
+}
 static int wait_ready(int fd, short events, int64_t deadline)
 {
     struct pollfd p;
@@ -603,7 +735,8 @@ static const char *reason(int code)
     case 503: return "Service Unavailable"; default: return "Internal Server Error";
     }
 }
-static void respond(int fd, int code, const char *type, const char *extra, const char *body)
+static void respond_policy(int fd, int code, const char *type, const char *extra,
+                           const char *body, int signs_page)
 {
     char header[1024];
     size_t n = strlen(body);
@@ -616,10 +749,15 @@ static void respond(int fd, int code, const char *type, const char *extra, const
          * Do not accept Origin:null or weaken the Host/CSRF checks instead. */
         "X-Content-Type-Options: nosniff\r\nReferrer-Policy: same-origin\r\n"
         "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; "
-        "form-action 'self'; frame-ancestors 'none'; base-uri 'none'\r\n%s\r\n",
-        code, reason(code), type, (unsigned long)n, extra ? extra : "");
+        "form-action 'self'; frame-ancestors 'none'; base-uri 'none'%s\r\n%s\r\n",
+        code, reason(code), type, (unsigned long)n,
+        signs_page ? "; script-src 'self'; connect-src 'self'" : "", extra ? extra : "");
     if (len < 0 || (size_t)len >= sizeof(header)) return;
     if (send_all(fd, header, (size_t)len, deadline) == 0) send_all(fd, body, n, deadline);
+}
+static void respond(int fd, int code, const char *type, const char *extra, const char *body)
+{
+    respond_policy(fd, code, type, extra, body, 0);
 }
 static void error_response(int fd, int code, const char *error)
 {
@@ -732,6 +870,159 @@ static void status_response(int fd, struct service *s)
         status.supported, status.state, ssid, status.ipv4, status.error, status.bt);
     respond(fd, 200, "application/json; charset=utf-8", NULL, body);
 }
+static void signs_response(int fd, const struct service *s)
+{
+    struct sign_status status;
+    char body[640];
+    int n;
+    read_sign_status(s, &status);
+    n = snprintf(body, sizeof(body), "{\"version\":1,\"source\":\"gps_offline\","
+        "\"status_available\":%s,\"state\":\"%s\",\"gps_fresh\":%s,\"active\":%s,"
+        "\"sequence\":%" PRIu32 ",\"code\":\"%s\",\"speed_kmh\":%u,\"distance_m\":%u,"
+        "\"event_id\":%" PRIu32 ",\"monotonic_ms\":%" PRIu64 ",\"expires_in_ms\":%u}\n",
+        status.available ? "true" : "false", sign_states[status.state],
+        status.gps_fresh ? "true" : "false", status.active ? "true" : "false",
+        status.sequence, sign_codes[status.code], status.speed, status.distance,
+        status.event_id, status.monotonic_ms, status.expires);
+    if (n < 0 || (size_t)n >= sizeof(body)) { error_response(fd, 500, "signs_error"); return; }
+    respond(fd, 200, "application/json; charset=utf-8", NULL, body);
+}
+static void signs_page_response(int fd)
+{
+    static const char page[] =
+        "<!doctype html><html lang=\"vi\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>C2M D4 · Biển báo ngoại tuyến</title><style>"
+        "body{font:18px system-ui,sans-serif;max-width:760px;margin:1em auto;padding:0 1em;color:#17212b}"
+        "#warning{border:4px solid #ae1723;padding:1em;text-align:center}"
+        "#sign{font-size:2em;font-weight:bold}#speed{display:block;font-size:4em;font-weight:bold}"
+        "button{padding:1em;font:inherit}.note{padding:1em;background:#eef4ff}"
+        "[hidden]{display:none!important}</style><script src=\"/signs.js\" defer></script>"
+        "</head><body><nav><a href=\"/\">Cấu hình WiFi · D3</a> · "
+        "<a href=\"/api/signs\">JSON biển báo</a></nav><h1>Biển báo ngoại tuyến · D4</h1>"
+        "<p class=\"note\">Biển trong dữ liệu gần vị trí GPS — không xác nhận làn/hướng/giới hạn đang hiệu lực</p>"
+        "<p id=\"fresh\" role=\"status\">Chưa có dữ liệu mới — không hiển thị cảnh báo.</p>"
+        "<section id=\"warning\" hidden aria-live=\"polite\"><div id=\"sign\"></div>"
+        "<span id=\"speed\"></span><p id=\"distance\"></p></section>"
+        "<p id=\"empty\">Không có cảnh báo đang hiển thị.</p>"
+        "<button id=\"sound\" type=\"button\" aria-pressed=\"false\">Bật tiếng bíp trên điện thoại/trình duyệt</button>"
+        "<p>Âm thanh mặc định tắt, chỉ bật sau khi bấm nút; bíp ngắn tạo cục bộ, "
+        "không giọng đọc/TTS. Âm thanh qua điện thoại/trình duyệt, KHÔNG qua loa camera. "
+        "Chỉ dùng khi trang ở tiền cảnh; trình duyệt có thể chặn âm thanh.</p>"
+        "<p>Chỉ tham khảo, không thay thế quan sát biển thực tế hoặc các biện pháp an toàn. "
+        "Không nhìn hay thao tác trang khi lái xe. Dữ liệu GPS/cơ sở dữ liệu có thể sai hoặc thiếu. "
+        "Trang không truy cập GPS của điện thoại; không kết nối Internet, không dùng CDN. "
+        "Nếu mất cập nhật, cảnh báo tự xóa sau tối đa 3 giây; ẩn trang sẽ xóa ngay.</p>"
+        "<noscript>Cần JavaScript để cập nhật. Không có cảnh báo trực tiếp khi JavaScript tắt.</noscript>"
+        "</body></html>\n";
+    respond_policy(fd, 200, "text/html; charset=utf-8", NULL, page, 1);
+}
+static void signs_script_response(int fd)
+{
+    /* Static script: no status text, credentials or per-device values embedded.
+     * Only textContent with fixed labels and bounded numbers reaches the DOM. */
+    static const char script[] =
+        "'use strict';\n(() => {\n"
+        "const el = id => document.getElementById(id);\n"
+        "const states = Object.freeze({waiting_gps:'Chờ GPS',warming_up:'GPS đang ổn định',"
+        "ready:'Sẵn sàng',stale:'Dữ liệu đã cũ',no_database:'Không có cơ sở dữ liệu',"
+        "disabled:'Đã tắt',error:'Không có dữ liệu hợp lệ'});\n"
+        "const labels = Object.freeze({none:'',speed_limit:'Biển giới hạn tốc độ',"
+        "residential_start:'Bắt đầu khu dân cư',residential_end:'Hết khu dân cư'});\n"
+        "let audio = null, enabled = false, tone = null, lastEvent = null;\n"
+        "let expiresMono = 0, expiresWall = 0, expiryTimer = 0, busy = false, generation = 0, controller = null;\n"
+        "const integer = (v, lo, hi) => Number.isSafeInteger(v) && v >= lo && v <= hi;\n"
+        "const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);\n"
+        "function clearWarning(message) {\n"
+        "  clearTimeout(expiryTimer); expiresMono = expiresWall = 0;\n"
+        "  el('warning').hidden = true; el('sign').textContent = ''; el('speed').textContent = '';\n"
+        "  el('distance').textContent = ''; el('empty').hidden = false; el('fresh').textContent = message;\n"
+        "}\n"
+        "function mute() {\n"
+        "  enabled = false; if (tone) { try { tone.stop(); } catch (_) {} tone = null; }\n"
+        "  if (audio && audio.state === 'running') audio.suspend().catch(() => {});\n"
+        "  el('sound').textContent = 'Bật tiếng bíp trên điện thoại/trình duyệt';\n"
+        "  el('sound').setAttribute('aria-pressed', 'false');\n"
+        "}\n"
+        "el('sound').addEventListener('click', async () => {\n"
+        "  if (enabled) { mute(); return; }\n"
+        "  if (document.hidden) return; el('sound').disabled = true; const epoch = generation;\n"
+        "  try {\n"
+        "    const Audio = window.AudioContext || window.webkitAudioContext;\n"
+        "    if (!Audio) throw new Error('unavailable');\n"
+        "    if (!audio) audio = new Audio(); await audio.resume();\n"
+        "    if (document.hidden || epoch !== generation || audio.state !== 'running') throw new Error('suspended');\n"
+        "    enabled = true; el('sound').textContent = 'Tắt tiếng bíp trên điện thoại/trình duyệt';\n"
+        "    el('sound').setAttribute('aria-pressed', 'true');\n"
+        "  } catch (_) { mute(); el('sound').textContent = 'Âm thanh bị chặn — bấm để thử bật lại'; }\n"
+        "  finally { el('sound').disabled = false; }\n"
+        "});\n"
+        "function beep() {\n"
+        "  if (!enabled || document.hidden || !audio || audio.state !== 'running') return;\n"
+        "  try {\n"
+        "    const oscillator = audio.createOscillator(), gain = audio.createGain(), t = audio.currentTime;\n"
+        "    oscillator.frequency.value = 880; gain.gain.setValueAtTime(0, t);\n"
+        "    gain.gain.linearRampToValueAtTime(0.035, t + 0.015);\n"
+        "    gain.gain.linearRampToValueAtTime(0, t + 0.15);\n"
+        "    oscillator.connect(gain); gain.connect(audio.destination); tone = oscillator;\n"
+        "    oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); if (tone === oscillator) tone = null; };\n"
+        "    oscillator.start(t); oscillator.stop(t + 0.18);\n"
+        "  } catch (_) { mute(); }\n"
+        "}\n"
+        "function valid(s) {\n"
+        "  return s && s.version === 1 && s.source === 'gps_offline' && own(states, s.state) && own(labels, s.code)\n"
+        "    && typeof s.status_available === 'boolean' && typeof s.gps_fresh === 'boolean' && typeof s.active === 'boolean'\n"
+        "    && integer(s.sequence, 0, 4294967295) && integer(s.event_id, 0, 4294967295)\n"
+        "    && integer(s.speed_kmh, 0, 130) && (s.speed_kmh === 0 || s.speed_kmh >= 10)\n"
+        "    && integer(s.distance_m, 0, 2000) && integer(s.expires_in_ms, 0, 3000)\n"
+        "    && integer(s.monotonic_ms, 0, Number.MAX_SAFE_INTEGER);\n"
+        "}\n"
+        "function expired() {\n"
+        "  if (expiresMono && (performance.now() >= expiresMono || Date.now() >= expiresWall))\n"
+        "    clearWarning('Dữ liệu đã cũ — đã xóa cảnh báo.');\n"
+        "}\n"
+        "async function poll() {\n"
+        "  if (busy || document.hidden) return; busy = true;\n"
+        "  const epoch = generation, started = performance.now(), wall = Date.now();\n"
+        "  controller = new AbortController(); const current = controller;\n"
+        "  const timeout = setTimeout(() => current.abort(), 1800);\n"
+        "  try {\n"
+        "    const response = await fetch('/api/signs', {method:'GET', mode:'same-origin', credentials:'omit',\n"
+        "      cache:'no-store', redirect:'error', signal:current.signal});\n"
+        "    if (!response.ok || !response.headers.get('content-type')?.startsWith('application/json')) throw new Error('response');\n"
+        "    const s = await response.json();\n"
+        "    if (epoch !== generation || document.hidden) return;\n"
+        "    if (!valid(s)) throw new Error('schema');\n"
+        "    const remaining = s.expires_in_ms - Math.max(performance.now() - started, Date.now() - wall, 0);\n"
+        "    clearWarning(states[s.state] + ' — không có cảnh báo đang hiển thị.');\n"
+        "    if (!s.status_available || !s.gps_fresh || s.state !== 'ready' || remaining <= 0) {\n"
+        "      if (remaining <= 0 && s.status_available) el('fresh').textContent = 'Dữ liệu đã cũ — đã xóa cảnh báo.';\n"
+        "      return;\n"
+        "    }\n"
+        "    el('fresh').textContent = 'GPS mới theo nguồn ngoại tuyến — không phải xác minh độc lập.';\n"
+        "    expiresMono = performance.now() + remaining; expiresWall = Date.now() + remaining;\n"
+        "    expiryTimer = setTimeout(expired, Math.ceil(remaining));\n"
+        "    if (!s.active || s.code === 'none' || (s.code === 'speed_limit' && !s.speed_kmh)) return;\n"
+        "    el('sign').textContent = labels[s.code];\n"
+        "    el('speed').textContent = s.code === 'speed_limit' ? String(s.speed_kmh) + ' km/h' : '';\n"
+        "    el('distance').textContent = 'Khoảng cách trong dữ liệu: ' + String(s.distance_m) + ' m';\n"
+        "    const isNew = lastEvent !== s.event_id; lastEvent = s.event_id;\n"
+        "    el('empty').hidden = true; el('warning').hidden = false; if (isNew) beep();\n"
+        "  } catch (_) {\n"
+        "    if (epoch === generation) clearWarning('Mất cập nhật hoặc dữ liệu không hợp lệ — đã xóa cảnh báo.');\n"
+        "  } finally { clearTimeout(timeout); if (controller === current) controller = null; busy = false; }\n"
+        "}\n"
+        "function pause() {\n"
+        "  generation++; if (controller) controller.abort(); mute();\n"
+        "  clearWarning('Trang đã ẩn hoặc vừa trở lại — chờ dữ liệu mới.');\n"
+        "}\n"
+        "document.addEventListener('visibilitychange', () => { pause(); if (!document.hidden) poll(); });\n"
+        "window.addEventListener('pagehide', pause);\n"
+        "window.addEventListener('pageshow', () => { clearWarning('Chờ dữ liệu mới.'); poll(); });\n"
+        "setInterval(poll, 1000); setInterval(expired, 250); poll();\n"
+        "})();\n";
+    respond(fd, 200, "application/javascript; charset=utf-8", NULL, script);
+}
 static const char *notice_for(const char *path)
 {
     if (!strcmp(path, "/?notice=saved")) return "Đã lưu cấu hình riêng tư. Chưa kết nối; hãy bấm Kết nối khi sẵn sàng.";
@@ -776,7 +1067,7 @@ static void page_response(int fd, struct service *s, const char *path)
         "Kết nối (giữ AP)</button></form><form method=\"post\" action=\"/api/forget\">"
         "<input type=\"hidden\" name=\"csrf\" value=\"%s\"><p><button type=\"submit\">"
         "Quên cấu hình đã lưu</button></p></form><p><a href=\"/\">Làm mới trạng thái</a> · "
-        "<a href=\"/api/status\">JSON trạng thái</a></p><p>Không có chức năng đặt lại, "
+        "<a href=\"/api/status\">JSON trạng thái</a> · <a href=\"/signs\">Biển báo ngoại tuyến · D4</a></p><p>Không có chức năng đặt lại, "
         "ghi flash, thay đổi ghi hình hoặc nvconf. HTTP không mã hóa; chỉ dùng "
         "trong AP đáng tin cậy, không công khai ra Internet.</p></body></html>\n",
         s->loopback ? "Chế độ thử trên localhost; chưa xác nhận AP của camera." : "Trang chỉ phục vụ tại IPv4 AP đã xác minh của wlan0; AP hiện đang hoạt động.",
@@ -808,6 +1099,13 @@ static void handle_request(int fd, struct service *s)
     if (!strcmp(request.method, "GET")) {
         if (!strcmp(request.path, "/") || *notice_for(request.path)) page_response(fd, s, request.path);
         else if (!strcmp(request.path, "/api/status")) status_response(fd, s);
+        else if (!strcmp(request.path, "/signs") || !strcmp(request.path, "/api/signs") || !strcmp(request.path, "/signs.js")) {
+            if (request.fetch_site[0] && strcmp(request.fetch_site, "same-origin") && strcmp(request.fetch_site, "none"))
+                error_response(fd, 403, "cross_origin_rejected");
+            else if (!strcmp(request.path, "/signs")) signs_page_response(fd);
+            else if (!strcmp(request.path, "/api/signs")) signs_response(fd, s);
+            else signs_script_response(fd);
+        }
         else error_response(fd, 404, "not_found");
         goto done;
     }
@@ -858,6 +1156,9 @@ int c2m_web_self_test(void)
     struct sha1 sha;
     struct form form;
     struct request request;
+    struct sign_status sign;
+    char sign_text[] = "version=1\nsource=gps_offline\nstate=ready\ngps_fresh=1\nactive=1\n"
+        "sequence=9\ncode=speed_limit\nspeed_kmh=50\ndistance_m=100\nevent_id=4\nmonotonic_ms=1000\n";
     unsigned char output[32], decoded[33];
     char hex[65];
     size_t n;
@@ -887,6 +1188,10 @@ int c2m_web_self_test(void)
         || valid_password((const unsigned char *)"short", 5)
         || valid_password((const unsigned char *)"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 64)) return 1;
     if (!equal_token(expected, expected) || equal_token(expected, "short")) return 1;
+    if (parse_sign_status(sign_text, sizeof(sign_text) - 1, 3000, &sign) < 0
+        || !sign.active || sign.code != SIGN_SPEED || sign.speed != 50) return 1;
+    sign_text[0] = 'x';
+    if (parse_sign_status(sign_text, sizeof(sign_text) - 1, 3000, &sign) == 0) return 1;
     if (valid_utf8_ssid((const unsigned char *)"\xc0\xaf", 2)
         || valid_utf8_ssid((const unsigned char *)"\xed\xa0\x80", 3)
         || valid_utf8_ssid((const unsigned char *)"\xf4\x90\x80\x80", 4)
@@ -907,7 +1212,7 @@ static void usage(FILE *out)
 {
     fputs("Usage: c2m-web [--bind 127.0.0.1] [--port 8099]\n"
           "  [--config-dir /customer/c2m-state] [--run-dir /tmp/c2m-d3]\n"
-          "  [--status-file /tmp/c2m_wifi_status]\n"
+          "  [--status-file /tmp/c2m_wifi_status] [--sign-status-file /tmp/c2m_d4_status]\n"
           "  c2m-web --self-test\n"
           "Default binding requires validated AP mode and IPv4 on wlan0.\n"
           "Only the exact IPv4 loopback address is allowed as an explicit bind.\n", out);
@@ -920,6 +1225,7 @@ int main(int argc, char **argv)
     struct sigaction action;
     unsigned char random[TOKEN_BYTES];
     const char *config = C2M_WEB_CONFIG_DIR, *run = C2M_WEB_RUN_DIR, *status = C2M_WEB_STATUS_FILE;
+    const char *sign_status = C2M_WEB_SIGN_STATUS_FILE;
     int listener = -1, reuse = 1, i, exit_code = 1;
     memset(&service, 0, sizeof(service)); service.config_fd = service.run_fd = -1;
     service.port = C2M_WEB_DEFAULT_PORT;
@@ -942,10 +1248,12 @@ int main(int argc, char **argv)
         } else if (!strcmp(argv[i], "--config-dir")) config = value;
         else if (!strcmp(argv[i], "--run-dir")) run = value;
         else if (!strcmp(argv[i], "--status-file")) status = value;
+        else if (!strcmp(argv[i], "--sign-status-file")) sign_status = value;
         else { usage(stderr); goto done; }
     }
     if (status[0] != '/') { fputs("Status path must be absolute.\n", stderr); goto done; }
-    service.status_path = status;
+    if (sign_status[0] != '/') { fputs("Sign status path must be absolute.\n", stderr); goto done; }
+    service.status_path = status; service.sign_status_path = sign_status;
     if (service.loopback) {
         inet_pton(AF_INET, "127.0.0.1", &service.address);
         inet_pton(AF_INET, "255.0.0.0", &service.mask);

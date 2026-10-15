@@ -63,6 +63,10 @@ jobs:
           python3 tests/test_d3_web.py
           python3 tests/test_d3_wifi_control.py
           python3 tests/test_d3_gps.py
+          python3 tests/test_d4_database.py
+          python3 tests/test_d4_web.py
+          python3 tests/test_d4_advisory.py
+          python3 tools/fw/test_d4_mutation.py
           python3 tools/fw/test_reversion_sd_package.py
       - name: D3 real-browser loopback form regression (no device access)
         env:
@@ -74,6 +78,8 @@ jobs:
             exit 1
           fi
           python3 tests/test_d3_web_browser.py
+          python3 tests/test_d4_browser.py
+          python3 tests/test_d4_end_to_end.py
   arm-minimal:
     # Reproducible cross-build of the MINIMAL idle binary (static analysis only).
     # Label: HOST-CROSS-BUILT, NOT device-tested. No firmware needed.

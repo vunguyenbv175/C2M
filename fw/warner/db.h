@@ -13,7 +13,12 @@
 #define SIGNDB_H
 
 #include "warner.h"
+#include <stdio.h>
 
+/* Caller owns an already checked, seekable binary stream at offset zero.
+ * Exact-size/read checks are identical to signdb_load. Never closes the
+ * stream, reopens a pathname, or returns a partial prefix. Clears n_out. */
+warner_sign_t *signdb_load_stream(FILE *stream, int *n_out);
 warner_sign_t *signdb_load(const char *path, int *n_out);
 void signdb_free(warner_sign_t *signs);
 

@@ -6,7 +6,7 @@
 #include <math.h>
 
 #define REC_SIZE 100
-#define MAX_SIGNS 40000U /* deployment memory bound, not format maximum */
+#define MAX_SIGNS 40000U
 
 static int utf8_string(const unsigned char *s, size_t size) {
     size_t i = 0;
@@ -15,7 +15,7 @@ static int utf8_string(const unsigned char *s, size_t size) {
         int extra, j;
         unsigned int code, minimum;
         if (c < 0x80) {
-            if (c < 0x20 || c == 0x7f) return 0; /* no control/log injection */
+            if (c < 0x20 || c == 0x7f) return 0;
             continue;
         }
         if (c >= 0xc2 && c <= 0xdf) { extra = 1; code = c & 0x1f; minimum = 0x80; }
@@ -33,8 +33,7 @@ static int utf8_string(const unsigned char *s, size_t size) {
     return i < size && s[i] == 0;
 }
 
-warner_sign_t *signdb_load(const char *path, int *n_out) {
-    FILE *f;
+warner_sign_t *signdb_load_stream(FILE *f, int *n_out) {
     unsigned char hdr[12], rec[REC_SIZE];
     unsigned int n, i;
     long size;
@@ -42,16 +41,13 @@ warner_sign_t *signdb_load(const char *path, int *n_out) {
     const unsigned int endian = 1;
     if (!n_out) return NULL;
     *n_out = 0;
-    if (!path || sizeof(double) != 8 || sizeof(float) != 4 ||
-        *((const unsigned char *)&endian) != 1) return NULL;
-    f = fopen(path, "rb");
-    if (!f) return NULL;
+    if (!f || sizeof(double) != 8 || sizeof(float) != 4 ||
+        *((const unsigned char *)&endian) != 1 || ferror(f) || ftell(f) != 0) return NULL;
     if (fread(hdr, 1, sizeof(hdr), f) != sizeof(hdr) ||
         memcmp(hdr, "C2MSDB01", 8) != 0) goto fail;
     n = (unsigned int)hdr[8] | ((unsigned int)hdr[9] << 8) |
         ((unsigned int)hdr[10] << 16) | ((unsigned int)hdr[11] << 24);
     if (n == 0 || n > MAX_SIGNS) goto fail;
-    /* Check exact length before allocation; appended or truncated data fails. */
     if (fseek(f, 0, SEEK_END) || (size = ftell(f)) < 0 ||
         size != 12L + (long)n * REC_SIZE || fseek(f, 12, SEEK_SET)) goto fail;
     signs = (warner_sign_t *)calloc(n, sizeof(warner_sign_t));
@@ -72,15 +68,25 @@ warner_sign_t *signdb_load(const char *path, int *n_out) {
         memcpy(signs[i].label, rec + 36, WARNER_LABEL_LEN);
     }
     if (ferror(f) || fgetc(f) != EOF || ferror(f)) goto fail;
-    fclose(f);
     *n_out = (int)n;
     return signs;
 fail:
-    fclose(f);
     free(signs);
+    *n_out = 0;
     return NULL;
 }
 
-void signdb_free(warner_sign_t *signs) {
-    free(signs);
+warner_sign_t *signdb_load(const char *path, int *n_out) {
+    FILE *f;
+    warner_sign_t *signs;
+    if (!n_out) return NULL;
+    *n_out = 0;
+    if (!path) return NULL;
+    f = fopen(path, "rb");
+    if (!f) return NULL;
+    signs = signdb_load_stream(f, n_out);
+    fclose(f);
+    return signs;
 }
+
+void signdb_free(warner_sign_t *signs) { free(signs); }
