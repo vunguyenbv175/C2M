@@ -35,15 +35,38 @@ class SignBrowserTests(unittest.TestCase):
             if self.evaluate(expression):
                 return
             time.sleep(0.05)
-        self.fail("browser state did not converge: " + expression)
+        # Keep failures actionable without changing the production page or
+        # relaxing its three-second native/browser freshness contract.
+        diagnostic = self.evaluate("""(()=>({
+            href:location.href,
+            readyState:document.readyState,
+            documentHidden:document.hidden,
+            hidden:document.getElementById('warning')?.hidden,
+            fresh:document.getElementById('fresh')?.textContent,
+            distance:document.getElementById('distance')?.textContent,
+            beeps:window.__beeps
+        }))()""")
+        errors = [event["params"] for event in self.events
+                  if event.get("method") in ("Runtime.exceptionThrown", "Network.loadingFailed")]
+        self.fail("browser state did not converge: " + expression + "; state=" + repr(diagnostic)
+                  + "; browser_errors=" + repr(errors[-5:]))
 
     def publish(self, event=1, active=1, state="ready", fresh=1):
         self.publisher_sequence += 1
-        self.sign_status.write_bytes(signs_tests.snapshot(
-            code="residential_start", speed_kmh=0,
+        payload = signs_tests.snapshot(
+            code="residential_start", speed_kmh=0, distance_m=self.publisher_sequence,
             monotonic_ms=int(time.monotonic()*1000), sequence=self.publisher_sequence,
-            event_id=event, active=active, state=state, gps_fresh=fresh))
-        self.sign_status.chmod(0o600)
+            event_id=event, active=active, state=state, gps_fresh=fresh)
+        # The server may read while a poll is in progress. Replace a complete,
+        # mode-correct snapshot instead of exposing write_bytes' truncation gap.
+        temporary = self.sign_status.with_name(self.sign_status.name + ".tmp")
+        try:
+            temporary.write_bytes(payload)
+            temporary.chmod(0o600)
+            os.replace(temporary, self.sign_status)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     def configure_sign_server(self):
         self.http.stop()
@@ -62,23 +85,24 @@ class SignBrowserTests(unittest.TestCase):
 
     def test_actual_render_audio_gesture_dedup_and_expiry(self):
         self.configure_sign_server()
-        self.publish()
+        self.command("Runtime.enable")
         # Add instrumentation before the first page JS; actual browser audio
         # constructor/autoplay policy stays intact. Counts scheduling, not hearing.
+        # An IIFE avoids introducing page-global lexical bindings. Do not wrap
+        # fetch/Response.json: baseline synchronization uses rendered fixture data.
         self.command("Page.addScriptToEvaluateOnNewDocument", {"source": """
-            window.__beeps=0;window.__signRequests=0;window.__signResponses=0;
-            const originalFetch=window.fetch;
-            window.fetch=async function(...args){
-                const request=++window.__signRequests,response=await originalFetch.apply(this,args);
-                const json=response.json.bind(response);
-                response.json=async function(){const value=await json();window.__signResponses=request;return value;};
-                return response;};
-            const original=AudioContext.prototype.createOscillator;
-            AudioContext.prototype.createOscillator=function(){
-                const oscillator=original.call(this),start=oscillator.start.bind(oscillator);
-                oscillator.start=function(...args){window.__beeps++;return start(...args);};return oscillator;};
+            (()=>{
+                window.__beeps=0;
+                const original=AudioContext.prototype.createOscillator;
+                AudioContext.prototype.createOscillator=function(){
+                    const oscillator=original.call(this),start=oscillator.start.bind(oscillator);
+                    oscillator.start=function(...args){window.__beeps++;return start(...args);};return oscillator;};
+            })();
         """})
         self.navigate("/signs")
+        # Start the synthetic producer only after navigation/instrumentation. A
+        # pre-navigation one-shot snapshot can expire before Chrome's first poll.
+        self.publish()
         self.wait_js("!document.getElementById('warning').hidden")
         self.assertIn("GPS", self.evaluate("document.body.innerText"))
         self.assertEqual(self.evaluate("window.__beeps"), 0)
@@ -86,11 +110,14 @@ class SignBrowserTests(unittest.TestCase):
         self.click_sound()
         self.wait_js("document.getElementById('sound').getAttribute('aria-pressed')==='true'")
         self.assertEqual(self.evaluate("window.__beeps"), 0, "enable is not replay")
-        # A poll already in flight at the gesture cannot arm audio. Let a fresh
-        # post-enable response establish the intentionally conservative baseline.
-        target = self.evaluate("window.__signRequests+1")
-        self.publish(event=1)
-        self.wait_js(f"window.__signResponses>={target}")
+        # One request may have started before the gesture. Observe two distinct
+        # rendered heartbeats of the same event: the second necessarily comes
+        # from a post-enable poll and establishes the silent baseline. Using the
+        # displayed distance marker does not interfere with native fetch/JSON.
+        for _ in range(2):
+            self.publish(event=1)
+            marker = json.dumps(f"Khoảng cách trong dữ liệu: {self.publisher_sequence} m")
+            self.wait_js(f"document.getElementById('distance').textContent==={marker}")
         self.assertEqual(self.evaluate("window.__beeps"), 0, "baseline is silent")
         self.publish(event=2)
         self.wait_js("window.__beeps===1")
