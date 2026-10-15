@@ -131,6 +131,19 @@ def write_mock_dropbear(path: Path, log: Path | None = None,
 
 
 class CoreTests(unittest.TestCase):
+    def test_stock_nss_is_scoped_to_trusted_package_dir(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        header = HEADER.read_text(encoding="utf-8")
+        boot = BOOT.read_text(encoding="utf-8")
+        self.assertIn('"LD_LIBRARY_PATH=/customer/c2m:/lib"', header)
+        self.assertIn('"/customer/c2m/libnss_files.so.2"', header)
+        self.assertIn('export LD_LIBRARY_PATH=/customer/c2m:/lib', boot)
+        self.assertIn('if (!c->loopback && trusted_nss_module())', source)
+        self.assertLess(source.index('if (!c->loopback && trusted_nss_module())'),
+                        source.index('pw = getpwnam("root")'))
+        self.assertEqual(source.count('(char *)C2M_DEBUG_LIBRARY_ENV'), 2)
+        self.assertNotIn('export LD_LIBRARY_PATH=/customer/ssh', boot)
+
     def test_portable_native_self_test(self) -> None:
         with tempfile.TemporaryDirectory(prefix="c2m-debug-core-") as tmp:
             binary = Path(tmp) / ("core.exe" if os.name == "nt" else "core")

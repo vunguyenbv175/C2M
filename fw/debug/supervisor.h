@@ -6,6 +6,8 @@
  * Production CLI (camera, ARM glibc 2.30, root only):
  *   /customer/c2m/c2m-debug --serve
  * Fixed production paths (no overrides accepted without --loopback-test):
+ *   NSS module  /customer/c2m/libnss_files.so.2 (stock glibc-2.30 bytes,
+ *              mutator-pinned; read-only, 0644, single link)
  *   dropbear    /customer/c2m/dropbear
  *   dropbearkey /customer/c2m/dropbearkey
  *   owner pub   /customer/c2m/debug_owner.pub   (ssh-ed25519, one line)
@@ -106,6 +108,9 @@
 
 #define C2M_DEBUG_DROPBEAR "/customer/c2m/dropbear"
 #define C2M_DEBUG_DROPBEARKEY "/customer/c2m/dropbearkey"
+#define C2M_DEBUG_NSS_MODULE "/customer/c2m/libnss_files.so.2"
+#define C2M_DEBUG_LIBRARY_ENV "LD_LIBRARY_PATH=/customer/c2m:/lib"
+#define C2M_DEBUG_NSS_BYTES 361400
 #define C2M_DEBUG_OWNER_PUB "/customer/c2m/debug_owner.pub"
 #define C2M_DEBUG_RUN_DIR "/tmp/c2m-debug"
 #define C2M_DEBUG_CONFIG_DIR "/customer/minieye/config/.c2m-debug"

@@ -38,6 +38,12 @@ This is the **client key** fingerprint, not the future camera host key.
 - Listen only on verified stock AP `wlan0`, IPv4 `192.168.1.1`, port2222;
   bind both address and interface. No wildcard/WAN/STA listener, route,
   firewall, AP/STA mode change, or inbound tunnel.
+- The stock rootfs lacks `libnss_files.so.2`, which glibc2.30 needs for
+  normal passwd/group lookups. Copy its exact existing customer-image bytes
+  to the protected debug asset directory as0644; pin SHA-256
+  `381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd`.
+  Set only the fixed loader path `/customer/c2m:/lib`, never the writable
+  stock SSH library directory. No custom account parser or auth bypass.
 - Public-key-only authentication; password/PAM and forwarding compiled out.
   Single-UID server prevents the owner key from authorizing other accounts.
 - Stock-directory trust is explicitly limited to fixed vendor paths/UIDs:
@@ -68,7 +74,8 @@ ADAS, or inject M4 warnings/audio as a shortcut.
    QEMU self-tests/key generation. Run native real SSH positive/negative
    authentication and fixture-supervisor tests on loopback only.
 2. Private firmware workflow must pin the public owner key and include exactly
-   four debug service files plus that public key. Preserve EN core, C audio,
+   five debug service files (including the byte-pinned stock glibc NSS module)
+   plus that public key. Preserve EN core, C audio,
    D3.1 Wi-Fi protections, D4 advisory scope and Bluetooth V2 inventory.
 3. Deep-validate and final-extract the actual updater payload before staging.
    CI stock-token packages are not flash-ready. Reidentify the updater card;

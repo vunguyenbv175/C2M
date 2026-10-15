@@ -805,6 +805,30 @@ static int trusted_exec(const char *path)
     return access(path, X_OK) ? -1 : 0;
 }
 
+/* The only auxiliary runtime module is an exact stock-glibc file pinned
+ * by the image mutator. Never load from group-writable /customer/ssh/lib.
+ * This check precedes getpwnam(), which is the first NSS lookup here. */
+static int trusted_nss_module(void)
+{
+    const char *path = C2M_DEBUG_NSS_MODULE;
+    struct stat before, after;
+    int fd, ok;
+    if (parent_dirs_safe(path) || lstat(path, &before) ||
+        !S_ISREG(before.st_mode) || before.st_nlink != 1 ||
+        !pkg_asset_uid_ok(before.st_uid, before.st_gid) ||
+        (before.st_mode & 07777) != 0644 ||
+        before.st_size != C2M_DEBUG_NSS_BYTES) return -1;
+    fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return -1;
+    ok = !fstat(fd, &after) && after.st_ino == before.st_ino &&
+        after.st_dev == before.st_dev && S_ISREG(after.st_mode) &&
+        after.st_nlink == 1 && (after.st_mode & 07777) == 0644 &&
+        after.st_size == C2M_DEBUG_NSS_BYTES &&
+        pkg_asset_uid_ok(after.st_uid, after.st_gid);
+    close(fd);
+    return ok ? 0 : -1;
+}
+
 /* Read and validate the owner pubkey file. No key bytes are logged. */
 static int read_owner(const char *path, char *lineout, size_t cap, char fp[17])
 {
@@ -895,7 +919,7 @@ static int hostkey_ok(const char *path)
  * skipped and never unlinked. Only the unique name this call reserved is
  * ever removed. Final install is atomic no-overwrite via link(). */
 static int generate_hostkey(const char *dropbearkey, const char *final_path,
-                           const char *config_dir, int configfd)
+                           const char *config_dir, int configfd, int loopback)
 {
     static unsigned hk_serial;
     int attempt;
@@ -922,8 +946,10 @@ static int generate_hostkey(const char *dropbearkey, const char *final_path,
     if (child == 0) {
         char *const argv[] = { (char *)dropbearkey, (char *)"-t",
                                (char *)"ed25519", (char *)"-f", tmppath, NULL };
-        char *const envp[] = { (char *)"PATH=/bin:/usr/bin",
-                               (char *)"HOME=/root", (char *)"LANG=C", NULL };
+        char *envp[] = { (char *)"PATH=/bin:/usr/bin",
+                          (char *)"HOME=/root", (char *)"LANG=C",
+                          (char *)C2M_DEBUG_LIBRARY_ENV, NULL };
+        if (loopback) envp[3] = NULL;
         int nullfd;
         if (setpgid(0, 0)) _exit(126);
         nullfd = open("/dev/null", O_RDWR);
@@ -1006,7 +1032,8 @@ static int ensure_hostkey(const struct serve_cfg *c, int configfd,
         return hostkey_ok(final_path);
     }
     if (errno != ENOENT) return -1;
-    return generate_hostkey(c->dropbearkey, final_path, c->config_dir, configfd);
+    return generate_hostkey(c->dropbearkey, final_path, c->config_dir, configfd,
+                            c->loopback);
 }
 
 static int stage_run_file(int runfd, const char *name, const char *data)
@@ -1227,6 +1254,12 @@ static int serve(const struct serve_cfg *c)
         fputs("c2m-debug: root required\n", stderr);
         return 1;
     }
+    if (!c->loopback && trusted_nss_module()) {
+        publish_status(c, "inactive", "nss_asset_unavailable", "none");
+        fputs("c2m-debug: pinned stock NSS module unavailable\n", stderr);
+        rc = 1;
+        goto out;
+    }
     /* Root account must exist with a usable shell (read-only check). */
     errno = 0;
     pw = getpwnam("root");
@@ -1382,7 +1415,7 @@ static int serve(const struct serve_cfg *c)
         /* Owned dropbear in its own session/group; stderr to /dev/null
          * (no log file). Clean environment, no shell. */
         char *argv[26];
-        char *envp[4];
+        char *envp[5];
         int nullfd, i = 0;
         close(execpipe[0]);
         if (setsid() < 0) _exit(126);
@@ -1422,7 +1455,9 @@ static int serve(const struct serve_cfg *c)
         envp[0] = (char *)"PATH=/bin:/usr/bin";
         envp[1] = (char *)"HOME=/root";
         envp[2] = (char *)"LANG=C";
-        envp[3] = NULL;
+        envp[3] = (char *)C2M_DEBUG_LIBRARY_ENV;
+        envp[4] = NULL;
+        if (c->loopback) envp[3] = NULL;
         execve(c->dropbear, argv, envp);
         {
             const unsigned char failed_exec = 1;

@@ -76,8 +76,10 @@ D4_MAX_OUTPUT_BYTES = 1_300_000
 D4_MODES = {"c2m-signs": 0o755, "d4_boot.sh": 0o755, "signs-d4.bin": 0o644}
 DEBUG_MODES = {"c2m-debug": 0o755, "dropbear": 0o755,
                "dropbearkey": 0o755, "debug_boot.sh": 0o755,
-               "debug_owner.pub": 0o644}
-DEBUG_NAMES = ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh")
+               "debug_owner.pub": 0o644, "libnss_files.so.2": 0o644}
+DEBUG_NAMES = ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "libnss_files.so.2")
+DEBUG_NSS_SHA256 = "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd"
+DEBUG_NSS_BYTES = 361400
 DEBUG_ELF_NAMES = ("c2m-debug", "dropbear", "dropbearkey")
 DEBUG_MAX_SUPERVISOR = 256 * 1024
 DEBUG_MAX_DROPBEAR = 2 * 1024 * 1024
@@ -141,6 +143,18 @@ def sha_file(p: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def check_debug_nss(data: bytes) -> dict:
+    """Require the byte-exact existing customer glibc-2.30 NSS module."""
+    digest = hashlib.sha256(data).hexdigest()
+    if len(data) != DEBUG_NSS_BYTES or digest != DEBUG_NSS_SHA256:
+        raise ValueError("debug stock NSS module pin mismatch")
+    if (data[:6] != b"\x7fELF\x01\x01" or
+            int.from_bytes(data[16:18], "little") != 3 or
+            int.from_bytes(data[18:20], "little") != 40):
+        raise ValueError("debug stock NSS must be ELF32 little-endian ARM ET_DYN")
+    return {"sha256": digest, "size": len(data)}
 
 
 def check_debug_owner_key(data: bytes, expected_sha256: str) -> dict:
@@ -336,16 +350,19 @@ def main() -> int:
             if has_symlink(services) or not services.is_dir():
                 raise ValueError("Debug services must be a nonsymlink directory")
             if {p.name for p in services.iterdir()} != set(DEBUG_NAMES):
-                raise ValueError("Debug services must contain exactly c2m-debug, "
-                                 "dropbear, dropbearkey and debug_boot.sh")
+                raise ValueError("Debug services must contain exactly the four debug binaries/scripts and libnss_files.so.2")
             for name in DEBUG_NAMES:
                 source = services / name
                 if has_symlink(source) or not source.is_file():
                     raise ValueError(f"missing/nonregular debug service {name}")
                 if source.stat().st_size == 0:
                     raise ValueError(f"empty debug service {name}")
+                if name == "libnss_files.so.2" and source.stat().st_size != DEBUG_NSS_BYTES:
+                    raise ValueError("debug stock NSS module size mismatch")
                 data = source.read_bytes()
-                if name.endswith(".sh"):
+                if name == "libnss_files.so.2":
+                    check_debug_nss(data)
+                elif name.endswith(".sh"):
                     if len(data) > DEBUG_MAX_SHELL:
                         raise ValueError("debug shell exceeds size bound: debug_boot.sh")
                     if b"\r" in data or not data.startswith(b"#!/bin/sh\n"):

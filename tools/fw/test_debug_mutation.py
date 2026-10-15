@@ -20,8 +20,30 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / "tools/fw/mutate_customer.py"
 D3_NAMES = ("boot.sh", "connectivity_probe.sh", "c2m-web", "c2m-wifi", "wpa_supplicant")
-DEBUG_NAMES = ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh")
-DEBUG_ALL = ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "debug_owner.pub")
+DEBUG_NAMES = ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "libnss_files.so.2")
+DEBUG_ALL = (*DEBUG_NAMES, "debug_owner.pub")
+NSS_SIZE = 361400
+
+
+def synthetic_nss() -> bytes:
+    data = bytearray(NSS_SIZE)
+    data[:6] = b"\x7fELF\x01\x01"
+    data[16] = 3
+    data[18] = 40
+    return bytes(data)
+
+
+def tool_command() -> list[str]:
+    # Test-only patch of the immutable production pin: no CLI/env escape hatch
+    # is added to the mutator and no stock module bytes enter this public test.
+    pin = hashlib.sha256(synthetic_nss()).hexdigest()
+    code = ("import importlib.util,sys; from unittest.mock import patch; "
+            f"spec=importlib.util.spec_from_file_location('mutator_fixture',{str(TOOL)!r}); "
+            "m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); "
+            f"sys.argv=[{str(TOOL)!r}]+sys.argv[1:]; "
+            f"p=patch.object(m,'DEBUG_NSS_SHA256',{pin!r}); p.start(); "
+            "sys.exit(m.main())")
+    return [sys.executable, "-c", code]
 OWNER_COMMENT = "c2m-debug-owner"
 
 
@@ -74,7 +96,9 @@ class DebugMutationTest(unittest.TestCase):
         dbg = root / "dbg"
         dbg.mkdir()
         for name in DEBUG_NAMES:
-            if name.endswith(".sh"):
+            if name == "libnss_files.so.2":
+                (dbg / name).write_bytes(synthetic_nss())
+            elif name.endswith(".sh"):
                 (dbg / name).write_bytes(b"#!/bin/sh\nexit 0\n")
             else:
                 (dbg / name).write_bytes(arm_elf())
@@ -92,7 +116,7 @@ class DebugMutationTest(unittest.TestCase):
                    "--debug-owner-key-sha256": digest(f["key"].read_bytes()),
                    "--out-manifest": str(f["out"])}
         options.update(override or {})
-        command = [sys.executable, str(TOOL)]
+        command = tool_command()
         for name, value in options.items():
             if name not in omit:
                 command.append(name)
@@ -143,7 +167,7 @@ class DebugMutationTest(unittest.TestCase):
         self.assertEqual(actual, expected | {"/wifi", "/wifi/rcInsDriver.sh"})
         for name in DEBUG_ALL:
             row = rows["/c2m/" + name]
-            want = 0o644 if name == "debug_owner.pub" else 0o755
+            want = 0o644 if name in ("debug_owner.pub", "libnss_files.so.2") else 0o755
             data = (f["tree"] / "c2m" / name).read_bytes()
             self.assertEqual(row["mode"], want, name)
             self.assertEqual(row["mode_oct"], oct(want), name)
@@ -193,7 +217,7 @@ class DebugMutationTest(unittest.TestCase):
         db = f["root"] / "db.bin"
         db.write_bytes(b"C2MSDB01" + _st.pack("<I", 1) + row)
         out = f["out"]
-        cmd = [sys.executable, str(TOOL), "--tree", str(f["tree"]), "--manifest", str(f["stock"]),
+        cmd = tool_command() + ["--tree", str(f["tree"]), "--manifest", str(f["stock"]),
                "--idle-bin", str(f["idle"]), "--tsr-experiment",
                "--d3-services-dir", str(f["d3"]), "--d4-services-dir", str(d4),
                "--d4-database", str(db), "--d4-database-sha256", digest(db.read_bytes()),
@@ -271,6 +295,30 @@ class DebugMutationTest(unittest.TestCase):
                     elif case == "big-endian": data[5] = 2
                     dr.write_bytes(bytes(data))
                 self.assert_blocked(f)
+
+    def test_pinned_nss_module_fails_closed(self):
+        for case in ("missing", "size", "tampered", "wrong-abi"):
+            with self.subTest(case=case):
+                f = self.fixture()
+                path = f["dbg"] / "libnss_files.so.2"
+                if case == "missing":
+                    path.unlink()
+                elif case == "size":
+                    path.write_bytes(synthetic_nss()[:-1])
+                else:
+                    data = bytearray(synthetic_nss())
+                    data[18 if case == "wrong-abi" else -1] ^= 1
+                    path.write_bytes(data)
+                self.assert_blocked(f)
+        # The unpatched production checker must reject every synthetic module.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("nss_pin_checker", TOOL)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.DEBUG_NSS_SHA256,
+                         "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd")
+        with self.assertRaises(ValueError):
+            module.check_debug_nss(synthetic_nss())
 
     def test_bad_owner_keys(self):
         good = owner_pub()
@@ -432,7 +480,7 @@ class DebugMutationTest(unittest.TestCase):
         # Stock behavior without debug flags is unchanged: D3-only still works
         # and reports no debug fields or extra paths.
         f = self.fixture()
-        cmd = [sys.executable, str(TOOL), "--tree", str(f["tree"]), "--manifest", str(f["stock"]),
+        cmd = tool_command() + ["--tree", str(f["tree"]), "--manifest", str(f["stock"]),
                "--idle-bin", str(f["idle"]), "--tsr-experiment",
                "--d3-services-dir", str(f["d3"]), "--out-manifest", str(f["out"])]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)

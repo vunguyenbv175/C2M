@@ -72,6 +72,9 @@ SYSROOT_ENV = "C2M_DEBUG_SSH_SYSROOT"
 QEMU_ENV = "C2M_DEBUG_SSH_QEMU"
 DEFAULT_TARBALL = ROOT / "work" / "dropbear-upstream" / f"dropbear-{VER}.tar.bz2"
 DEFAULT_QEMU = "/usr/bin/qemu-arm-static"
+NSS_ENV = "C2M_DEBUG_SSH_NSS_DIR"
+NSS_SHA = "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd"
+NSS_SIZE = 361400
 LINUX = sys.platform.startswith("linux")
 REQUIRED = os.environ.get(REQUIRE_ENV) == "1"
 
@@ -395,15 +398,18 @@ class DebugSshNativeTests(unittest.TestCase):
                     "pututxline", "openpty"):
             if f"--disable-{opt}" in help_proc.stdout:
                 cfg.append(f"--disable-{opt}")
+        native_flags = f"-O2 -I{src} -I{src / 'src'} -DLOCALOPTIONS_H_EXISTS"
+        build_env = dict(os.environ, CFLAGS=native_flags,
+                         LTM_CFLAGS=native_flags)
         configure = subprocess.run(
-            ["sh", "./configure"] + cfg, cwd=src, capture_output=True,
-            text=True, timeout=120)
+            ["sh", "./configure"] + cfg, cwd=src, env=build_env,
+            capture_output=True, text=True, timeout=120)
         if configure.returncode != 0:
             raise AssertionError(
                 "native configure failed:\n" + configure.stdout[-4000:] + configure.stderr[-4000:])
         make = subprocess.run(
             ["make", "-j2", "PROGRAMS=dropbear dropbearkey"], cwd=src,
-            capture_output=True, text=True, timeout=240)
+            env=build_env, capture_output=True, text=True, timeout=240)
         if make.returncode != 0:
             raise AssertionError(
                 "native make failed:\n" + make.stdout[-4000:] + make.stderr[-4000:])
@@ -551,6 +557,14 @@ class DebugSshNativeTests(unittest.TestCase):
             args.append(remote_cmd)
         return args
 
+    def server_diagnostics(self) -> str:
+        # Only synthetic fixture servers: retain the cause of protocol failures
+        # instead of mistaking a reset/refused port for auth rejection.
+        parts = []
+        for path in sorted(Path(self.tmp.name).glob("dropbear-stderr-*.log")):
+            parts.append(path.read_text(encoding="utf-8", errors="replace")[-4000:])
+        return "\nfixture server stderr:\n" + "\n".join(parts)
+
     def run_ssh(self, args: list[str], stdin: bytes | None = None,
                 timeout: int = SSH_TIMEOUT) -> subprocess.CompletedProcess:
         try:
@@ -564,7 +578,7 @@ class DebugSshNativeTests(unittest.TestCase):
 
     def test_keyonly_exec_ok(self) -> None:
         result = self.run_ssh(self.ssh_args(self.client_key, "printf hello-debug-ssh"))
-        self.assertEqual(result.returncode, 0, result.stderr[:1000].decode("utf-8", "replace"))
+        self.assertEqual(result.returncode, 0, result.stderr[:1000].decode("utf-8", "replace") + self.server_diagnostics())
         self.assertEqual(result.stdout, b"hello-debug-ssh")
 
     def test_binary_roundtrip_over_stdin(self) -> None:
@@ -573,7 +587,7 @@ class DebugSshNativeTests(unittest.TestCase):
         target = self.fixture_dir / "upload.bin"
         quoted = shlex.quote(str(target))
         put = self.run_ssh(self.ssh_args(self.client_key, f"cat > {quoted}"), stdin=payload)
-        self.assertEqual(put.returncode, 0, put.stderr[:1000].decode("utf-8", "replace"))
+        self.assertEqual(put.returncode, 0, put.stderr[:1000].decode("utf-8", "replace") + self.server_diagnostics())
         hashed = self.run_ssh(self.ssh_args(self.client_key, f"sha256sum {quoted}"))
         self.assertEqual(hashed.returncode, 0)
         first = hashed.stdout.decode("ascii", "strict").split()[0]
@@ -683,7 +697,7 @@ class DebugSshNativeTests(unittest.TestCase):
         self.assertTrue(
             any(token in combined for token in
                 ("prohibit", "denied", "not allowed", "disabled", "forward")),
-            f"expected forwarding rejection, got: {combined[:1000]}")
+            f"expected forwarding rejection, got: {combined[:1000]}" + self.server_diagnostics())
 
 
 class DebugSshArmTests(unittest.TestCase):
@@ -699,7 +713,8 @@ class DebugSshArmTests(unittest.TestCase):
 
     @classmethod
     def binary_cmd(cls, binary: Path, *args: str) -> list[str]:
-        return [cls.qemu, "-L", str(cls.sysroot), str(binary), *args]
+        return [cls.qemu, "-L", str(cls.sysroot), "-E",
+                f"LD_LIBRARY_PATH={cls.nss_dir}:/lib", str(binary), *args]
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -744,6 +759,17 @@ class DebugSshArmTests(unittest.TestCase):
             require_or_skip(
                 f"sysroot missing: set {SYSROOT_ENV} to the stock sysroot")
         assert sysroot is not None
+        if os.geteuid() != 0:
+            require_or_skip("ARM fixture requires root to match the stock root passwd entry")
+        nss_raw = os.environ.get(NSS_ENV)
+        if not nss_raw or not Path(nss_raw).is_absolute():
+            require_or_skip(f"ARM fixture requires absolute {NSS_ENV}")
+        cls.nss_dir = Path(nss_raw)
+        nss_module = cls.nss_dir / "libnss_files.so.2"
+        if (nss_module.is_symlink() or not nss_module.is_file() or
+                nss_module.stat().st_size != NSS_SIZE or
+                sha256_file(nss_module) != NSS_SHA or not is_arm32_elf(nss_module)):
+            raise AssertionError("ARM stock NSS module pin mismatch")
         if not (sysroot / "lib" / "ld-linux-armhf.so.3").is_file():
             require_or_skip("sysroot lacks /lib/ld-linux-armhf.so.3")
         qemu = resolve_qemu()
@@ -918,6 +944,14 @@ class DebugSshArmTests(unittest.TestCase):
             args.append(remote_cmd)
         return args
 
+    def server_diagnostics(self) -> str:
+        # Only synthetic fixture servers: retain the cause of protocol failures
+        # instead of mistaking a reset/refused port for auth rejection.
+        parts = []
+        for path in sorted(Path(self.tmp.name).glob("dropbear-stderr-*.log")):
+            parts.append(path.read_text(encoding="utf-8", errors="replace")[-4000:])
+        return "\nfixture server stderr:\n" + "\n".join(parts)
+
     def run_ssh(self, args: list[str], stdin: bytes | None = None,
                 timeout: int = SSH_TIMEOUT) -> subprocess.CompletedProcess:
         try:
@@ -940,7 +974,7 @@ class DebugSshArmTests(unittest.TestCase):
 
     def test_keyonly_exec_ok(self) -> None:
         result = self.run_ssh(self.ssh_args(self.client_key, "printf hello-debug-ssh"))
-        self.assertEqual(result.returncode, 0, result.stderr[:1000].decode("utf-8", "replace"))
+        self.assertEqual(result.returncode, 0, result.stderr[:1000].decode("utf-8", "replace") + self.server_diagnostics())
         self.assertEqual(result.stdout, b"hello-debug-ssh")
 
     def test_binary_roundtrip_over_stdin(self) -> None:
@@ -949,7 +983,7 @@ class DebugSshArmTests(unittest.TestCase):
         target = self.fixture_dir / "upload.bin"
         quoted = shlex.quote(str(target))
         put = self.run_ssh(self.ssh_args(self.client_key, f"cat > {quoted}"), stdin=payload)
-        self.assertEqual(put.returncode, 0, put.stderr[:1000].decode("utf-8", "replace"))
+        self.assertEqual(put.returncode, 0, put.stderr[:1000].decode("utf-8", "replace") + self.server_diagnostics())
         hashed = self.run_ssh(self.ssh_args(self.client_key, f"sha256sum {quoted}"))
         self.assertEqual(hashed.returncode, 0)
         first = hashed.stdout.decode("ascii", "strict").split()[0]
@@ -1059,7 +1093,7 @@ class DebugSshArmTests(unittest.TestCase):
         self.assertTrue(
             any(token in combined for token in
                 ("prohibit", "denied", "not allowed", "disabled", "forward")),
-            f"expected forwarding rejection, got: {combined[:1000]}")
+            f"expected forwarding rejection, got: {combined[:1000]}" + self.server_diagnostics())
 
 
 if __name__ == "__main__":

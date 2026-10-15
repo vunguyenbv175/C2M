@@ -1,0 +1,27 @@
+name: debug-ssh-tests
+# Fast host-only iteration; no private firmware, keys, camera, radio or cards.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-ssh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned public upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/dropbear-upstream
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 2 --max-time 120 \
+            https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2 \
+            -o work/dropbear-upstream/dropbear-2026.94.tar.bz2
+          echo 'e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81  work/dropbear-upstream/dropbear-2026.94.tar.bz2' | sha256sum -c -
+      - name: Required native supervisor and real SSH gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/test_debug_supervisor.py
+          C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py DebugSshPolicyTests DebugSshNativeTests

@@ -339,6 +339,26 @@ jobs:
           # Pinned upstream Dropbear 2026.94 via fw/debug/build_dropbear.sh.
           # Never put this group in `if ! (...)`, which disables errexit and
           # can hide build failures. The real owner key bytes never enter logs.
+          # Read-only copy of the existing stock glibc-2.30 NSS module. The
+          # rootfs alone lacks it; never load root code from stock ssh/lib.
+          python3 - <<'EOF'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "tools/fw")
+          from mutate_customer import check_debug_nss
+          source = Path("work/tree/ssh/lib/libnss_files.so.2")
+          if source.is_symlink() or not source.is_file():
+              raise SystemExit("DEBUG-GATE: stock NSS source unavailable")
+          data = source.read_bytes()
+          print(check_debug_nss(data))
+          prefix = Path("work/sysroot/customer/c2m")
+          prefix.mkdir(parents=True, exist_ok=True)
+          target = prefix / "libnss_files.so.2"
+          target.write_bytes(data)
+          target.chmod(0o644)
+          # Private QEMU fixture only; do not alter firmware /etc or host /etc.
+          Path("work/sysroot/etc/nsswitch.conf").write_text("passwd: files\ngroup: files\n")
+          EOF
           : > work/debug_build.log
           : > work/debug_build_tests.txt
           trap 'cat work/debug_build.log work/debug_build_tests.txt' ERR
@@ -346,20 +366,22 @@ jobs:
             > work/debug_build.log 2>&1
           (
             set -eu
-            # Exact four-file deploy; objects/reports/licenses stay PRIVATE
+            # Exact five-file deploy; objects/reports/licenses stay PRIVATE
             # in work/debug-build and never enter work/debug-services.
             mkdir -p work/debug-services
             cp work/debug-build/c2m-debug work/debug-services/c2m-debug
             cp work/debug-build/dropbear work/debug-services/dropbear
             cp work/debug-build/dropbearkey work/debug-services/dropbearkey
             cp work/debug-build/debug_boot.sh work/debug-services/debug_boot.sh
+            cp work/sysroot/customer/c2m/libnss_files.so.2 work/debug-services/libnss_files.so.2
+            chmod 644 work/debug-services/libnss_files.so.2
             chmod 755 work/debug-services/c2m-debug work/debug-services/dropbear \
               work/debug-services/dropbearkey work/debug-services/debug_boot.sh
             python3 - <<'EOF'
           from pathlib import Path
           services = Path("work/debug-services")
           if services.is_symlink() or {p.name for p in services.iterdir()} != {
-                  "c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh"}:
+                  "c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "libnss_files.so.2"}:
               raise SystemExit("DEBUG-GATE: unexpected deploy output")
           for name in ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh"):
               path = services / name
@@ -389,16 +411,17 @@ jobs:
             test -f tests/test_debug_ssh.py
             C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
               C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py
-            C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
+            sudo env C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
               C2M_DEBUG_SSH_TARGET_DIR="$PWD/work/debug-build" \
               C2M_DEBUG_SSH_SYSROOT="$PWD/work/sysroot" \
-              C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py
+              C2M_DEBUG_SSH_NSS_DIR="$PWD/work/sysroot/customer/c2m" \
+              C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py DebugSshArmTests
           ) > work/debug_build_tests.txt 2>&1
           trap - ERR
           cat work/debug_build_tests.txt
           (
             cd work/debug-services
-            sha256sum c2m-debug dropbear dropbearkey debug_boot.sh
+            sha256sum c2m-debug dropbear dropbearkey debug_boot.sh libnss_files.so.2
           ) > work/debug_services.sha256
           find fw/debug -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
             -print0 | sort -z | xargs -0 sha256sum > work/debug_source.sha256
@@ -420,22 +443,25 @@ jobs:
               "c2m_debug_sha256": digest("work/debug-services/c2m-debug"),
               "dropbear_sha256": digest("work/debug-services/dropbear"),
               "dropbearkey_sha256": digest("work/debug-services/dropbearkey"),
+              "nss_module_sha256": digest("work/debug-services/libnss_files.so.2"),
               "debug_owner_sha256": digest("work/debug-private/debug_owner.pub"),
-              "assets_count": 4,
+              "assets_count": 5,
               "dropbear_version": "2026.94",
               "dropbear_tar_sha256": "e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81",
           }
           expected = {"build_script_sha256", "boot_script_sha256", "c2m_debug_sha256",
                       "dropbear_sha256", "dropbearkey_sha256", "debug_owner_sha256",
-                      "assets_count", "dropbear_version", "dropbear_tar_sha256"}
+                      "assets_count", "dropbear_version", "dropbear_tar_sha256", "nss_module_sha256"}
           if set(report) != expected:
               raise SystemExit("DEBUG-GATE: report supplemental-data mismatch")
           if report["debug_owner_sha256"] != owner["sha256"]:
               raise SystemExit("DEBUG-GATE: deployed owner key changed after pin validation")
           if report["debug_owner_sha256"] != "08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d":
               raise SystemExit("DEBUG-GATE: owner pin mismatch")
-          if report["assets_count"] != 4:
+          if report["assets_count"] != 5:
               raise SystemExit("DEBUG-GATE: assets count mismatch")
+          if report["nss_module_sha256"] != "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd":
+              raise SystemExit("DEBUG-GATE: stock NSS module changed")
           # Hashes only; never key bytes.
           Path("work/debug_report.json").write_text(json.dumps(report, indent=2) + "\n")
           print(json.dumps(report, sort_keys=True))
@@ -477,7 +503,7 @@ jobs:
             cmp -s "work/d4-services/$file" "work/tree/c2m/$file"
           done
           cmp -s work/d4-private/signs-d4.bin work/tree/c2m/signs-d4.bin
-          for file in c2m-debug dropbear dropbearkey debug_boot.sh; do
+          for file in c2m-debug dropbear dropbearkey debug_boot.sh libnss_files.so.2; do
             cmp -s "work/debug-services/$file" "work/tree/c2m/$file"
           done
           cmp -s work/debug-private/debug_owner.pub work/tree/c2m/debug_owner.pub
@@ -486,7 +512,7 @@ jobs:
           from pathlib import Path
           expected = {"c2m-idle", "tsr_profile_boot.sh", "boot.sh", "connectivity_probe.sh",
                       "c2m-web", "c2m-wifi", "wpa_supplicant", "c2m-signs", "d4_boot.sh", "signs-d4.bin",
-                      "c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "debug_owner.pub"}
+                      "c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "debug_owner.pub", "libnss_files.so.2"}
           deployed = Path("work/tree/c2m")
           if deployed.is_symlink() or {p.name for p in deployed.iterdir()} != expected:
               raise SystemExit("D4-DEBUG-GATE: installed service allowlist mismatch")

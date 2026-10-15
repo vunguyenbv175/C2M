@@ -17,6 +17,7 @@ _bin=/customer/c2m/c2m-debug
 _dropbear=/customer/c2m/dropbear
 _dropbearkey=/customer/c2m/dropbearkey
 _owner=/customer/c2m/debug_owner.pub
+_nss=/customer/c2m/libnss_files.so.2
 
 # Fixed production assets only; refuse links and non-executables.
 [ -f "$_bin" ] && [ ! -L "$_bin" ] || exit 0
@@ -29,6 +30,11 @@ _owner=/customer/c2m/debug_owner.pub
 # Full validation happens in the supervisor; this is only a presence gate.
 [ -f "$_owner" ] && [ ! -L "$_owner" ] || exit 0
 grep -qs '^ssh-ed25519 [A-Za-z0-9+/]\{68\}\( [!-~]\{1,256\}\)\?$' "$_owner" || exit 0
+
+# Use only the pinned private copy of the stock glibc NSS module. Never
+# include the stock group-writable /customer/ssh/lib directory.
+[ -f "$_nss" ] && [ ! -L "$_nss" ] || exit 0
+export LD_LIBRARY_PATH=/customer/c2m:/lib
 
 # Detached low-priority supervisor. It re-validates everything, generates
 # the persistent hostkey on first boot only, and stops after 20 minutes.
