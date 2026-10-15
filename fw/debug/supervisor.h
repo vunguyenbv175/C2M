@@ -46,12 +46,13 @@
  * skipped, never unlinked (only the unique name this call reserved is
  * ever removed). Never touches stock hostkeys or /etc/passwd|shadow|ssh.
  *
- * Stock-ancestor trust policy (parent to confirm final rootfs manifest;
- * open question is whether the /customer mountpoint is uid 1000 or 1001):
- *   exact known paths /, /customer, /customer/minieye,
- *   /customer/minieye/config with uid/gid in {0,1000,1001} and mode exactly
- *   0755 (0775 additionally allowed for minieye/config, matching the
- *   existing 0775 uid-1001 stock config dir), plus the exact package path
+ * Stock-ancestor trust policy (actual EN rootfs cpio facts, parent doc:
+ *   /tmp, /var, /customer at 0775 1001:1001; / has no entry so kernel
+ *   default 0755 root:root; customer UBIFS flashes /customer as 0755):
+ *   exact known paths /, /tmp, /var, /customer, /customer/minieye,
+ *   /customer/minieye/config: /tmp,/var,/customer accept 0775 1001:1001
+ *   or 0755 root; /customer additionally 0755 known set (UBIFS fact);
+ *   minieye/config 0755/0775 known set; plus the exact package path
  *   /customer/c2m with uid/gid exactly 1001:1001 and mode exactly 0755
  *   (dropbear/dropbearkey/owner-pub install dir; no group/other writes).
  *   These stock UIDs run all

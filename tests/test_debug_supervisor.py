@@ -166,7 +166,7 @@ class CoreTests(unittest.TestCase):
                       "starting", "listener_unverified",
                       "process_running_listener_unverified",
                       "getpgid", "/proc/net/tcp", "any_override",
-                      "c2m_debug_cli_valid"):
+                      "c2m_debug_cli_valid", "c2m_debug_stock_path_ok"):
             self.assertIn(token, source + header, token)
         self.assertIn('#define C2M_DEBUG_BIND_ADDR "192.168.1.1"', header)
         self.assertIn('#define C2M_DEBUG_LOOPBACK_ADDR "127.0.0.1"', header)

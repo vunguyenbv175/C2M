@@ -1587,19 +1587,19 @@ static int serve(const struct serve_cfg *c)
         }
         child = -1;
     }
-    /* Remove transient listener artifacts; hostkey persists. Only files
-     * this run staged are ever unlinked (staged flag); a run_conflict
-     * on foreign objects leaves them untouched. */
-    if (staged && runfd >= 0) {
-        (void)unlinkat(runfd, "dropbear.pid", 0);
-        (void)unlinkat(runfd, "authorized_keys", 0);
-    }
+    /* Transient listener artifacts are revoked on every exit below;
+     * the hostkey persists, and foreign run-conflict objects stay untouched. */
 
 out:
     wipe(owner_line, sizeof(owner_line));
     wipe(authdata, sizeof(authdata));
     if (execpipe[0] >= 0) close(execpipe[0]);
     if (execpipe[1] >= 0) close(execpipe[1]);
+    /* Early exec/proof failures also revoke the staged authorization file. */
+    if (staged && runfd >= 0) {
+        (void)unlinkat(runfd, "dropbear.pid", 0);
+        (void)unlinkat(runfd, "authorized_keys", 0);
+    }
     if (runfd >= 0) close(runfd);
     if (configfd >= 0) close(configfd);
     if (lockfd >= 0) close(lockfd);
