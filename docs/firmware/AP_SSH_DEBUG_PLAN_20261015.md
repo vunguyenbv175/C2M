@@ -120,8 +120,19 @@ ADAS, or inject M4 warnings/audio as a shortcut.
 - All eight VI WAVs, `/minieye/adas/md5sum.txt` and the experimental TSR boot
   profile remain byte-identical to the prior D3.1 reference. EN cardv/ADAS
   protected hashes remain fixed. D3 boot is unchanged; probe expands toV2.
-- No firmware copied to any card, no camera connection, no flash. Reidentify
-  the distinct updater media before writing; never stage on MINIEYE.
+- Owner inserted the updater on2026-10-15. Reidentified before/during writes:
+  `D: C2M_FLASH_B`, USB SM3350 disk1, physical33201061888 bytes, partition1
+  offset1048576/size33200013312, FAT32. Not MINIEYE. The previous four files
+  matched the verified D3.1 payload exactly before replacement.
+- Backed up prior payload/log to private hardware capture directory
+  `06_candidate_D4/updater_before_debug_20261015_222200`. Removed the old
+  trigger first; wrote/flushed/hashed three files, then wrote `sysVer.txt`
+  last. Final card readback4/4 matches the pinned local payload, token
+  `20261015000001`; volume flush passed, Healthy and NOT Dirty. Unrelated
+  files/directories and diagnostic log retained unchanged.
+- Local on-card proof:
+  `build/candidate-d4-debug-final-r38756253160/on_card_verification_20261015_222200.json`.
+  Staging is complete; no camera connection or flash performed by the agent.
 
 ## Promotion criteria
 
