@@ -231,6 +231,7 @@ class D4AdvisoryTests(unittest.TestCase):
                     "state=ready\n" in text and "active=1\n" in text and
                     "code=residential_start\n" in text), self._read(status))
                 first = self._read(status)
+                self._assert_status(first, state="ready", active=1)
                 # The mandatory web schema enumerates eleven fields; adding
                 # any twelfth/unknown key would make its strict parser reject.
                 self.assertEqual(first.count("\n"), 11)
@@ -378,15 +379,17 @@ class D4AdvisoryTests(unittest.TestCase):
             gps.write_bytes(gps_bytes(0))
             db.chmod(0o600)
             gps.chmod(0o600)
-            # A directory is never overwritten, and failed publish doesn't
-            # consume event 1 or the per-sign cooldown.
-            status.mkdir(mode=0o700)
+            # After the first inactive heartbeat, a directory blocks delivery
+            # of event 1 without consuming its event ID or sign cooldown.
             process = subprocess.Popen(
                 [str(self.binary), "--serve", "--db", str(db),
                  "--gps-file", str(gps), "--status-file", str(status)],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:
-                time.sleep(0.2)
+                self.assertTrue(self._wait_for(status, lambda text:
+                    "state=warming_up\n" in text), self._read(status))
+                status.unlink()
+                status.mkdir(mode=0o700)
                 replacement = root / "gps.next"
                 replacement.write_bytes(gps_bytes(1))
                 replacement.chmod(0o600)
@@ -398,6 +401,85 @@ class D4AdvisoryTests(unittest.TestCase):
                     "active=1\n" in text and "event_id=1\n" in text), self._read(status))
             finally:
                 self._stop(process)
+
+    @unittest.skipUnless(LINUX, "descriptor/process integration is Linux-only")
+    def test_missing_database_and_gps_emit_honest_inactive_heartbeats(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="c2m-d4-missing-") as name:
+            root = Path(name)
+            db, gps, status = root / "db", root / "gps", root / "status"
+            for have_db, expected in ((False, "no_database"), (True, "waiting_gps")):
+                if have_db:
+                    db.write_bytes(db_bytes())
+                    db.chmod(0o600)
+                if status.exists():
+                    status.unlink()
+                process = subprocess.Popen(
+                    [str(self.binary), "--serve", "--db", str(db),
+                     "--gps-file", str(gps), "--status-file", str(status)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                try:
+                    self.assertTrue(self._wait_for(status, lambda text:
+                        f"state={expected}\n" in text), self._read(status))
+                    text = self._read(status)
+                    self._assert_status(text, state=expected, active=0)
+                    self.assertEqual(self._field(text, "gps_fresh"), "0")
+                    self.assertEqual(self._field(text, "code"), "none")
+                    self.assertEqual(self._field(text, "event_id"), "0")
+                finally:
+                    self._stop(process)
+
+    @unittest.skipUnless(LINUX, "descriptor/process integration is Linux-only")
+    def test_symlink_ancestors_and_writable_db_parent_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="c2m-d4-ancestor-") as name:
+            root = Path(name)
+            real = root / "real"
+            real.mkdir(mode=0o700)
+            alias = root / "alias"
+            os.symlink(real, alias)
+            db, gps, status = real / "db", real / "gps", root / "status"
+            db.write_bytes(db_bytes())
+            gps.write_bytes(gps_bytes(0))
+            db.chmod(0o600)
+            gps.chmod(0o600)
+            for db_path, gps_path, status_path, expected in (
+                (alias / "db", gps, status, "no_database"),
+                (db, alias / "gps", status, "waiting_gps"),
+                (db, gps, alias / "status", None),
+            ):
+                if status.exists():
+                    status.unlink()
+                process = subprocess.Popen(
+                    [str(self.binary), "--serve", "--db", str(db_path),
+                     "--gps-file", str(gps_path), "--status-file", str(status_path)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                try:
+                    if expected:
+                        self.assertTrue(self._wait_for(status_path, lambda text:
+                            f"state={expected}\n" in text and "active=0\n" in text),
+                            self._read(status_path))
+                    else:
+                        time.sleep(1.2)
+                        self.assertFalse((real / "status").exists())
+                        self.assertIsNone(process.poll())
+                finally:
+                    self._stop(process)
+            writable = root / "writable"
+            writable.mkdir(mode=0o700)
+            insecure_db = writable / "db"
+            insecure_db.write_bytes(db_bytes())
+            insecure_db.chmod(0o600)
+            writable.chmod(0o777)
+            status.unlink(missing_ok=True)
+            process = subprocess.Popen(
+                [str(self.binary), "--serve", "--db", str(insecure_db),
+                 "--gps-file", str(gps), "--status-file", str(status)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            try:
+                self.assertTrue(self._wait_for(status, lambda text:
+                    "state=no_database\n" in text), self._read(status))
+            finally:
+                self._stop(process)
+                writable.chmod(0o700)
 
     @staticmethod
     def _stop(process: subprocess.Popen[str]) -> None:
@@ -433,9 +515,35 @@ class D4AdvisoryTests(unittest.TestCase):
         raise AssertionError((key, text))
 
     def _assert_status(self, text: str, *, state: str, active: int) -> None:
-        self.assertEqual(self._field(text, "state"), state, text)
-        self.assertEqual(self._field(text, "active"), str(active), text)
-        self.assertEqual(len(text.splitlines()), 11, text)
+        keys = ("version", "source", "state", "gps_fresh", "active", "sequence", "code",
+                "speed_kmh", "distance_m", "event_id", "monotonic_ms")
+        self.assertTrue(text.endswith("\n"), text)
+        self.assertNotIn("\r", text)
+        lines = text.splitlines()
+        self.assertEqual(len(lines), len(keys), text)
+        self.assertEqual(tuple(line.split("=", 1)[0] for line in lines), keys, text)
+        fields = dict(line.split("=", 1) for line in lines)
+        self.assertEqual(fields["version"], "1")
+        self.assertEqual(fields["source"], "gps_offline")
+        self.assertEqual(fields["state"], state, text)
+        self.assertEqual(fields["active"], str(active), text)
+        self.assertEqual(fields["speed_kmh"], "0")
+        for key, maximum in (("gps_fresh", 1), ("active", 1), ("sequence", 2**32 - 1),
+                             ("event_id", 2**32 - 1), ("distance_m", 2000),
+                             ("monotonic_ms", 2**64 - 1)):
+            value = fields[key]
+            self.assertTrue(value.isascii() and value.isdecimal(), text)
+            self.assertEqual(str(int(value)), value, text)
+            self.assertLessEqual(int(value), maximum, text)
+        if active:
+            self.assertEqual(state, "ready")
+            self.assertEqual(fields["gps_fresh"], "1")
+            self.assertIn(fields["code"], ("residential_start", "residential_end"))
+            self.assertGreater(int(fields["event_id"]), 0)
+        else:
+            self.assertEqual(fields["code"], "none")
+            self.assertEqual(fields["distance_m"], "0")
+            self.assertEqual(fields["event_id"], "0")
 
 
 if __name__ == "__main__":
