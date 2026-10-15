@@ -35,6 +35,15 @@ Plan hiện hành: `docs/firmware/CANDIDATE_D_TSR_FAST_TRACK.md`.
 
 ## 1. Pipeline TSR trong firmware
 
+**2026-10-15 correction (exact EN hash above):** the diagram below is historical
+component-level context, not a proved complete call chain. Independently checked
+Thumb callsites show `ReadTsr` exports trace/warning via **CollectService**, not
+ScreenService. Its direct distribution call targets **SetTlrResult**, not
+SetTsrResult; no direct Thumb caller of SetTsrResult was found in the bounded
+scan. Do not infer M4 sign output or active inference from these symbols.
+Recovered static map fields, callsites and remaining units/lifetime/receiver
+unknowns are recorded in `../firmware/M4_SIGN_DISPLAY_FINDINGS_20261015.md`.
+
 ```
 camera (ringbuf_vehicle, vehicle_run_freq=10)
         │

@@ -124,4 +124,5 @@ stationary:
 
 D4 remains a separate offline GPS nearby-area advisory displayed in `/signs`
 with optional phone/browser beep; it does not claim M4 speed or camera-speaker
-output.
+output. Native traffic-sign display is investigated separately in
+`M4_SIGN_DISPLAY_FINDINGS_20261015.md`; owner has never seen a sign on M4.

@@ -65,13 +65,15 @@ Quy tắc cứng: code ngoài `M4Adapter` cấm include struct packet thô
 | DisplayState field | Stock target | Ghi chú an toàn |
 |---|---|---|
 | `warning.fcw/pcw/ldw` | `vehicle/vehicleWarning`, `lane/laneWarningRes`, `pedWarning` | V1 chỉ forward trạng thái đã fusion từ StockADASProvider; không tự sinh FCW khi chưa benchmark |
-| `ego_speed_kmh`, `speed_limit_kmh` | `cardv GPSSpeed/GPSLevel` JSON + TSR overlay nếu runtime chứng minh | Hiển thị kèm confidence; không override TSR stock khi confidence thấp |
-| `navigation.arrow/distance` | `ScreenModeSet/theme`, `DispBrightSet` nếu M4 dùng chung channel; nếu không, giữ NAV trên Voice + Web trước | Không chiếm channel an toàn của FCW |
-| `tpms` | `StorageStatus`-style JSON info hoặc text field rảnh | Chỉ info priority P5, không chen vào P0 |
-| `system` | `StorageStatus/ClientConn/RecordVoice` | Chỉ trạng thái vô hại ở L2 |
+| Vehicle speed / speed limit | Native `GPSSpeed` is vehicle speed only; no verified stock sign/limit widget mapping | Do not send a sign limit as vehicle speed; 3D speed/sign rendering remains unproved |
+| `navigation.arrow/distance` | No verified native target; retain separate Web presentation | `ScreenModeSet/theme` is day/night, not navigation or 2D/3D layout; never repurpose warning slots |
+| `tpms` | No verified native target | Do not put unrelated values into stock storage/warning fields |
+| `system` | Only proven stock fields with their actual meanings | `RecordVoice` remains DENY; system classification does not override policy |
 
-L2 replay test gợi ý (vô hại): cùng `brightness`, cùng `StorageStatus`, cùng
-`DisplayMode` vừa capture được, gửi lại khi M4 online và quan sát không đổi trạng thái.
+L2 replay is a future gate only: exact harmless captured values, verified
+outbound path and receiver, stationary owner approval, and canonical policy
+checks are required. Connecting a client to cardv is not a verified outbound
+relay and can steal the native M4 stream.
 
 ## 5. Passive tooling (đã có + cải tiến sprint này)
 
@@ -82,7 +84,7 @@ discover_transport.py  # OFF vs ON, rank interface/USB/ARP/socket
 libflow_protocol.py    # outer/inner decode + schema check
 libflow_subscriber.py  # read-only subscribe vehicle,ped,lane
 decode_payload.py      # decode 1 frame offline
-cardv_status_client.py # passive recv :8080 minieye-websocket
+cardv_status_client.py # observer :8080; ONLY with M4 disconnected (single-client stream)
 ```
 
 Cải tiến sprint 1 (đã implement):
