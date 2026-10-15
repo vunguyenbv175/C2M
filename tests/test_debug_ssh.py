@@ -718,6 +718,9 @@ class DebugSshNativeTests(unittest.TestCase):
                 pass
 
     def test_forwarding_rejected(self) -> None:
+        authenticated = self.run_ssh(self.ssh_args(self.client_key, "printf authenticated"))
+        self.assertEqual(authenticated.returncode, 0, self.server_diagnostics())
+        self.assertEqual(authenticated.stdout, b"authenticated")
         unused = free_port()
         args = ["ssh", "-F", "/dev/null",
                 "-i", str(self.client_key),
@@ -739,7 +742,7 @@ class DebugSshNativeTests(unittest.TestCase):
         combined = (result.stdout + result.stderr).decode("utf-8", "replace").lower()
         self.assertTrue(
             any(token in combined for token in
-                ("prohibit", "denied", "not allowed", "disabled", "forward")),
+                ("administratively prohibited", "connect failed", "not allowed", "disabled", "forward")),
             f"expected forwarding rejection, got: {combined[:1000]}" + self.server_diagnostics())
 
 
@@ -1133,6 +1136,9 @@ class DebugSshArmTests(unittest.TestCase):
                 pass
 
     def test_forwarding_rejected(self) -> None:
+        authenticated = self.run_ssh(self.ssh_args(self.client_key, "printf authenticated"))
+        self.assertEqual(authenticated.returncode, 0, self.server_diagnostics())
+        self.assertEqual(authenticated.stdout, b"authenticated")
         unused = free_port()
         args = ["ssh", "-F", "/dev/null",
                 "-i", str(self.client_key),
@@ -1154,7 +1160,7 @@ class DebugSshArmTests(unittest.TestCase):
         combined = (result.stdout + result.stderr).decode("utf-8", "replace").lower()
         self.assertTrue(
             any(token in combined for token in
-                ("prohibit", "denied", "not allowed", "disabled", "forward")),
+                ("administratively prohibited", "connect failed", "not allowed", "disabled", "forward")),
             f"expected forwarding rejection, got: {combined[:1000]}" + self.server_diagnostics())
 
 
