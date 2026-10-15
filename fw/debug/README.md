@@ -65,8 +65,14 @@ Script greps `./configure --help` and uses only found options:
   `--disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp`
   `--disable-wtmpx --disable-loginfunc --disable-pututline`
   `--disable-pututxline --disable-openpty`.
-- `LTM_CFLAGS` carries arch/prefix; script fails if
-  `libtommath/Makefile` lacks `armv7-a`/`compat_prefix`.
+- `LTM_CFLAGS` carries arch/prefix plus absolute `-I$src -I$src/src`;
+  script fails if `libtommath/Makefile` lacks
+  `armv7-a`/`compat_prefix`/`$src/src`. The absolute src include is required
+  because bundled `libtommath` builds inside `libtommath/` with only
+  `LTM_CFLAGS` (its `%.o` rule ignores `CPPFLAGS`) while upstream
+  `tommath_class.h` tails `#include "dbmalloc.h"` from Dropbear `src/`
+  (CI r38738994826 failed at `bn_cutoffs.o` without it). Those dirs hold only
+  Dropbear headers, no stock libc override.
 - `make` log must show `compat_prefix` for both `libtommath` and
   `libtomcrypt`, else fail.
 - `ac_cv_func_crypt=no ac_cv_lib_crypt_crypt=no`: no host `-lcrypt`

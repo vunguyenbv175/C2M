@@ -202,6 +202,36 @@ int c2m_debug_cli_valid(int loopback, int any_override, const char *bind,
     return 1;
 }
 
+/* Pure stock-ancestor table (uid/gid/mode integers only, no stat calls),
+ * so self-test covers it portably with vectors. Facts: EN cpio has /tmp,
+ * /var, /customer at 0775 1001:1001; / has no entry (kernel default 0755
+ * root:root); customer UBIFS flashes /customer as 0755 chown 1001. */
+int c2m_debug_stock_path_ok(const char *path, unsigned uid, unsigned gid,
+                            unsigned mode)
+{
+    int known;
+    if (!path) return 0;
+    known = (uid == 0 || uid == 1000 || uid == 1001) &&
+            (gid == 0 || gid == 1000 || gid == 1001);
+    if (!strcmp(path, "/"))
+        return uid == 0 && gid == 0 && mode == 0755;
+    if (!strcmp(path, "/tmp") || !strcmp(path, "/var")) {
+        if (mode == 0775)
+            return uid == 1001 && gid == 1001; /* actual cpio fact */
+        return uid == 0 && gid == 0 && mode == 0755;
+    }
+    if (!strcmp(path, "/customer")) {
+        if (mode == 0775)
+            return uid == 1001 && gid == 1001; /* actual cpio fact */
+        return known && mode == 0755; /* UBIFS flash fact + legacy */
+    }
+    if (!strcmp(path, "/customer/minieye") ||
+        !strcmp(path, "/customer/minieye/config"))
+        return known && (mode == 0755 || mode == 0775);
+    if (!strcmp(path, "/customer/c2m"))
+        return uid == 1001 && gid == 1001 && mode == 0755;
+    return 0;
+}
 /* ---------- self-test (pure, no I/O beyond printf) ---------- */
 
 static void b64_encode_block(const unsigned char *in, size_t n, char *out)
@@ -342,6 +372,46 @@ int c2m_debug_self_test(void)
               !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 2, 49) &&
               !c2m_debug_cli_valid(1, 1, NULL, 2222, 2, 100),
           &failures);
+    /* Stock table vectors from actual EN cpio facts (/tmp,/var,/customer
+     * 0775 1001:1001; / kernel default 0755 root; UBIFS /customer 0755). */
+    check("stock_root",
+          c2m_debug_stock_path_ok("/", 0, 0, 0755) &&
+              !c2m_debug_stock_path_ok("/", 0, 0, 0775) &&
+              !c2m_debug_stock_path_ok("/", 1001, 1001, 0775) &&
+              !c2m_debug_stock_path_ok(NULL, 0, 0, 0755) &&
+              !c2m_debug_stock_path_ok("", 0, 0, 0755),
+          &failures);
+    check("stock_tmp_cpio_fact",
+          c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0775) &&
+              c2m_debug_stock_path_ok("/tmp", 0, 0, 0755) &&
+              !c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0755) &&
+              !c2m_debug_stock_path_ok("/tmp", 1000, 1000, 0775) &&
+              !c2m_debug_stock_path_ok("/tmp", 0, 0, 0775) &&
+              !c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0777),
+          &failures);
+    check("stock_var_cpio_fact",
+          c2m_debug_stock_path_ok("/var", 1001, 1001, 0775) &&
+              c2m_debug_stock_path_ok("/var", 0, 0, 0755) &&
+              !c2m_debug_stock_path_ok("/var", 1001, 1001, 0755) &&
+              !c2m_debug_stock_path_ok("/var", 1001, 1001, 0777),
+          &failures);
+    check("stock_customer_both_facts",
+          c2m_debug_stock_path_ok("/customer", 1001, 1001, 0775) &&
+              c2m_debug_stock_path_ok("/customer", 1001, 1001, 0755) &&
+              c2m_debug_stock_path_ok("/customer", 0, 0, 0755) &&
+              c2m_debug_stock_path_ok("/customer", 1000, 1000, 0755) &&
+              !c2m_debug_stock_path_ok("/customer", 1000, 1000, 0775) &&
+              !c2m_debug_stock_path_ok("/customer", 1001, 1001, 0777),
+          &failures);
+    check("stock_package_exact_preserved",
+          c2m_debug_stock_path_ok("/customer/c2m", 1001, 1001, 0755) &&
+              c2m_debug_stock_path_ok("/customer/minieye/config", 1001,
+                                      1001, 0775) &&
+              !c2m_debug_stock_path_ok("/customer/c2m", 1001, 1001,
+                                       0775) &&
+              !c2m_debug_stock_path_ok("/customer/c2m", 0, 0, 0755) &&
+              !c2m_debug_stock_path_ok("/etc", 0, 0, 0755),
+          &failures);
 
     if (failures) {
         printf("c2m-debug self-test: FAILED\n");
@@ -400,6 +470,9 @@ static void on_signal(int sig)
     g_stop = 1;
 }
 
+/* Forward: verified group signaling (defined with stop_group below). */
+static void signal_group(pid_t leader, int sig);
+
 struct serve_cfg {
     const char *dropbear;
     const char *dropbearkey;
@@ -441,32 +514,27 @@ static int absolute_path(const char *in, char *out, size_t size)
     return (n < 0 || (size_t)n >= size) ? -1 : 0;
 }
 
-/* Stock-ancestor trust policy. Parent to confirm the final rootfs
- * manifest (open: /customer mountpoint uid 1000 vs 1001). Until then the
- * exact known paths /, /customer, /customer/minieye,
- * /customer/minieye/config accept uid/gid in {0,1000,1001} with mode
- * exactly 0755 (0775 additionally for minieye/config, matching the
- * existing 0775 uid-1001 stock config dir). These stock UIDs run all
- * vendor code and are trusted exactly like root-run vendor code here;
- * they are NOT a security boundary against an arbitrary uid-1001
- * process: package-asset checks below stay exact. Ancestors are never
- * chmodded and intermediate ancestors never created. */
-static int stock_uid_ok(uid_t u, gid_t g)
-{
-    return (u == 0 || u == 1000 || u == 1001) &&
-           (g == 0 || g == 1000 || g == 1001);
-}
-
+/* Stock-ancestor trust policy, driven by ACTUAL EN rootfs cpio facts
+ * (parent-parsed image: cpio entries /tmp 0775 1001:1001,
+ * /var 0775 1001:1001, /customer 0775 1001:1001; demo.sh may tmpfs-mount
+ * /tmp differently, which this table does NOT chase -- the cpio fact is
+ * accepted, demo mounts stay covered only by the generic sticky-root
+ * rule below). / has no cpio entry (archive starts at dev); the kernel
+ * rootfs default is 0755 root:root, so / stays exactly that, unchanged.
+ * Customer UBIFS is produced by mkfs from an input tree with 0755 chown
+ * 1001, so on flash /customer is actually 0755; both 0755 and the 0775
+ * cpio fact are accepted and documented here for the parent doc record.
+ * This trusts the vendor UID set, not a hardened multiuser boundary:
+ * the camera already runs vendor code as root and uid 1001.
+ * Ancestors are never chmodded and intermediate ancestors never created.
+ * /tmp stickiness is NOT broadened here: any non-sticky
+ * group/other-writable ancestor outside this exact table still fails
+ * closed; the parent checks rootfs metadata separately. */
 static int stock_trusted_ancestor(const char *path, const struct stat *st)
 {
-    if (!stock_uid_ok(st->st_uid, st->st_gid)) return 0;
-    if (!strcmp(path, "/")) return (st->st_mode & 07777) == 0755;
-    if (!strcmp(path, "/customer")) return (st->st_mode & 07777) == 0755;
-    if (!strcmp(path, "/customer/minieye") ||
-        !strcmp(path, "/customer/minieye/config"))
-        return (st->st_mode & 07777) == 0755 ||
-               (st->st_mode & 07777) == 0775;
-    return 0;
+    return c2m_debug_stock_path_ok(path, (unsigned)st->st_uid,
+                                   (unsigned)st->st_gid,
+                                   (unsigned)(st->st_mode & 07777));
 }
 
 /* Package-asset ownership: root, the running euid (loopback fixtures),
@@ -822,24 +890,33 @@ static int hostkey_ok(const char *path)
 }
 
 /* One-time hostkey generation via dropbearkey, no shell, bounded 15 s,
- * own process group, cleared environment. Atomic no-overwrite via link. */
+ * own process group, cleared environment. Temp names are unique per
+ * pid+time+counter (up to 32 attempts); a pre-existing temp name is
+ * skipped and never unlinked. Only the unique name this call reserved is
+ * ever removed. Final install is atomic no-overwrite via link(). */
 static int generate_hostkey(const char *dropbearkey, const char *final_path,
                            const char *config_dir, int configfd)
 {
-    char tmpname[96], tmppath[PATH_MAX];
-    pid_t child;
-    int64_t until;
-    int status = -1;
-    struct stat st;
-    static const char *empty_env_note = NULL;
-    (void)empty_env_note;
-    (void)config_dir;
-    snprintf(tmpname, sizeof(tmpname), ".host_ed25519.tmp-%ld", (long)getpid());
-    if (snprintf(tmppath, sizeof(tmppath), "%s/%s", config_dir, tmpname) >=
-        (int)sizeof(tmppath))
-        return -1;
-    if (!fstatat(configfd, tmpname, &st, AT_SYMLINK_NOFOLLOW) || errno != ENOENT)
-        return -1;
+    static unsigned hk_serial;
+    int attempt;
+    for (attempt = 0; attempt < C2M_DEBUG_HOSTKEY_TMP_RETRIES; attempt++) {
+        char tmpname[96], tmppath[PATH_MAX];
+        pid_t child;
+        int64_t until, ms;
+        int status = -1;
+        struct stat st;
+        ms = now_ms();
+        if (ms < 0) return -1;
+        snprintf(tmpname, sizeof(tmpname), ".host_ed25519.tmp-%ld-%llx-%u",
+                 (long)getpid(),
+                 (unsigned long long)((unsigned long long)ms & 0xffffffffULL),
+                 hk_serial++);
+        if (snprintf(tmppath, sizeof(tmppath), "%s/%s", config_dir,
+                     tmpname) >= (int)sizeof(tmppath))
+            return -1;
+        if (!fstatat(configfd, tmpname, &st, AT_SYMLINK_NOFOLLOW))
+            continue; /* stale or foreign: never unlink, try next name */
+        if (errno != ENOENT) return -1;
     child = fork();
     if (child < 0) return -1;
     if (child == 0) {
@@ -868,14 +945,14 @@ static int generate_hostkey(const char *dropbearkey, const char *final_path,
         struct timespec pause = { 0, 50000000 };
         if (r == child) break;
         if (r < 0 && errno != EINTR) {
-            (void)kill(-child, SIGKILL);
+                signal_group(child, SIGKILL);
             while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
             }
             return -1;
         }
         now = now_ms();
         if (now < 0 || now >= until) {
-            (void)kill(-child, SIGKILL);
+                signal_group(child, SIGKILL);
             while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
             }
             (void)unlinkat(configfd, tmpname, 0);
@@ -914,6 +991,8 @@ static int generate_hostkey(const char *dropbearkey, const char *final_path,
     }
     (void)unlinkat(configfd, tmpname, 0);
     return hostkey_ok(final_path);
+    }
+    return -1;
 }
 
 static int ensure_hostkey(const struct serve_cfg *c, int configfd,
@@ -955,13 +1034,29 @@ static int stage_run_file(int runfd, const char *name, const char *data)
     return 0;
 }
 
+/* Signal one owned child. The caller must hold the child unreaped (no
+ * PID reuse possible), then the group signal goes to -leader only after
+ * verifying getpgid(leader)==leader; otherwise only the single PID is
+ * signaled (a raced ESRCH from getpgid/kill is harmless either way). */
+static void signal_group(pid_t leader, int sig)
+{
+    pid_t pg;
+    if (leader <= 1) return;
+    errno = 0;
+    pg = getpgid(leader);
+    if (pg == leader)
+        (void)kill(-leader, sig);
+    else
+        (void)kill(leader, sig);
+}
+
 static void stop_group(pid_t leader)
 {
     int64_t until;
     struct timespec pause = { 0, 100000000 };
     int status;
     if (leader <= 1) return;
-    (void)kill(-leader, SIGTERM);
+    signal_group(leader, SIGTERM);
     until = now_ms() + 2000;
     while (now_ms() < until) {
         pid_t r = waitpid(leader, &status, WNOHANG);
@@ -969,7 +1064,7 @@ static void stop_group(pid_t leader)
         if (r < 0 && errno != EINTR) break;
         nanosleep(&pause, NULL);
     }
-    (void)kill(-leader, SIGKILL);
+    signal_group(leader, SIGKILL);
     until = now_ms() + 500;
     while (now_ms() < until) {
         pid_t r = waitpid(leader, &status, WNOHANG);
@@ -981,6 +1076,95 @@ static void stop_group(pid_t leader)
     }
 }
 
+#ifdef __linux__
+/* Owned-listener proof without any TCP connect (no auth-session overhead,
+ * no interference with Dropbear, and a foreign listener on the same port
+ * cannot satisfy the owned-PID fd check). /proc/net/tcp prints each
+ * IPv4 word byte-swapped hex on little-endian (127.0.0.1 -> 0100007F);
+ * the camera target is little-endian ARM, fixtures run little-endian. */
+static int proc_ip_expect(const char *bind_addr, char out[9])
+{
+    unsigned char b[4];
+    if (inet_pton(AF_INET, bind_addr, b) != 1) return -1;
+    snprintf(out, 9, "%02X%02X%02X%02X", b[3], b[2], b[1], b[0]);
+    return 0;
+}
+
+static int collect_listen_inodes(const char *bind_addr, int port,
+                                 unsigned long *inos, int cap)
+{
+    FILE *f;
+    char line[512];
+    char expect[9], portexp[8];
+    int n = 0;
+    if (proc_ip_expect(bind_addr, expect)) return -1;
+    snprintf(portexp, sizeof(portexp), "%04X", (unsigned)port);
+    f = fopen("/proc/net/tcp", "r");
+    if (!f) return -1;
+    if (!fgets(line, sizeof(line), f)) {
+        fclose(f);
+        return -1;
+    }
+    while (fgets(line, sizeof(line), f)) {
+        char *tok[12];
+        int nt = 0;
+        char *s, *save, *colon;
+        for (s = strtok_r(line, " \t\n", &save);
+             s && nt < 12; s = strtok_r(NULL, " \t\n", &save))
+            tok[nt++] = s;
+        if (nt < 10) continue;
+        colon = strchr(tok[1], ':');
+        if (!colon) continue;
+        *colon = 0;
+        if (strcmp(tok[1], expect) || strcmp(colon + 1, portexp)) continue;
+        if (strcmp(tok[3], "0A")) continue; /* LISTEN only */
+        if (n < cap)
+            inos[n++] = (unsigned long)strtoul(tok[9], NULL, 10);
+    }
+    fclose(f);
+    return n;
+}
+
+static int pid_holds_inode(pid_t pid, unsigned long ino)
+{
+    char dir[64], path[96], link[128], want[64];
+    DIR *d;
+    struct dirent *e;
+    ssize_t n;
+    snprintf(dir, sizeof(dir), "/proc/%ld/fd", (long)pid);
+    snprintf(want, sizeof(want), "socket:[%lu]", ino);
+    d = opendir(dir);
+    if (!d) return 0;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.') continue;
+        if (snprintf(path, sizeof(path), "%s/%s", dir, e->d_name) >=
+            (int)sizeof(path))
+            continue;
+        n = readlink(path, link, sizeof(link) - 1);
+        if (n < 0) continue;
+        link[n] = 0;
+        if (!strcmp(link, want)) {
+            closedir(d);
+            return 1;
+        }
+    }
+    closedir(d);
+    return 0;
+}
+
+static int listener_owned_by(pid_t pid, const char *bind_addr, int port)
+{
+    unsigned long inos[16];
+    int n, i;
+    if (pid <= 1) return 0;
+    n = collect_listen_inodes(bind_addr, port, inos, 16);
+    if (n <= 0) return 0;
+    for (i = 0; i < n; i++)
+        if (pid_holds_inode(pid, inos[i])) return 1;
+    return 0;
+}
+#endif
+
 static int serve(const struct serve_cfg *c)
 {
     int runfd = -1, configfd = -1, lockfd = -1;
@@ -991,14 +1175,52 @@ static int serve(const struct serve_cfg *c)
     struct stat a, b;
     struct passwd *pw;
     pid_t child = -1;
-    int64_t start = 0, deadline = 0;
+    int64_t serve_start = 0, deadline = 0;
+    int staged = 0;
+    int execpipe[2] = { -1, -1 };
     int rc = 1;
 
-    if (c->port < 1 || c->port > 65535 || c->window_sec < 1 ||
-        c->window_sec > 86400 || c->poll_ms < 50 || c->poll_ms > 5000 ||
-        !valid_bind(c->bind_addr, c->port, c->loopback)) {
+    /* Pure gate first: no filesystem or network I/O on this path. */
+    if (!c2m_debug_cli_valid(c->loopback, 0, c->bind_addr, c->port,
+                             c->window_sec, c->poll_ms)) {
         fputs("c2m-debug: invalid serve bounds\n", stderr);
         return 2;
+    }
+    serve_start = now_ms();
+    if (serve_start < 0) {
+        fputs("c2m-debug: clock unavailable\n", stderr);
+        return 1;
+    }
+    deadline = serve_start + (int64_t)c->window_sec * 1000;
+
+    runfd = safe_dir(c->run_dir, 1, 1);
+    configfd = safe_dir(c->config_dir, 1, 1);
+    if (runfd < 0 || configfd < 0 ||
+        fstat(runfd, &a) || fstat(configfd, &b) ||
+        (a.st_dev == b.st_dev && a.st_ino == b.st_ino)) {
+        fputs("c2m-debug: private directories unavailable\n", stderr);
+        rc = 1;
+        goto out;
+    }
+    lockfd = openat(runfd, "supervisor.lock",
+                    O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (lockfd < 0 || private_file_ok(lockfd, 0600, 0)) {
+        fputs("c2m-debug: lock unavailable\n", stderr);
+        rc = 1;
+        goto out;
+    }
+    {
+        struct flock fl;
+        memset(&fl, 0, sizeof(fl));
+        fl.l_type = F_WRLCK;
+        fl.l_whence = SEEK_SET;
+        if (fcntl(lockfd, F_SETLK, &fl)) {
+            /* Another supervisor owns the lock (and the status file);
+             * never publish here, just exit. */
+            fputs("c2m-debug: already running\n", stderr);
+            rc = 1;
+            goto out;
+        }
     }
     if (!c->loopback && geteuid() != 0) {
         publish_status(c, "inactive", "root_required", "none");
@@ -1015,36 +1237,6 @@ static int serve(const struct serve_cfg *c)
         return 1;
     }
 
-    runfd = safe_dir(c->run_dir, 1, 1);
-    configfd = safe_dir(c->config_dir, 1, 1);
-    if (runfd < 0 || configfd < 0 ||
-        fstat(runfd, &a) || fstat(configfd, &b) ||
-        (a.st_dev == b.st_dev && a.st_ino == b.st_ino)) {
-        publish_status(c, "inactive", "private_dirs_unavailable", "none");
-        fputs("c2m-debug: private directories unavailable\n", stderr);
-        rc = 1;
-        goto out;
-    }
-    lockfd = openat(runfd, "supervisor.lock",
-                    O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
-    if (lockfd < 0 || private_file_ok(lockfd, 0600, 0)) {
-        publish_status(c, "inactive", "private_dirs_unavailable", "none");
-        fputs("c2m-debug: lock unavailable\n", stderr);
-        rc = 1;
-        goto out;
-    }
-    {
-        struct flock fl;
-        memset(&fl, 0, sizeof(fl));
-        fl.l_type = F_WRLCK;
-        fl.l_whence = SEEK_SET;
-        if (fcntl(lockfd, F_SETLK, &fl)) {
-            publish_status(c, "inactive", "already_running", "none");
-            fputs("c2m-debug: already running\n", stderr);
-            rc = 1;
-            goto out;
-        }
-    }
     if (trusted_exec(c->dropbear) || trusted_exec(c->dropbearkey)) {
         publish_status(c, "inactive", "dropbear_assets_unavailable", "none");
         fputs("c2m-debug: dropbear assets unavailable\n", stderr);
@@ -1064,11 +1256,32 @@ static int serve(const struct serve_cfg *c)
         rc = 1;
         goto out;
     }
-    if (ap_valid(c)) {
-        publish_status(c, "inactive", "ap_not_validated", fp);
-        fputs("c2m-debug: AP not validated; refusing to listen\n", stderr);
-        rc = 1;
-        goto out;
+    /* Startup AP readiness: retry up to 60 s (poll interval) inside the
+     * same overall window, so a still-coming-up AP is not permanently
+     * missed at boot. */
+    {
+        int64_t ap_start = now_ms();
+        struct timespec pause;
+        if (ap_start < 0) {
+            publish_status(c, "inactive", "clock_unavailable", fp);
+            fputs("c2m-debug: clock unavailable\n", stderr);
+            rc = 1;
+            goto out;
+        }
+        while (ap_valid(c)) {
+            int64_t now = now_ms();
+            if (now < 0 || now - ap_start >= C2M_DEBUG_STARTUP_AP_MS ||
+                now >= deadline) {
+                publish_status(c, "inactive", "ap_not_validated", fp);
+                fputs("c2m-debug: AP not validated; refusing to listen\n",
+                      stderr);
+                rc = 1;
+                goto out;
+            }
+            pause.tv_sec = c->poll_ms / 1000;
+            pause.tv_nsec = (long)(c->poll_ms % 1000) * 1000000L;
+            nanosleep(&pause, NULL);
+        }
     }
     /* Stage run files. Refuse to reclaim unsafe pre-existing objects. */
     {
@@ -1127,8 +1340,33 @@ static int serve(const struct serve_cfg *c)
     }
     wipe(owner_line, sizeof(owner_line));
     wipe(authdata, sizeof(authdata));
+    staged = 1;
 
-    if (publish_status(c, "active", "listening", fp)) {
+    /* Exec-result pipe: CLOEXEC write end closes on successful execve
+     * (parent reads EOF); a failed exec writes errno first. */
+    if (pipe(execpipe)) {
+        publish_status(c, "failed", "dropbear_fork_failed", fp);
+        fputs("c2m-debug: pipe unavailable\n", stderr);
+        rc = 1;
+        goto out;
+    }
+    {
+        int fd0 = fcntl(execpipe[0], F_GETFD);
+        int fd1 = fcntl(execpipe[1], F_GETFD);
+        int rw = fcntl(execpipe[0], F_GETFL);
+        if (fd0 < 0 || fd1 < 0 || rw < 0 ||
+            fcntl(execpipe[0], F_SETFD, fd0 | FD_CLOEXEC) ||
+            fcntl(execpipe[1], F_SETFD, fd1 | FD_CLOEXEC) ||
+            fcntl(execpipe[0], F_SETFL, rw | O_NONBLOCK)) {
+            publish_status(c, "failed", "dropbear_fork_failed", fp);
+            rc = 1;
+            goto out;
+        }
+    }
+    /* Honest transient state: the listener is NOT yet proven. active is
+     * published only after owned-listener proof below. */
+    if (publish_status(c, "starting",
+                       "process_running_listener_unverified", fp)) {
         fputs("c2m-debug: status publication failed\n", stderr);
         rc = 1;
         goto out;
@@ -1146,6 +1384,7 @@ static int serve(const struct serve_cfg *c)
         char *argv[26];
         char *envp[4];
         int nullfd, i = 0;
+        close(execpipe[0]);
         if (setsid() < 0) _exit(126);
         nullfd = open("/dev/null", O_RDWR);
         if (nullfd < 0) _exit(126);
@@ -1185,20 +1424,111 @@ static int serve(const struct serve_cfg *c)
         envp[2] = (char *)"LANG=C";
         envp[3] = NULL;
         execve(c->dropbear, argv, envp);
+        {
+            int e = errno;
+            (void)write(execpipe[1], &e, 1);
+        }
         _exit(127);
     }
-    /* Parent supervises: window, AP re-validation, child liveness. */
-    start = now_ms();
-    if (start < 0) {
-        stop_group(child);
-        while (waitpid(child, NULL, 0) < 0 && errno == EINTR) {
+    /* Parent owns only the read end from here on. */
+    close(execpipe[1]);
+    execpipe[1] = -1;
+    /* Owned-listener proof: active requires the kernel to show OUR child
+     * holding the bound LISTEN socket (no TCP connect probe). */
+    {
+        int exec_failed = 0, exec_ok = 0, proved = 0;
+        int64_t fork_ms = now_ms();
+        struct timespec proof_pause = { 0, 50000000 };
+        int status;
+        if (fork_ms < 0) {
+            publish_status(c, "failed", "clock_unavailable", fp);
+            rc = 1;
+            stop_group(child);
+            while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
+            }
+            child = -1;
+            goto out;
         }
-        child = -1;
-        publish_status(c, "failed", "clock_unavailable", fp);
-        rc = 1;
-        goto out;
+        while (!proved && !g_stop) {
+            int64_t now = now_ms();
+            pid_t r;
+            if (now < 0 || now - fork_ms >= C2M_DEBUG_PROOF_MS) break;
+            r = waitpid(child, &status, WNOHANG);
+            if (r == child) {
+                publish_status(c, "failed",
+                               exec_failed ? "dropbear_exec_failed"
+                                           : "dropbear_exited",
+                               fp);
+                child = -1;
+                rc = 1;
+                goto out;
+            }
+            if (r < 0 && errno != EINTR) {
+                publish_status(c, "failed", "dropbear_wait_failed", fp);
+                rc = 1;
+                goto out;
+            }
+            for (;;) {
+                char eb;
+                ssize_t n = read(execpipe[0], &eb, 1);
+                if (n == 1) {
+                    exec_failed = 1;
+                } else if (n == 0) {
+                    exec_ok = 1;
+                    break;
+                } else if (errno == EINTR) {
+                    continue;
+                } else {
+                    break; /* EAGAIN: pre-exec; other errors: retry next tick */
+                }
+            }
+#ifdef __linux__
+            if (exec_ok &&
+                listener_owned_by(child, c->bind_addr, c->port)) {
+                proved = 1;
+                break;
+            }
+#else
+            (void)exec_ok;
+#endif
+            nanosleep(&proof_pause, NULL);
+        }
+        if (g_stop) {
+            if (child > 1) {
+                stop_group(child);
+                while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
+                }
+                child = -1;
+            }
+            publish_status(c, "expired", "stopped", fp);
+            rc = 0;
+            goto out;
+        }
+        if (!proved) {
+            if (child > 1) {
+                stop_group(child);
+                while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
+                }
+                child = -1;
+            }
+            publish_status(c, "failed", "listener_unverified", fp);
+            fputs("c2m-debug: listener ownership unproven\n", stderr);
+            rc = 1;
+            goto out;
+        }
+        close(execpipe[0]);
+        execpipe[0] = -1;
+        if (publish_status(c, "active", "listening", fp)) {
+            fputs("c2m-debug: status publication failed\n", stderr);
+            stop_group(child);
+            while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
+            }
+            child = -1;
+            rc = 1;
+            goto out;
+        }
     }
-    deadline = start + (int64_t)c->window_sec * 1000;
+    /* Parent supervises within the overall window from serve start. */
     rc = 0;
     while (!g_stop) {
         pid_t r;
@@ -1257,12 +1587,19 @@ static int serve(const struct serve_cfg *c)
         }
         child = -1;
     }
-    /* Remove transient listener artifacts; hostkey persists. */
-    (void)unlinkat(runfd, "dropbear.pid", 0);
-    (void)unlinkat(runfd, "authorized_keys", 0);
+    /* Remove transient listener artifacts; hostkey persists. Only files
+     * this run staged are ever unlinked (staged flag); a run_conflict
+     * on foreign objects leaves them untouched. */
+    if (staged && runfd >= 0) {
+        (void)unlinkat(runfd, "dropbear.pid", 0);
+        (void)unlinkat(runfd, "authorized_keys", 0);
+    }
 
 out:
     wipe(owner_line, sizeof(owner_line));
+    wipe(authdata, sizeof(authdata));
+    if (execpipe[0] >= 0) close(execpipe[0]);
+    if (execpipe[1] >= 0) close(execpipe[1]);
     if (runfd >= 0) close(runfd);
     if (configfd >= 0) close(configfd);
     if (lockfd >= 0) close(lockfd);
@@ -1272,7 +1609,7 @@ out:
 int main(int argc, char **argv)
 {
     struct serve_cfg c;
-    int mode = 0, i;
+    int mode = 0, any_override = 0, i;
     memset(&c, 0, sizeof(c));
     c.dropbear = C2M_DEBUG_DROPBEAR;
     c.dropbearkey = C2M_DEBUG_DROPBEARKEY;
@@ -1302,35 +1639,42 @@ int main(int argc, char **argv)
                 return 2;
             }
             mode = !strcmp(argv[i], "--self-test") ? 1 : 2;
-        } else if (i + 1 < argc && !strcmp(argv[i], "--dropbear"))
-            c.dropbear = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--dropbearkey"))
-            c.dropbearkey = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--owner-pub"))
-            c.owner_pub = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--run-dir"))
-            c.run_dir = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--config-dir"))
-            c.config_dir = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--status-file"))
-            c.status_file = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--bind"))
-            c.bind_addr = argv[++i];
-        else if (i + 1 < argc && !strcmp(argv[i], "--port"))
-            c.port = atoi(argv[++i]);
-        else if (i + 1 < argc && !strcmp(argv[i], "--window-sec"))
-            c.window_sec = atoi(argv[++i]);
-        else if (i + 1 < argc && !strcmp(argv[i], "--poll-ms"))
-            c.poll_ms = atoi(argv[++i]);
-        else if (i + 1 < argc && !strcmp(argv[i], "--ap-state-file"))
-            c.ap_state_file = argv[++i];
-        else {
+        } else if (i + 1 < argc && !strcmp(argv[i], "--dropbear")) {
+            c.dropbear = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--dropbearkey")) {
+            c.dropbearkey = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--owner-pub")) {
+            c.owner_pub = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--run-dir")) {
+            c.run_dir = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--config-dir")) {
+            c.config_dir = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--status-file")) {
+            c.status_file = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--bind")) {
+            c.bind_addr = argv[++i]; any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--port")) {
+            c.port = atoi(argv[++i]); any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--window-sec")) {
+            c.window_sec = atoi(argv[++i]); any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--poll-ms")) {
+            c.poll_ms = atoi(argv[++i]); any_override = 1;
+        } else if (i + 1 < argc && !strcmp(argv[i], "--ap-state-file")) {
+            c.ap_state_file = argv[++i]; any_override = 1;
+        } else {
             usage(stderr);
             return 2;
         }
     }
     if (mode == 1) return c2m_debug_self_test();
     if (mode != 2) {
+        usage(stderr);
+        return 2;
+    }
+    /* Production gate: any override without an explicit --loopback-test
+     * is rejected here with no filesystem or network I/O, in any order. */
+    if (!c2m_debug_cli_valid(c.loopback, any_override, c.bind_addr, c.port,
+                             c.window_sec, c.poll_ms)) {
         usage(stderr);
         return 2;
     }

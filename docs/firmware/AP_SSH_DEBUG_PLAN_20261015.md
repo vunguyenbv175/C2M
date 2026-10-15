@@ -40,6 +40,13 @@ This is the **client key** fingerprint, not the future camera host key.
   firewall, AP/STA mode change, or inbound tunnel.
 - Public-key-only authentication; password/PAM and forwarding compiled out.
   Single-UID server prevents the owner key from authorizing other accounts.
+- Stock-directory trust is explicitly limited to fixed vendor paths/UIDs:
+  hash-verified EN rootfs CPIO records `tmp`, `var`, `customer` as
+  `0775 1001:1001`; rebuilt customer root may be `0755 1001:1001`. These
+  vendor UIDs are trusted as part of existing root-run firmware, not treated
+  as hostile multi-user accounts. Private debug leaf directories must still
+  be root-owned0700, and `/customer/c2m` exact `0755 1001:1001`; no global
+  stock-directory chmod or ownership rewrite is used to make debug work.
 - Host key generated once into a new private config directory. Do not use
   fleet-shared stock host keys. Pin its real cryptographic fingerprint at
   first owner-controlled connection; the supervisor's short FNV correlation

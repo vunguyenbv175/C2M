@@ -339,6 +339,8 @@ jobs:
           # Pinned upstream Dropbear 2026.94 via fw/debug/build_dropbear.sh.
           # Never put this group in `if ! (...)`, which disables errexit and
           # can hide build failures. The real owner key bytes never enter logs.
+          : > work/debug_build.log
+          : > work/debug_build_tests.txt
           trap 'cat work/debug_build.log work/debug_build_tests.txt' ERR
           bash fw/debug/build_dropbear.sh --out work/debug-build --sysroot work/sysroot \
             > work/debug_build.log 2>&1
@@ -385,6 +387,10 @@ jobs:
             # synthetic temp keys on loopback, never owner keys or ~/.ssh.
             test -f tests/test_debug_ssh.py
             C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
+              C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py
+            C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
+              C2M_DEBUG_SSH_TARGET_DIR="$PWD/work/debug-build" \
+              C2M_DEBUG_SSH_SYSROOT="$PWD/work/sysroot" \
               C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py
           ) > work/debug_build_tests.txt 2>&1
           trap - ERR

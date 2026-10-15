@@ -79,6 +79,15 @@ cat > "$work/compat_prefix.h" <<EOF
 #include "$root/fw/d3/compat.h"
 EOF
 flags="-Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-stack-protector -fno-pie -D_TIME_BITS=32 -U_FILE_OFFSET_BITS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -include $work/compat_prefix.h"
+# Bundled libtommath compiles inside libtommath/ using only LTM_CFLAGS (its
+# %.o rule ignores CPPFLAGS). Upstream tommath_class.h tail includes
+# "dbmalloc.h", which lives in Dropbear src/src/ (r38738994826:
+# tommath_class.h:1322 fatal error: dbmalloc.h). The bundled relative -I is
+# not carried into LTM_CFLAGS, so add absolute -I to the extracted $src and
+# $src/src. Absolute survives the sub-make cwd change; these dirs hold only
+# Dropbear headers (no libc overrides) and keep arch/compat-prefix intact.
+# Appended to flags so both CFLAGS and derived LTM_CFLAGS carry it.
+flags="$flags -I$src -I$src/src"
 
 # Custom _start (GLIBC_2.4 pin) + init-array trampoline for static archives.
 python3 - "$work/start.S" <<'PY'
@@ -182,6 +191,9 @@ EOF
     # LTM_CFLAGS propagation: bundled libtommath Makefile must carry arch/prefix.
     grep -q "armv7-a" libtommath/Makefile || { echo 'LTM_CFLAGS did not propagate' >&2; exit 1; }
     grep -q "compat_prefix" libtommath/Makefile || { echo 'LTM compat prefix missing' >&2; exit 1; }
+    # LTM src include: libtommath %.o ignores CPPFLAGS, so dbmalloc.h
+    # (src/src/dbmalloc.h) must be visible via absolute -I baked into LTM.
+    grep -Fq -- "$src/src" libtommath/Makefile || { echo 'LTM Dropbear src include missing' >&2; exit 1; }
     # Modern random path record: getrandom (GLIBC_2.25) is within the 2.30 cap.
     # NOTE: config.h holds only configure probes; Dropbear option values live
     # in the preprocessor output below, never in config.h.
