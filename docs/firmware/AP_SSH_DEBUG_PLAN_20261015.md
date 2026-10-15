@@ -11,9 +11,16 @@ established. Stock firmware contains dormant OpenSSH 5.6p1, which is too old
 to enable with its default configuration/shared stock keys. The proposed
 new debug bundle uses pinned **Dropbear 2026.94** instead.
 
-Source/build/package/tests are being integrated. Nothing here means the
-camera already has a new listener, has been flashed, or has accepted SSH.
-Camera Wi-Fi remains disconnected; ask before a hardware session.
+Source/build/package/tests have passed on source `d5bb236`:
+- General CI `38755971989`: SUCCESS.
+- Native real SSH `38756257980`: SUCCESS.
+- Private firmware CI `38756253160`: SUCCESS, including actual ARM/QEMU SSH
+  exec/binary roundtrip, wrong-key/no-key/password/cross-UID rejection and
+  authenticated forwarding rejection, then deep validation/preservation.
+
+Nothing here means the camera already has a new listener, has been flashed,
+or has accepted SSH. Camera Wi-Fi remains disconnected; ask before a
+hardware session.
 
 ## Dedicated owner key
 
@@ -94,6 +101,27 @@ ADAS, or inject M4 warnings/audio as a shortcut.
    results to resolve nl80211 capability parsing and M4/TSR routing before
    proposing persistent changes. Bluetooth remains passive until a separate
    transport is proven safe.
+
+## Local preparation evidence (not staged, not hardware accepted)
+
+- Private vault release: `deliverables/20261015-d4-debug-r38756253160`,
+  vault commit `6889a85`; source/public evidence pinned to `d5bb236`.
+- Retrieved TAR and all ten release-member SHA-256 checks passed locally.
+- Reserved local updater token `20261015000001` applied with the fail-closed
+  version-only repacker; all payloads, commands, padding/footer and stock
+  second-stage script unchanged. Four local payload files read back exactly.
+- Local final package in `build/candidate-d4-debug-final-r38756253160/`:
+  TAR SHA-256 `b1843c57e852827e26446215df17c79b84c4add66f4a63c3acc456d86d45a3d3`;
+  inner SHA-256 `4aec53d0b64d5e54aad6b7ddd6c4fe932f21872f102c9fcc746b2bb0f8f797be`.
+- Final local deep validator: VALID,33/33. Customer re-extracted from that
+  exact inner image; all227 stock paths checked with zero unallowlisted
+  changes. Directory size/mtime are documented rebuild artifacts; identity
+  mode/uid/gid still checked. Fourteen runtime assets directly extracted.
+- All eight VI WAVs, `/minieye/adas/md5sum.txt` and the experimental TSR boot
+  profile remain byte-identical to the prior D3.1 reference. EN cardv/ADAS
+  protected hashes remain fixed. D3 boot is unchanged; probe expands toV2.
+- No firmware copied to any card, no camera connection, no flash. Reidentify
+  the distinct updater media before writing; never stage on MINIEYE.
 
 ## Promotion criteria
 
