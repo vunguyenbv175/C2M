@@ -1425,8 +1425,11 @@ static int serve(const struct serve_cfg *c)
         envp[3] = NULL;
         execve(c->dropbear, argv, envp);
         {
-            int e = errno;
-            (void)write(execpipe[1], &e, 1);
+            const unsigned char failed_exec = 1;
+            ssize_t sent;
+            do { sent = write(execpipe[1], &failed_exec, 1); }
+            while (sent < 0 && errno == EINTR);
+            if (sent != 1) _exit(127);
         }
         _exit(127);
     }

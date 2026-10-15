@@ -87,7 +87,7 @@ flags="-Os -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard -fno-stack-protector 
 # $src/src. Absolute survives the sub-make cwd change; these dirs hold only
 # Dropbear headers (no libc overrides) and keep arch/compat-prefix intact.
 # Appended to flags so both CFLAGS and derived LTM_CFLAGS carry it.
-flags="$flags -I$src -I$src/src"
+flags="$flags -I$src -I$src/src -DLOCALOPTIONS_H_EXISTS"
 
 # Custom _start (GLIBC_2.4 pin) + init-array trampoline for static archives.
 python3 - "$work/start.S" <<'PY'

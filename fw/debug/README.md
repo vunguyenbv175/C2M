@@ -65,7 +65,9 @@ Script greps `./configure --help` and uses only found options:
   `--disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp`
   `--disable-wtmpx --disable-loginfunc --disable-pututline`
   `--disable-pututxline --disable-openpty`.
-- `LTM_CFLAGS` carries arch/prefix plus absolute `-I$src -I$src/src`;
+- `LTM_CFLAGS` carries arch/prefix plus absolute `-I$src -I$src/src` and
+  `-DLOCALOPTIONS_H_EXISTS`, so bundled math code includes the same
+  password-disabled local policy even though its sub-make ignores `CPPFLAGS`;
   script fails if `libtommath/Makefile` lacks
   `armv7-a`/`compat_prefix`/`$src/src`. The absolute src include is required
   because bundled `libtommath` builds inside `libtommath/` with only
