@@ -793,6 +793,10 @@ class DebugSshArmTests(unittest.TestCase):
         nss_raw = os.environ.get(NSS_ENV)
         if not nss_raw or not Path(nss_raw).is_absolute():
             require_or_skip(f"ARM fixture requires absolute {NSS_ENV}")
+        import stat
+        prefix_stat = sysroot.stat()
+        if prefix_stat.st_uid != 0 or stat.S_IMODE(prefix_stat.st_mode) != 0o755:
+            raise AssertionError("QEMU prefix root must match kernel-root metadata: 0755 root")
         cls.nss_dir = Path(nss_raw)
         nss_module = cls.nss_dir / "libnss_files.so.2"
         if (nss_module.is_symlink() or not nss_module.is_file() or

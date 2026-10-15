@@ -359,6 +359,10 @@ jobs:
           # Private QEMU fixture only; do not alter firmware /etc or host /etc.
           Path("work/sysroot/etc/nsswitch.conf").write_text("passwd: files\ngroup: files\n")
           EOF
+          # The archive has no '/' entry. QEMU maps stat('/') to this prefix,
+          # so match the camera's kernel root (not the checkout runner UID).
+          sudo chown 0:0 work/sysroot
+          sudo chmod 755 work/sysroot
           : > work/debug_build.log
           : > work/debug_build_tests.txt
           trap 'cat work/debug_build.log work/debug_build_tests.txt' ERR
