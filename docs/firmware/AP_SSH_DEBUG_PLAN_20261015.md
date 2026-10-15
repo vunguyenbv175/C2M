@@ -45,7 +45,10 @@ This is the **client key** fingerprint, not the future camera host key.
   Set only the fixed loader path `/customer/c2m:/lib`, never the writable
   stock SSH library directory. No custom account parser or auth bypass.
 - Public-key-only authentication; password/PAM and forwarding compiled out.
-  Single-UID server prevents the owner key from authorizing other accounts.
+  A restrictive same-UID source patch prevents the owner key from authorizing
+  other accounts; normal Linux multi-user kernel support remains enabled.
+  Upstream key-file checks accept only the supervisor's exact known `/tmp`
+  ancestor policy, never arbitrary writable parents or a writable key file.
 - Stock-directory trust is explicitly limited to fixed vendor paths/UIDs:
   hash-verified EN rootfs CPIO records `tmp`, `var`, `customer` as
   `0775 1001:1001`; rebuilt customer root may be `0755 1001:1001`. These

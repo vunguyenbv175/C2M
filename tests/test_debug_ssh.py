@@ -378,7 +378,7 @@ class DebugSshNativeTests(unittest.TestCase):
         if got != EXPECTED_SHA:
             raise AssertionError(f"upstream tarball SHA mismatch: {got}")
         # Root account must exist (read-only check); login user is current euid
-        # because DROPBEAR_SVR_MULTIUSER=0 only allows the server UID.
+        # because the reviewed same-UID patch permits only the server UID.
         try:
             root = pwdmod.getpwnam("root")
         except KeyError:

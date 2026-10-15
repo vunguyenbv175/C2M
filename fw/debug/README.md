@@ -98,7 +98,19 @@ privilege-dropping checks remain intact. Without it, root-run `-D <run dir>`
 could authorize the owner key for other accounts. `SVR_DROP_PRIVS` remains on.
 A valid root passwd entry/shell is still required (read-only, never modified).
 
-No auth bypass, no default keys.
+No auth bypass, no default keys. The same patch also permits just the exact
+`/tmp` ancestor layouts checked by the supervisor: root-owned sticky `/tmp`,
+or stock EN `0775 1001:1001`. The private root-owned0700 debug directory,
+key file and all other path components retain upstream permission checks.
+The vendor UID trust is an existing firmware assumption, not a new hardened
+multi-user security boundary; no global chmod changes are made.
+
+The firmware pipeline additionally copies the exact stock glibc2.30
+`libnss_files.so.2` (361400 bytes, SHA-256
+`381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd`)
+to `/customer/c2m` as0644. The rootfs alone lacks an NSS module for normal
+account lookups. Only the fixed loader path `/customer/c2m:/lib` is used;
+no stock library, passwd or shadow edits and no custom account parser.
 
 Build: `make PROGRAMS='dropbear dropbearkey'`.
 
@@ -124,7 +136,7 @@ records sanitized snapshots (`reports/dropbear-macros-full.txt`,
   `CLI_PROXYCMD`, `CLI_NETCAT`, `SFTPSERVER`;
 - `1`: `SVR_PUBKEY_AUTH`, `SVR_MULTIUSER`, `ED25519`, `CHACHA20POLY1305`;
 - negative controls reject `SVR_PASSWORD_AUTH 1`, `SVR_PAM_AUTH 1`,
-  `SVR_MULTIUSER 0`; source gate also requires `C2M_DEBUG_SAME_UID_ONLY`.
+  `SVR_MULTIUSER 0` is rejected; source gate requires `C2M_DEBUG_SAME_UID_ONLY`.
 
 Any mismatch fails the build before `make`. Password-roundtrip rejection
 on live targets is covered separately by parent CI native tests.
