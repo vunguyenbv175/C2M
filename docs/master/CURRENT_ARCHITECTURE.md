@@ -65,7 +65,10 @@ UART control was used in those diagnostics.
 
 - Corrected GPS reader:10/10 live samples decoded, freshness acquired. The
   installed old D4 producer is unchanged; real advisories/browser beep remain
-  unaccepted. Updated producer has synthetic stock-QEMU proof, not deployment.
+  unaccepted. A finite shadow later loaded the valid12708-record DB and completed
+  on hardware, but had two transient stale polls with unresolved cause. This
+  is not stable corrected runtime or deployment; see
+  `../firmware/D4_SHADOW_HARDWARE_20261016.md`.
 - AP+STA remains UNKNOWN: single/ordinary wiphy query advertises an empty
   interface-combinations payload. Exact RTL8821CS module has VIF code but no
   proven safe concurrent runtime. Do not force STA at the cost of AP.

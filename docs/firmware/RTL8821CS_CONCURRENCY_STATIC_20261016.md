@@ -46,7 +46,11 @@ More decisive runtime evidence is in `RAM_OBSERVERS_HARDWARE_20261016.md`:
 - Actual `wlan0` is AP on5180MHz, phy0.
 - Single and ordinary dump GET_WIPHY include an explicitly zero-byte
   `INTERFACE_COMBINATIONS` attribute, not a complete valid AP+STA proof.
-- Split dump output was truncated; do not turn its counters into absence proof.
+- The first split dump was truncated and cannot prove absence. A later exact
+  verified probe completed all59 target replies without text truncation or
+  parse error and again saw one zero-byte combination attribute; see
+  `D4_SHADOW_HARDWARE_20261016.md`. This is complete advertisement evidence,
+  not physical hardware impossibility or safe VIF-creation proof.
 - Only `lo`, `usb0`, `wlan0` interface names were observed.
 
 The stock scripts use one `wlan0` and explicitly stop AP before starting STA

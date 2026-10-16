@@ -76,8 +76,11 @@ known raw-subsecond guard defect, not evidence that it repaired itself.
   `build/ram-debug-r38834878886/`; private vault commit `53abf9f`.
   Updated nlprobe SHA-256
   `bac1b848d9b70671a688e1ea97636ef4d4c0bb2e05b2302b0bb4ea5b660ff2aa`.
-  This new probe has not been run on the camera and cannot retrospectively
-  complete the truncated capture.
+  That exact followup bundle was not executed on the camera. A later rebuilt
+  probe from verified bundle `38836577606` did complete the live59-reply split
+  dump without truncation; it again saw one zero-byte combination attribute.
+  See `D4_SHADOW_HARDWARE_20261016.md`; this later result is separate evidence,
+  not a reconstruction of the truncated earlier capture.
 - Source version text still says `linux_live_validated=no`; that is a compile-
   time label, not dynamically rewritten by a successful individual hardware
   run. The exact live modes/results above are the actual evidence.
@@ -126,7 +129,9 @@ Next tasks:
    and local-only compile-time implementation are recorded in
    `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`. Its later source passed Linux
    and stock-ARM/QEMU gates (`38836575675`/`38836577606`) and local4/4 retrieval,
-   but no shadow producer was executed in this hardware session or afterwards.
-   Owner disconnected camera Wi-Fi; notify before any new hardware session.
+   but no shadow producer was executed in this observer session. A later
+   separately notified session ran the finite shadow with valid DB and transient
+   GPS freshness loss, documented in `D4_SHADOW_HARDWARE_20261016.md`. Owner
+   reconnection is session-specific; notify before any new hardware session.
 4. Real-route D4 advisories/beep, Bluetooth RF and M4 3D speed/sign rendering
    remain unaccepted. Notify owner before another hardware session.

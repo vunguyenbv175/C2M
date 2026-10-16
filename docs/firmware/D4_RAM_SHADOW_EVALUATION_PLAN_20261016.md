@@ -1,6 +1,7 @@
 # D4 RAM shadow — prepared and stock-QEMU verified — 2026-10-16
 
-**ARM build, host fixtures and stock-QEMU runtime passed; not hardware-executed.**
+**ARM/QEMU gates passed; one finite hardware run completed with valid DB and
+transient GPS freshness loss. No production deployment or advisory acceptance.**
 
 `fw/d4/main.c` has a compile-time `C2M_D4_SHADOW_OBSERVE` variant using the same
 checked loader/core with fixed target paths,10 one-second samples and a30-second
@@ -43,16 +44,19 @@ passed in manual CI `38836577606` on source `a7cf680`.
   `f5d404e97078cace07ace6abb50d78808b7befd19c95623f7b40be33ddb9ad05`.
 - Local proof: `build/ram-debug-r38836577606/local_readback.json`.
 
-Owner has intentionally disconnected camera Wi-Fi. **Do not reconnect, query,
-reboot or run the shadow until notifying the owner and obtaining a new
-stationary hardware session.** No new camera access occurred for this build
-or retrieval, and the installed D4 producer remains unchanged. A laptop-local
-reviewed runner is prepared at `build/run_d4_shadow_reviewed.py`: its default
-mode checks only the independently pinned bundle, and hardware execution needs
-an explicit new-session/stationary confirmation plus actual source IPv4. It
-only uploads/runs the shadow, never `c2m-signs`; hashes, pure target self-test,
-external timeout/nice, cleanup and original producer hash are rechecked.
-The runner's local-check-only invocation passed; its hardware path has not run.
+No camera access occurred for this build or retrieval. Subsequently the owner
+reconnected for the notified finite test: the exact shadow completed10 samples,
+loaded the valid12708-record DB, and was cleaned without replacing the installed
+producer. Freshness was `[0,1,1,1,1,1,1,0,0,1]`; samples8–9 were stale with cause
+unresolved. See `D4_SHADOW_HARDWARE_20261016.md`; this is not stable-runtime,
+real-advisory or beep acceptance.
+
+The laptop-local reviewed runner `build/run_d4_shadow_reviewed.py` was used;
+its default mode checks only the pinned bundle. Hardware path reverified
+identity/hash/self-test, external timeout/nice, cleanup and unchanged installed
+producer. It uploaded only the shadow, never `c2m-signs`. Owner confirmed stock
+functions remained normal. **Hardware access is stopped. Notify owner before
+any new reconnection/query/test; no automated reboot or session extension.**
 
 The corrected GPS observer decoded10/10 actual samples and acquired freshness
 on hardware. The complete corrected producer passed stock-QEMU synthetic
