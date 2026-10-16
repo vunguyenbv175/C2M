@@ -83,12 +83,15 @@ UART control was used in those diagnostics.
   legs to both `adas:26012` and `cardv:8080`. No injection was performed;
   L1 decode and any replay remain gated. See
   `../firmware/M4_TRANSPORT_L0_20261016.md`.
-  A bounded receive-only `usb0` observer v2 is implemented and gated:
-  payload-only hex (96B L7 per segment, 20 packets, 512B snaplen) instead of
-  frame-start hex; host 4/4 PASS, ARM build/QEMU PASS (`38852345666`,
-  source `23a2d45`, bundle `d3dc30cf…57ac4`, 11624B, `observer_v2`,
-  no-transmit, sentinel unchanged). No camera contact for L1 yet; hardware
-  run needs a newly notified stationary session. See
+  Sniffer V2 build/QEMU passed (`38852345666`) but was HELD before upload:
+  static review found invalid-offset/header leakage and Ethernet-padding
+  payload errors, plus insufficient exact-run/current-link runner gates.
+  Do not use V2 for hardware or treat its tests as successful capture proof.
+  V3 fixes payload bounds, protocol-zero interface attach, nonblocking receive,
+  actual output-byte budget and explicit prefix truncation/seq/ack metadata.
+  A newly owner-confirmed read-only preflight found the live USB legs healthy;
+  V3 synthetic/ARM gates and exact pinned runner remain required before run.
+  No sniffer has executed on camera yet; see
   `../firmware/M4_SNIFF_L1_PLAN_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that

@@ -43,7 +43,10 @@ def main() -> int:
             runtime.get("status_writer") is not False or
             runtime.get("transmit") is not False or
             runtime.get("finite_packets") != 20 or
-            runtime.get("sniff_schema") != "observer_v2"):
+            runtime.get("undefined_import_no_transmit_gate") is not True or
+            runtime.get("record_budget_bytes") != 6144 or
+            runtime.get("partial_payload_prefixes_not_reassembled_stream") is not True or
+            runtime.get("sniff_schema") != "observer_v3"):
         raise SystemExit("Mandatory M4 sniff ARM runtime proof/pins missing")
     subprocess.run(["python3", "fw/device_minimal/check_elf.py", str(args.sniff),
                     "--allow-dynamic"], cwd=ROOT, check=True, timeout=30)
@@ -65,6 +68,9 @@ def main() -> int:
         "sha256": {"c2m-m4-sniff": hashlib.sha256(blob).hexdigest()},
         "bytes": {"c2m-m4-sniff": len(blob)},
         "source_sha256": source_pins, "stock_qemu_m4_sniff": "PASS",
+        "sniff_schema": "observer_v3", "record_budget_bytes": 6144,
+        "capture_scope": "partial_payload_prefixes_not_reassembled_stream",
+        "undefined_import_no_transmit_gate": True,
         "native_elf_hardware_executed": False, "camera_used": False,
         "radio_used": False, "firmware_package_created": False,
         "private_database_included": False, "keys_included": False,

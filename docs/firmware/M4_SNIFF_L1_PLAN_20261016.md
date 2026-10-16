@@ -21,14 +21,32 @@ New RAM-only source `fw/m4_sniff/m4_usb_observe.c`:
 - Receive-only `AF_PACKET/SOCK_RAW` attach via `bind()`; NO transmit:
   no `send/sendto/sendmsg/connect`, no `ioctl/setsockopt` state change,
   no promiscuous toggle, no file writes, no status-file touch.
-- Finite: 20 packets max, 512B snaplen, 96B payload-only hex per packet,
-  15×1s `poll()`, 30s monotonic bound, signal-stop, external timeout still
-  required. Output stays ASCII and under 8KiB. Headers become metadata
-  (`payload_len`, ports, flags, leg); the hex dump skips Ethernet/IP/TCP
-  headers (IHL/TCP-offset aware, VLAN/frag safe) so a normal segment keeps
-  ~96B of L7 data instead of ~10B. Pure ACKs report `payload_len=0`.
-  Schema is `m4_sniff=observer_v2` (v1 dumped the first 64 frame bytes and
-  is superseded for L1 decode).
+- Finite: 20 received packets max, 512B snaplen, 96B payload prefix per
+  record; 15 poll calls (each waits AT MOST 1s), 30s monotonic bound,
+  signal-stop, external timeout still required. This is **NOT a guaranteed
+  15-second capture**: traffic-ready polls consume the budget immediately.
+- Schema `m4_sniff=observer_v3`: shared tested formatter emits L7 bytes only,
+  IP/UDP lengths exclude Ethernet padding, invalid/fragment/ARP frames emit
+  empty `payload_hex`. `payload_len` is advertised transport payload size;
+  `captured` is actual retained bytes; `truncated` explicitly marks omission.
+  IHL/TCP offset and one VLAN tag are supported; no IPv6/QinQ or reassembly.
+- IPv4 source/destination, ports, TCP sequence/ack and flags are metadata.
+  These help identify directions and gaps; they do NOT reconstruct missing
+  bytes. Each record is a partial prefix, not necessarily one complete WS
+  frame/MessagePack object. ACK-only traffic consumes packet/poll budget too.
+- A 6144-byte record budget plus bounded preamble/summary keeps stdout below
+  8192 bytes (hardware wrapper lifecycle tokens also bounded). Stop reason
+  `output_budget_partial` is normal bounded sampling, not complete capture.
+- Protocol-zero nonblocking AF_PACKET socket queues no traffic before binding
+  `usb0`; each receive also checks its returned ifindex. No promiscuous mode,
+  BPF bypass or new application connection is introduced.
+
+V1 frame-start dumping and V2 are superseded, NOT hardware-approved. Static
+preflight review found V2 dumped frame headers at offset zero for invalid/ARP
+frames and counted Ethernet padding as payload. Previous V2 claims of safe
+payload-only output and complete 15s duration are withdrawn; no V1/V2 native
+sniffer was uploaded/executed on camera. QEMU's absent-interface test alone
+cannot validate the successful capture/parser path.
 - Graceful when `usb0`/raw socket is absent (CI/QEMU path):
   `completion=iface_unavailable|capture_unavailable`, exit 0, still finite.
 - `--self-test` is pure synthetic Ethernet/IP/TCP/UDP/ARP parsing with
@@ -45,9 +63,11 @@ Target build defines no TEST macros.
 Host gate `tests/test_m4_sniff.py` (portable CLI + Linux runtime),
 QEMU gate `tools/fw/test_ram_m4_sniff_stock_qemu.py`
 (missing-`usb0` finite path, sentinel status file unchanged),
-hardware runner `build/run_m4_sniff_reviewed.py`
-(pinned bundle, fresh stationary session, pre/post health, exact RAM cleanup,
+hardware runner `build/run_m4_sniff_v3_reviewed.py`
+(exact pinned binary/manifest/source/run, parsed current link, raw lifecycle
+markers, pre/post health and unchanged native legs, exact RAM cleanup,
 installed producer PID/hash unchanged, private `C2M_HW_*` evidence only).
+Old `build/run_m4_sniff_reviewed.py` now refuses hardware execution.
 
 ## Why not `tcpdump` or a second `:8080` client
 
@@ -71,7 +91,15 @@ installed producer PID/hash unchanged, private `C2M_HW_*` evidence only).
 
 ## Status
 
-Source, ARM build script, host test, QEMU gate and reviewed runner are being
-added offline in this change. No camera contact has been made for L1 yet.
-Next: host-test PASS → ARM CI PASS → pinned bundle → newly notified hardware
-run → offline decode against `M4_STATIC_PROTOCOL_V1.md` topics/keys.
+Owner later confirmed ready. A fresh UUID/host-pinned READ-ONLY preflight
+at `m4_sniff_preflight_20261016_122434` found current USB legs, active finite
+SSH, running recorder/ADAS and unchanged D4 assets. No sniffer upload/execution
+yet: V2 was held for static-review blockers, fixed offline as V3. Local-only
+V3 runner is separately named `build/run_m4_sniff_v3_reviewed.py` and fails
+until exact source/run/manifest/binary pins are approved. It requires parsed
+current RNDIS/ARP/route/ESTABLISHED legs and validates raw lifecycle output
+without fabricating self-test markers. Raw capture must stay private.
+Next: synthetic successful parser/output tests → ARM CI/QEMU/import gate →
+exact pinned bundle → finite hardware run if owner readiness/window remain
+valid → offline decode. No replay, M4 widget support or full L1 acceptance is
+implied by any earlier build-only result.

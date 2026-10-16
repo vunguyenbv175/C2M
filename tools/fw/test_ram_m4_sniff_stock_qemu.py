@@ -46,11 +46,18 @@ def main():
     blob = binary.read_bytes()
     for forbidden in (b'--serve', b'--db', b'--gps-file', b'--status-file', b'c2m_d4_status'):
         assert forbidden not in blob, f'writer/fixture token present: {forbidden!r}'
-    for transmit in (b'send(', b'sendto(', b'sendmsg(', b'connect('):
-        # Source-level transmit calls must not be linked into the observer.
-        # Binary symbol check is intentionally strict: any transmit import fails.
-        assert transmit not in blob, f'transmit token present: {transmit!r}'
-    for token in (b'm4_sniff=observer_v2', b'iface_fixed=', b'usb0',
+    # Inspect actual undefined ELF imports, not C-call-shaped substrings.
+    # Dynamic symbol names contain no '('; the old byte grep was not a gate.
+    symbols = subprocess.check_output(['arm-linux-gnueabihf-readelf', '--wide',
+                                      '--dyn-syms', str(binary)], text=True)
+    imports = {row.split()[-1].split('@')[0] for row in symbols.splitlines()
+               if ' UND ' in row and len(row.split()) >= 8}
+    forbidden_calls = {'send', 'sendto', 'sendmsg', 'sendmmsg', 'connect', 'write',
+                       'writev', 'pwrite', 'pwrite64', 'ioctl', 'setsockopt',
+                       'system', 'popen', 'fopen', 'open', 'openat', 'creat',
+                       'syscall', 'execve', 'execv', 'execl', 'dlopen', 'dlsym'}
+    assert not (imports & forbidden_calls), sorted(imports & forbidden_calls)
+    for token in (b'm4_sniff=observer_v3', b'iface_fixed=', b'usb0',
                   b'payload_hex_fixed=', b'payload_len=', b'payload_hex=',
                   b'observer_simulation_not_production_delivery',
                   b'status_writes=0', b'transmit_bytes=0'):
@@ -58,6 +65,9 @@ def main():
     assert b'm4_sniff=observer_v1' not in blob, 'stale observer schema present'
     args.report.parent.mkdir(parents=True, exist_ok=True)
     try:
+        pure = subprocess.run([qemu, '-L', str(sysroot), str(binary), '--self-test'],
+                              capture_output=True, timeout=5)
+        assert pure.returncode == 0 and pure.stdout == b'M4 USB observe self-test: OK\n' and not pure.stderr
         r = subprocess.run([qemu, '-L', str(sysroot), str(binary), '--observe'],
                            capture_output=True, timeout=25)
         (args.report.with_suffix('.stdout.txt')).write_bytes(r.stdout)
@@ -66,7 +76,7 @@ def main():
         assert not r.stderr, r.stderr.decode(errors='replace')
         text = r.stdout.decode('ascii')
         assert len(r.stdout) < 8192
-        assert 'm4_sniff=observer_v2' in text
+        assert 'm4_sniff=observer_v3' in text
         assert 'iface_fixed=usb0' in text
         assert 'payload_hex_fixed=96' in text
         assert 'status_writes=0' in text and 'transmit_bytes=0' in text
@@ -89,7 +99,10 @@ def main():
               'finite_packets': 20, 'runtime': 'shipping ARM M4 sniff --observe under pinned stock QEMU',
               'interface_case': 'missing usb0 in CI (no private capture)',
               'status_sentinel_unchanged': True, 'target_hardware_accepted': False,
-              'sniff_schema': 'observer_v2'}
+              'sniff_schema': 'observer_v3',
+              'undefined_import_no_transmit_gate': True,
+              'record_budget_bytes': 6144,
+              'partial_payload_prefixes_not_reassembled_stream': True}
     args.report.write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     print(json.dumps(report, sort_keys=True))
 
