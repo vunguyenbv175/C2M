@@ -104,6 +104,15 @@ removal, camera access, auto-flash or automatic rollback is authorized. Leave
 Normal/Event/Photo/C2M_DIAG metadata untouched. Local frozen/reference packages
 are not copied together onto the updater root.
 
+## Completed release / card preparation
+
+Final source `fd7bd6a0c28477aaaccc4ee5784066300113a2da`, package CI38902291605
+and general CI38902290701 PASS. Private delivery independently read back,
+local version20261016000001 ALLOWLIST-OK/deep VALID33/33 and identified D: card
+staged with4/4 SHA256 readback. No format/media changes/camera access/flash.
+See `D5_VI_RELEASE_AND_CARD_20261016.md` for exact pins, rollback and evidence.
+Do not confuse completed preparation with hardware installation/acceptance.
+
 ## Hardware acceptance (not performed by package creation)
 
 Only after separate notice/approval, safe stationary power and identified updater

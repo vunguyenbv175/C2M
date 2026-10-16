@@ -13,6 +13,11 @@ greeting semantics retained; no ADB/WS injection or automatic resets. Separate
 manual build/validation, private retrieval and local version preparation;
 no camera access/card staging/flash authorized by package creation. See
 `../firmware/CANDIDATE_D5_VI_20261016.md` for scope and hardware acceptance.
+D5-VI sourcefd7bd6a/package CI38902291605/general CI38902290701 PASS; local
+version20261016000001 prepared/deep VALID33/33. Owner-approved identified D:
+updater card staged4/4 hash readback, no format/media changes/camera access or
+flash. Separate D4 rollback20261016000002 retained on laptop. See
+`../firmware/D5_VI_RELEASE_AND_CARD_20261016.md` for exact source/artifact pins.
 
 ## Decision
 
