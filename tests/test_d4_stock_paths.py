@@ -36,6 +36,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MAIN_C = ROOT / "fw" / "d4" / "main.c"
 
 HARNESS = r'''
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
