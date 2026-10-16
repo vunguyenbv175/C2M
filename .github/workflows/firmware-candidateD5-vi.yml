@@ -695,7 +695,9 @@ jobs:
                              "file": "work/vi-audios/" + src}
                             for img, src in pairs], indent=2))
           EOF
-          python3 tools/fw/mutate_customer.py --tree work/tree \
+          # P1 preserved VI ownership (1000/1001), not the CI runner UID.
+          # Mutate the private build tree as root rather than chmod stock paths.
+          sudo python3 tools/fw/mutate_customer.py --tree work/tree \
             --manifest work/customer_manifest.json \
             --idle-bin build/arm-dyn-b/c2m-idle \
             --audio-replacements work/audio_map.json \
