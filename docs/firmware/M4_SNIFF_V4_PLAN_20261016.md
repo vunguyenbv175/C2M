@@ -48,6 +48,25 @@ renderer support or an approved replay/injection schema.
   assumed from the prior session. Notify before connecting again; no automatic
   listener restart/extension and no second8080 client.
 
+## Final preparation and hardware result
+
+Manual run `38866208565` PASS on exact source
+`43ff7c3dd2de99d47c80c71de50bc822bd9bf90e`; Linux capture8/8 and decoder37/37,
+ARM/QEMU/import gates passed. Binary11832B SHA256
+`842014346152e2ba21f2604b486ec643de4b80b6bcb08cc642819c6e091fccc4`,
+manifest `e959fa1eb167456d547d5a5e9e344ede5e19a900fea01860ccf17dc3b4042cac`.
+Private vault `99bfda3fb1bcf3a36162a0100312c0271ded7a86`; local full byte/source/
+manifest readback PASS. Owner confirmed reconnected, stationary and normal.
+
+V4 ran once at14:47,12.043s:42 full data records,5646B payload,0 truncated;
+exit0 and RAM cleanup verified. **Strict26012 unchanged-connection gate failed**
+(client port changed), so not unconditional preservation PASS. No retry or
+further device access; owner reported no flicker and original functions normal.
+Offline complete server decode recovered39 messages, including10 native
+GPSSpeed on8080 and all four known ADAS payload families across24012/26012.
+See `M4_SNIFF_V4_HARDWARE_20261016.md` for counts/normalization and remaining
+receiver/layout gap. No need for more hardware to finish this sample's decode.
+
 V4 is a diagnostic capture, not production D4 deployment, camera recognition,
 3D widget implementation, legal-speed detection or sound delivery. No sign
 limit as GPSSpeed, false collision/lane warning or M4 firmware modification.

@@ -16,6 +16,17 @@
 - Camera Wi-Fi is disconnected. Continue offline; ask before another live
   camera session. No device/card/network probe is part of this investigation.
 
+## 2026-10-16 V4 native capture update
+
+A finite receive-only RNDIS capture retained complete small native TCP payloads,
+including GPSSpeed on8080 and lane/vehicle/pedestrian scene messages on24012/
+26012. No sign result was established by this bounded stationary sample;
+absence in it is not proof of absent TSR/receiver capability. No replay or
+injection was performed. The strict unchanged26012 connection gate failed
+(client reconnect), despite normal owner-visible behavior and healthy recorder/
+AP/D4; no unconditional preservation acceptance. See
+`M4_SNIFF_V4_HARDWARE_20261016.md` for schema counts and limits.
+
 ## Separate the three paths
 
 | Data/output | Confirmed evidence | Not established |

@@ -24,7 +24,24 @@ itself prove which process draws the 2D digits. They may be camera-burned video
 OSD or a native M4 overlay. Do not assume the 2D speed proves M4's 3D receiver
 has a usable speed model. Preserve the working 2D and all ADAS layers.
 
-## Confirmed live observation
+## 2026-10-16 native M4-path update (supersedes old transport uncertainty)
+
+Finite V4 AF_PACKET capture on proven RNDIS `usb0` retained10 COMPLETE native
+camera `.123:8080`→M4 `.129` `GPSSpeed` WebSocket JSON messages without adding
+an application client. The exact `type`/`uuid`/`speed` shape and integer speed
+field were independently inspected offline; no observed speed values are
+published. This proves camera emission onto the current M4 link, not that the
+M4 app accepts/applies the value or draws it in3D. Missing3D speed is no longer
+explainable solely as “camera never sends GPSSpeed”. Do not inject another copy.
+
+V4 kept all42 sampled payload records untruncated; strict unchanged-connection
+postflight FAILED because26012's native client port changed. Camera8080 stayed
+connected, original processes/recording/AP/D4 assets remained healthy in snapshots,
+and owner reported no screen flicker or original-function problem. Cause of
+26012 reconnect is UNKNOWN. No retry or further hardware access. See
+`M4_SNIFF_V4_HARDWARE_20261016.md`; this is not unconditional preservation pass.
+
+## Historical first-client observation
 
 After the laptop joined the expected camera AP, its camera-facing IPv4 was
 explicitly bound for HTTP/WS. The authorized stock UUID was verified before
@@ -69,7 +86,8 @@ GPS parser/cache -> GpsSetInfo2Chunk()
 The JSON template is `{"type":1601,"uuid":"GPSSpeed","speed":%d}`.
 The sender is stock outbound cardv→client traffic; cardv has no verified
 inbound 1601 setter/relay. It uses one global client pointer and the runtime
-M4 peer/path/interface remain unverified. On invalid GPS cardv maps cached
+M4 peer/path/interface were unverified at that earlier static review (now
+proven by RNDIS capture above). On invalid GPS cardv maps cached
 65535 to0; the JSON has no validity/timestamp, so speed0 cannot distinguish
 stationary from invalid GPS. For normal RMC input the cached value is integer
 km/h after knots×1.852 conversion, though the M4 render/unit behavior remains
@@ -102,8 +120,9 @@ Do not add an OSD attachment or change a display buffer on this evidence.
 Local search found no identified M4 receiver/renderer source, M4 firmware dump
 or update package, 3D layout assets, or documented speed-in-3D control. The
 camera firmware and host-side `M4Adapter` scaffold are not M4 UI firmware.
-`C2M_HW_20261012/07_m4/` has no physical-link capture; synthetic fixtures do
-not count as one. The actual component rendering 3D remains unverified.
+The earlier lack of physical-link capture is now superseded by V3/V4 native
+RNDIS captures; synthetic fixtures alone never counted. Those native captures
+still do not identify the actual3D rendering component or speed widget control.
 
 Needed next: identify the actual renderer/receiver and obtain a verified stock
 speed/sign display control or matching renderer documentation/source. A renderer
@@ -131,8 +150,10 @@ stationary:
 2. Use only an already-proven native capture mechanism that cannot create a
    second cardv client, or observe the physical M4 while cardv naturally emits
    its own frames. Do not attach a second WS client to :8080.
-3. If native speed reaches the proven M4 path but no digits appear, missing
-   capability is M4 receiver/layout firmware, not C2M GPS production.
+3. Native GPSSpeed now reaches the proven M4 link. If3D digits remain absent,
+   investigate receiver handling, validity/display policy and actual layout;
+   do not declare missing renderer capability or prescribe firmware replacement
+   from the transport packet alone.
 4. If native frames remain zero/invalid, resolve genuine camera GPS fix first.
 
 D4 remains a separate offline GPS nearby-area advisory displayed in `/signs`
