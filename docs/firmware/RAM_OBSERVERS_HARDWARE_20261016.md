@@ -68,6 +68,16 @@ known raw-subsecond guard defect, not evidence that it repaired itself.
 - Explicit split dump:59 replies, DONE received, but bounded text output
   truncated (`stage=truncated`,200-line/8192-byte budget). Its zero count is
   **not a complete absence proof** and must not overrule the truncation marker.
+  Source followup `ccd9d16` prioritizes target-phy combinations, distinguishes
+  empty attributes from missing attributes, uses actual AP phy/frequency for
+  dump, and reports parsing completeness separately from text truncation.
+  General Linux/Chrome CI `38834869497` and stock ARM/QEMU CI `38834878886`
+  passed on that source. The followup bundle was retrieved/verified3/3 under
+  `build/ram-debug-r38834878886/`; private vault commit `53abf9f`.
+  Updated nlprobe SHA-256
+  `bac1b848d9b70671a688e1ea97636ef4d4c0bb2e05b2302b0bb4ea5b660ff2aa`.
+  This new probe has not been run on the camera and cannot retrospectively
+  complete the truncated capture.
 - Source version text still says `linux_live_validated=no`; that is a compile-
   time label, not dynamically rewritten by a successful individual hardware
   run. The exact live modes/results above are the actual evidence.
