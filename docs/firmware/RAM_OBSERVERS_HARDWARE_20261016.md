@@ -123,7 +123,8 @@ Next tasks:
    gate. Prefer finite shadow output in a
    private RAM path/stdout; never two producers writing the shared D4 status,
    no stopping recorder/ADAS and no weakening production path checks. A plan
-   only is recorded in `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`; no shadow
-   producer is implemented or run by this session.
+   and local-only compile-time implementation are recorded in
+   `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`; no shadow producer was executed
+   in this hardware session.
 4. Real-route D4 advisories/beep, Bluetooth RF and M4 3D speed/sign rendering
    remain unaccepted. Notify owner before another hardware session.

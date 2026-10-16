@@ -8,6 +8,38 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Compile-time diagnostic shadow variant (NOT default production change).
+ * Build with -DC2M_D4_SHADOW_OBSERVE for a finite observer reusing the exact
+ * checked DB loader/GPS/core with fixed paths. Production compile (without
+ * this macro) is unchanged in behavior. Target shadow CLI is only
+ * --observe/--help/--self-test; no --serve/fixture path flags exist here.
+ * Host synthetic fixtures use compile-time TEST ONLY constants, never
+ * runtime CLI overrides; target ARM build must NOT define them. */
+#if defined(C2M_D4_SHADOW_TEST_DB) || defined(C2M_D4_SHADOW_TEST_GPS) || \
+    defined(C2M_D4_SHADOW_TEST_ALLOW)
+#ifndef C2M_D4_SHADOW_OBSERVE
+#error "shadow TEST macros require C2M_D4_SHADOW_OBSERVE"
+#endif
+#ifndef C2M_D4_SHADOW_TEST_ALLOW
+#error "shadow TEST path overrides require C2M_D4_SHADOW_TEST_ALLOW (host tests only)"
+#endif
+#endif
+#ifdef C2M_D4_SHADOW_OBSERVE
+#define C2M_D4_SHADOW_SAMPLES 10
+#define C2M_D4_SHADOW_INTERVAL_SEC 1
+#define C2M_D4_SHADOW_MAX_MS UINT64_C(30000)
+#ifdef C2M_D4_SHADOW_TEST_DB
+#define C2M_D4_SHADOW_DB_PATH C2M_D4_SHADOW_TEST_DB
+#else
+#define C2M_D4_SHADOW_DB_PATH C2M_D4_DEFAULT_DB
+#endif
+#ifdef C2M_D4_SHADOW_TEST_GPS
+#define C2M_D4_SHADOW_GPS_PATH C2M_D4_SHADOW_TEST_GPS
+#else
+#define C2M_D4_SHADOW_GPS_PATH C2M_GPS_DEFAULT_PATH
+#endif
+#endif
+
 #ifdef __linux__
 #include <errno.h>
 #include <fcntl.h>
@@ -171,6 +203,7 @@ static void database_close(struct database *db)
     signdb_free(db->signs);
 }
 
+#ifndef C2M_D4_SHADOW_OBSERVE
 static int target_ok(const struct checked_path *p)
 {
     struct stat st;
@@ -231,6 +264,8 @@ done:
     return result;
 }
 
+#endif /* !C2M_D4_SHADOW_OBSERVE: shadow never writes/renames any status file */
+
 static int gps_parent_ok(const char *path, int fixture)
 {
     struct checked_path p;
@@ -239,6 +274,7 @@ static int gps_parent_ok(const char *path, int fixture)
     return 1;
 }
 
+#ifndef C2M_D4_SHADOW_OBSERVE
 static int serve(const char *db_path, const char *gps_path, const char *status_path,
                  int fixture)
 {
@@ -284,18 +320,237 @@ static int serve(const char *db_path, const char *gps_path, const char *status_p
     database_close(&db);
     return rc;
 }
+#else /* C2M_D4_SHADOW_OBSERVE: finite observer, same loader/core, no status writer */
+static const char *shadow_state_name(enum c2m_d4_state state)
+{
+    switch (state) {
+    case C2M_D4_WAITING_GPS: return "waiting_gps";
+    case C2M_D4_WARMING_UP: return "warming_up";
+    case C2M_D4_READY: return "ready";
+    case C2M_D4_STALE: return "stale";
+    case C2M_D4_NO_DATABASE: return "no_database";
+    case C2M_D4_DISABLED: return "disabled";
+    case C2M_D4_ERROR: return "error";
+    default: return "unknown";
+    }
+}
+
+static const char *shadow_code_name(enum c2m_d4_code code)
+{
+    switch (code) {
+    case C2M_D4_NONE: return "none";
+    case C2M_D4_RESIDENTIAL_START: return "residential_start";
+    case C2M_D4_RESIDENTIAL_END: return "residential_end";
+    default: return "unknown";
+    }
+}
+
+/* Finite RAM-only observer: fixed DB+GPS, 10x1s, explicit monotonic bound,
+ * stdout summary only. Never writes/renames any status file, no
+ * camera/UART/IPC/network. Simulated publication is explicitly reported
+ * as observer simulation, not production delivery. Monotonic bound is
+ * enforced before and after each DB read/core step and sleep failures stop
+ * the run; callers must still apply an external timeout. */
+static int shadow_observe(void)
+{
+    struct database db;
+    struct c2m_d4_advisory core;
+    struct c2m_d4_cooldown *cooldowns = NULL;
+    struct c2m_d4_status status;
+    struct c2m_gps_snapshot gps;
+    struct sigaction action;
+    struct timespec delay;
+    uint64_t start_ms = 0, now = 0, last_ms = 0, deadline = 0, after_ms = 0;
+    int i, gps_result, ok, rc = 0, completed = 0;
+    int final_fresh = 0, final_active = 0;
+    const char *db_path = C2M_D4_SHADOW_DB_PATH;
+    const char *gps_path = C2M_D4_SHADOW_GPS_PATH;
+    const char *completion = "complete";
+#ifdef C2M_D4_SHADOW_TEST_ALLOW
+    const int fixture = 1;
+#else
+    const int fixture = 0;
+#endif
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = on_signal;
+    sigemptyset(&action.sa_mask);
+    if (sigaction(SIGINT, &action, NULL) || sigaction(SIGTERM, &action, NULL))
+        return 1;
+    if (milliseconds(&start_ms))
+        return 1;
+    if (start_ms > UINT64_MAX - C2M_D4_SHADOW_MAX_MS)
+        return 1;
+    deadline = start_ms + C2M_D4_SHADOW_MAX_MS;
+    database_open(&db, db_path, fixture);
+    if (db.valid) {
+        cooldowns = (struct c2m_d4_cooldown *)calloc((size_t)db.count,
+                                                     sizeof(*cooldowns));
+        if (!cooldowns)
+            db.valid = 0;
+    }
+    c2m_d4_init(&core, db.signs, db.count, cooldowns);
+    printf("d4_shadow=observer_v1\n");
+    printf("samples_fixed=%d interval_s_fixed=%d monotonic_bound_ms=%llu\n",
+           C2M_D4_SHADOW_SAMPLES, C2M_D4_SHADOW_INTERVAL_SEC,
+           (unsigned long long)C2M_D4_SHADOW_MAX_MS);
+    printf("db_valid=%d db_count=%d\n", db.valid ? 1 : 0,
+           db.valid ? db.count : 0);
+    printf("delivery_sim=observer_simulation_not_production_delivery\n");
+    printf("status_writes=0\n");
+    last_ms = start_ms;
+    for (i = 0; i < C2M_D4_SHADOW_SAMPLES; ++i) {
+        const char *state_name, *code_name;
+        int sleep_rc;
+        if (stopping) {
+            completion = "interrupted_signal";
+            rc = 1;
+            break;
+        }
+        if (milliseconds(&now)) {
+            completion = "error_clock";
+            rc = 1;
+            break;
+        }
+        if (now < last_ms) {
+            fputs("shadow: monotonic regression\n", stderr);
+            completion = "error_monotonic_regression";
+            rc = 1;
+            break;
+        }
+        if (now > deadline) {
+            fputs("shadow: monotonic bound exceeded\n", stderr);
+            completion = "error_monotonic_bound";
+            rc = 1;
+            break;
+        }
+        last_ms = now;
+        ok = database_unchanged(&db, db_path, fixture);
+        gps_result = C2M_GPS_IO_ERROR;
+        if (gps_parent_ok(gps_path, fixture))
+            gps_result = c2m_gps_read(gps_path, &gps);
+        c2m_d4_prepare(&core, gps_result == C2M_GPS_OK ? &gps : NULL, now,
+                       ok, 0, &status);
+        /* Bound applies after the DB read/core step as well: re-sample the
+         * clock without feeding a second timestamp to the core. */
+        if (milliseconds(&after_ms)) {
+            completion = "error_clock";
+            rc = 1;
+            break;
+        }
+        if (after_ms < now || after_ms < last_ms) {
+            fputs("shadow: monotonic regression\n", stderr);
+            completion = "error_monotonic_regression";
+            rc = 1;
+            break;
+        }
+        if (after_ms > deadline) {
+            fputs("shadow: monotonic bound exceeded\n", stderr);
+            completion = "error_monotonic_bound";
+            rc = 1;
+            break;
+        }
+        last_ms = after_ms;
+        if (stopping) {
+            completion = "interrupted_signal";
+            rc = 1;
+            break;
+        }
+        /* Observer simulation only: advances local hold/cooldown state so
+         * the summary reflects what WOULD be selected. This is NOT
+         * production delivery and never touches any status file. */
+        c2m_d4_published(&core, 1);
+        state_name = shadow_state_name(status.state);
+        code_name = shadow_code_name(status.code);
+        final_fresh = status.gps_fresh ? 1 : 0;
+        final_active = status.active ? 1 : 0;
+        printf("sample=%d state=%s gps_fresh=%d active=%d code=%s "
+               "distance_m=%u event_id=%" PRIu32 " sequence=%" PRIu32 " "
+               "delivery_sim=observer_simulation_not_production_delivery\n",
+               completed + 1, state_name, final_fresh, final_active, code_name,
+               status.distance_m, status.event_id, status.sequence);
+        ++completed;
+        if (fflush(stdout)) {
+            fputs("shadow: stdout failed\n", stderr);
+            completion = "error_write";
+            rc = 1;
+            break;
+        }
+        if (completed >= C2M_D4_SHADOW_SAMPLES)
+            break;
+        if (stopping) {
+            completion = "interrupted_signal";
+            rc = 1;
+            break;
+        }
+        delay.tv_sec = C2M_D4_SHADOW_INTERVAL_SEC;
+        delay.tv_nsec = 0;
+        sleep_rc = 0;
+        while (!stopping && nanosleep(&delay, &delay) != 0) {
+            if (errno == EINTR)
+                continue;
+            fputs("shadow: sleep failed\n", stderr);
+            completion = "error_sleep";
+            rc = 1;
+            sleep_rc = 1;
+            break;
+        }
+        if (sleep_rc)
+            break;
+        if (stopping) {
+            completion = "interrupted_signal";
+            rc = 1;
+            break;
+        }
+    }
+    printf("summary samples=%d db_valid=%d db_count=%d fresh_final=%d "
+           "active_final=%d completion=%s delivery_sim="
+           "observer_simulation_not_production_delivery status_writes=0\n",
+           completed, db.valid ? 1 : 0,
+           db.valid ? db.count : 0, final_fresh, final_active, completion);
+    free(cooldowns);
+    database_close(&db);
+    return rc;
+}
+#endif /* C2M_D4_SHADOW_OBSERVE */
 #endif
 
 static void usage(void)
 {
+#ifdef C2M_D4_SHADOW_OBSERVE
+    puts("usage: c2m-d4-shadow --observe | --self-test | --help\n"
+         "RAM-only diagnostic observer; fixed package DB and read-only GPS file.\n"
+         "Fixed paths: /customer/c2m/signs-d4.bin and /tmp/car_info (no overrides).\n"
+         "Fixed bounds: 10 samples at 1s, 30s monotonic bound; stdout summary only.\n"
+         "Never writes status files; delivery is observer simulation, not production delivery.");
+#else
     puts("usage: c2m-d4 --self-test | --help | --serve [--db ABS --gps-file ABS --status-file ABS]\n"
          "Experimental offline GPS NEARBY-area advisory only; no legal speed or audio.\n"
          "Default: fixed package DB, read-only /tmp/car_info, private /tmp status.\n"
          "Absolute path overrides are solely for host synthetic fixtures.");
+#endif
 }
 
 int main(int argc, char **argv)
 {
+#ifdef C2M_D4_SHADOW_OBSERVE
+    int result;
+    if (argc == 2 && !strcmp(argv[1], "--help")) { usage(); return 0; }
+    if (argc == 2 && !strcmp(argv[1], "--self-test")) {
+        result = c2m_d4_self_test();
+        puts(result ? "D4 synthetic advisory self-test: FAIL" : "D4 synthetic advisory self-test: OK");
+        return result ? 1 : 0;
+    }
+    if (argc == 2 && !strcmp(argv[1], "--observe")) {
+#ifdef __linux__
+        return shadow_observe();
+#else
+        fputs("D4 shadow observe unsupported on this platform\n", stderr);
+        return 3;
+#endif
+    }
+    usage();
+    return 2;
+#else
     const char *db = C2M_D4_DEFAULT_DB, *gps = C2M_GPS_DEFAULT_PATH;
     const char *status = C2M_D4_DEFAULT_STATUS;
     unsigned overrides = 0;
@@ -326,5 +581,6 @@ int main(int argc, char **argv)
     (void)db; (void)gps; (void)status;
     fputs("D4 serve unsupported on this platform\n", stderr);
     return 3;
+#endif
 #endif
 }

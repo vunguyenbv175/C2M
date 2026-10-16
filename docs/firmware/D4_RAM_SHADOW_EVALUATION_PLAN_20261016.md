@@ -1,6 +1,20 @@
 # Proposed D4 RAM shadow evaluation — 2026-10-16
 
-**Plan only. Not implemented, built or executed by this document.**
+**Local source implementation added; not yet target-built or hardware-executed.**
+
+`fw/d4/main.c` has a compile-time `C2M_D4_SHADOW_OBSERVE` variant using the same
+checked loader/core with fixed target paths,10 one-second samples and a30-second
+monotonic bound. The ordinary production build path keeps its existing CLI and
+status-writer behavior; the shadow build excludes the status writer entirely.
+Build script: `fw/d4/build_shadow_arm.sh`. Host tests:
+`tests/test_d4_shadow.py` (Windows4 passed/5 Linux fixture tests skipped).
+
+The shipping shadow CLI has no fixture path override and no `--serve`. Test-only
+path constants require an explicit host-test macro and are not used in the ARM
+build. Output labels simulated delivery, actual completed sample count and
+completion reason. Signals/errors cannot report full success. A stock-QEMU
+shipping-binary no-DB/sentinel gate and exact report-to-binary packaging gate
+are prepared; they must pass before any later hardware execution.
 
 The corrected GPS observer decoded10/10 actual samples and acquired freshness
 on hardware. The complete corrected producer passed stock-QEMU synthetic

@@ -31,6 +31,9 @@ jobs:
           cat work/evidence/host-arm-build-guards.txt
           python3 tools/fw/test_prepare_ram_debug_sysroot.py > work/evidence/host-sysroot.txt 2>&1
           cat work/evidence/host-sysroot.txt
+          python3 tests/test_d4_shadow.py > work/evidence/host-d4-shadow.txt 2>&1
+          python3 tools/fw/test_shadow_package_gate.py >> work/evidence/host-d4-shadow.txt 2>&1
+          cat work/evidence/host-d4-shadow.txt
       - name: Install ARM tools and QEMU (versions recorded)
         run: |
           set -euo pipefail
@@ -77,18 +80,27 @@ jobs:
           cat work/evidence/arm-nlprobe.txt
           bash tools/gps/build_gps_probe_arm.sh --out work/arm-gps-probe --sysroot work/private/sysroot > work/evidence/arm-gps-probe.txt 2>&1
           cat work/evidence/arm-gps-probe.txt
+          bash fw/d4/build_shadow_arm.sh --out work/arm-d4-shadow --sysroot work/private/sysroot > work/evidence/arm-d4-shadow.txt 2>&1
+          cat work/evidence/arm-d4-shadow.txt
       - name: Actual ARM D4 producer synthetic runtime under stock QEMU (GATE)
         run: |
           set -euo pipefail
           sudo timeout 45 python3 tools/fw/test_ram_d4_stock_qemu.py \
             --binary work/arm-d4/c2m-signs --sysroot work/private/sysroot \
             --report work/evidence/arm-d4-producer-runtime.json
+      - name: Exact finite ARM shadow no-status-writer runtime (GATE)
+        run: |
+          set -euo pipefail
+          sudo timeout 30 python3 tools/fw/test_ram_shadow_stock_qemu.py \
+            --binary work/arm-d4-shadow/c2m-d4-shadow --sysroot work/private/sysroot \
+            --report work/evidence/arm-d4-shadow-runtime.json
       - name: Assemble RAM-only bundle and source pins
         run: |
           set -euo pipefail
           python3 tools/fw/package_ram_debug.py --output work/ram-bundle \
             --d4 work/arm-d4/c2m-signs --nlprobe work/arm-nlprobe/c2m-nlprobe \
-            --gps-probe work/arm-gps-probe/c2m-gps-probe --evidence work/evidence
+            --gps-probe work/arm-gps-probe/c2m-gps-probe \
+            --d4-shadow work/arm-d4-shadow/c2m-d4-shadow --evidence work/evidence
           cp work/ram-bundle/manifest.json work/evidence/manifest.json
           cp work/ram-bundle/SHA256SUMS.txt work/evidence/SHA256SUMS.txt
       - name: Publish exact RAM-only bundle to PRIVATE vault
@@ -126,12 +138,15 @@ jobs:
             work/evidence/host-gps-probe.txt
             work/evidence/host-arm-build-guards.txt
             work/evidence/host-sysroot.txt
+            work/evidence/host-d4-shadow.txt
             work/evidence/toolchain.txt
             work/evidence/stock-runtime-pins.json
             work/evidence/arm-d4.txt
             work/evidence/arm-nlprobe.txt
             work/evidence/arm-gps-probe.txt
             work/evidence/arm-d4-producer-runtime.json
+            work/evidence/arm-d4-shadow.txt
+            work/evidence/arm-d4-shadow-runtime.json
             work/evidence/manifest.json
             work/evidence/SHA256SUMS.txt
             work/evidence/private-vault-location.txt
@@ -141,8 +156,10 @@ jobs:
           for f in work/evidence/host-gps.txt work/evidence/host-d4.txt \
             work/evidence/host-nlprobe.txt work/evidence/host-gps-probe.txt \
             work/evidence/host-arm-build-guards.txt work/evidence/host-sysroot.txt \
-            work/evidence/arm-d4.txt work/evidence/arm-nlprobe.txt \
-            work/evidence/arm-gps-probe.txt; do
+            work/evidence/host-d4-shadow.txt work/evidence/arm-d4.txt \
+            work/evidence/arm-nlprobe.txt work/evidence/arm-gps-probe.txt \
+            work/evidence/arm-d4-shadow.txt work/evidence/arm-d4-shadow-runtime.stdout.txt \
+            work/evidence/arm-d4-shadow-runtime.stderr.txt; do
             if test -f "$f"; then cat "$f"; fi
           done
       - name: Cleanup private runtime and credentials
