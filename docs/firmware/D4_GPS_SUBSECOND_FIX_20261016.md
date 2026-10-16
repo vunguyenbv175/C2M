@@ -115,8 +115,12 @@ Call the member `subsecond_raw`, not `millis` or `hundredths`:
   reader/producer regressions, real Chrome D3/D4/end-to-end suites and existing
   generic ARM idle build/ELF gates. This does not cross-build the updated D4
   producer or prove its exact stock-userspace runtime; those target-specific
-  gates remain before RAM evaluation. No updated native ARM binary has been
-  uploaded or run on the camera.
+  gates were subsequently passed by RAM bundle CI `38831681720` on source
+  `291cc3e`. In the later hardware session, the exact corrected native ARM GPS
+  observer decoded10/10 live samples, then8 fresh polls after two initial
+  warmups. See `RAM_OBSERVERS_HARDWARE_20261016.md`. The updated full D4 producer
+  was not uploaded/run; its exact binary passed synthetic stock-QEMU runtime
+  only, while the installed old producer remains unchanged.
 
 The already-flashed build still has the defect; this source fix does not
 change it. A later reviewed RAM-only evaluation must be bounded and performed

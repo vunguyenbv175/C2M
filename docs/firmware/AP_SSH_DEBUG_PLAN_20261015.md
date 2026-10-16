@@ -24,9 +24,12 @@ The source/build evidence alone was not hardware acceptance. The2026-10-16
 session subsequently observed the listener and authenticated SSH after the
 owner reported flash and Wi-Fi connection. Owner later confirmed stationary
 vehicle and normal recording/app/VI ADAS; a32KiB RAM roundtrip plus bounded
-reviewed shell execution/cleanup passed. D4 GPS decoding has a live contract
-discrepancy, so advisories remain unaccepted. Ask/notify before subsequent
-hardware sessions; never assume an old AP lease.
+reviewed shell execution/cleanup passed. A later fresh-boot session executed
+finite native ARM GPS/nl80211 observers with verified cleanup; see
+`RAM_OBSERVERS_HARDWARE_20261016.md`. Corrected GPS decoding/freshness passed
+on-device, but the installed old D4 producer remains unchanged and advisories
+remain unaccepted. Ask/notify before subsequent hardware sessions; never assume
+an old AP lease.
 
 ## Dedicated owner key
 
