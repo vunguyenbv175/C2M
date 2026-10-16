@@ -56,6 +56,32 @@ persistent calibration/config compatibility
 
 Enhancement-service failure must not stop stock recording or stock-app use.
 
+## Field status — 2026-10-16
+
+Owner has flashed the EN-preserving D4-debug candidate. Stock recording/app/
+Vietnamese ADAS are owner-reported normal. Dedicated AP-only modern SSH and
+finite native ARM RAM observers have executed successfully; no stock/M4/GPS
+UART control was used in those diagnostics.
+
+- Corrected GPS reader:10/10 live samples decoded, freshness acquired. The
+  installed old D4 producer is unchanged; real advisories/browser beep remain
+  unaccepted. Updated producer has synthetic stock-QEMU proof, not deployment.
+- AP+STA remains UNKNOWN: single/ordinary wiphy query advertises an empty
+  interface-combinations payload. Exact RTL8821CS module has VIF code but no
+  proven safe concurrent runtime. Do not force STA at the cost of AP.
+- Bluetooth HCI/transport/RF and M4 3D speed/sign rendering remain unproven.
+- Agent defaults remain read-only/bounded private RAM tests; no broad root
+  commands, shared status writers, calibration/recorder changes or second
+  cardv `:8080` observer.
+
+Current evidence:
+`../firmware/RAM_OBSERVERS_HARDWARE_20261016.md`,
+`../firmware/RAM_DEBUG_ARM_PREPARATION_20261016.md`,
+`../firmware/RTL8821CS_CONCURRENCY_STATIC_20261016.md`,
+`../firmware/D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`.
+Historical priorities below remain design context, not approval to replace
+ADAS or activate unverified transports during the current debug work.
+
 ## Current owner priorities
 
 ### P0 — recovery and evidence
