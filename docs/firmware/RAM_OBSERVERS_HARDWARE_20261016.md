@@ -104,11 +104,15 @@ was stopped before local driver/source analysis.
 
 Next tasks:
 
-1. Diagnose empty/unadvertised combinations explicitly without turning UNKNOWN
-   into NO or bypassing the controller's proof gate.
+1. Source now distinguishes `capability_combinations_empty` from
+   `capability_combinations_unadvertised`, keeping both UNKNOWN and blocked;
+   this diagnostic clarification is not installed on the camera and does not
+   make an AP+STA combination valid.
 2. Finish exact-driver static concurrency analysis; AP+STA remains unproven.
 3. Plan any updated producer test separately. Prefer finite shadow output in a
    private RAM path/stdout; never two producers writing the shared D4 status,
-   no stopping recorder/ADAS and no weakening production path checks.
+   no stopping recorder/ADAS and no weakening production path checks. A plan
+   only is recorded in `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`; no shadow
+   producer is implemented or run by this session.
 4. Real-route D4 advisories/beep, Bluetooth RF and M4 3D speed/sign rendering
    remain unaccepted. Notify owner before another hardware session.
