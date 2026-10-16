@@ -67,6 +67,7 @@ jobs:
           python3 tools/wifi/test_build_nlprobe_arm.py
           python3 tools/gps/test_c2m_gps_probe.py
           python3 tools/fw/test_prepare_ram_debug_sysroot.py
+          python3 tools/fw/test_package_ram_debug.py
           python3 tests/test_d3_gps.py
           python3 tests/test_d4_database.py
           python3 tests/test_d4_web.py

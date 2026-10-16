@@ -40,14 +40,33 @@ Manual workflow: `.github/workflows/ram-debug-arm.yml`.
    fixture files under stock QEMU: raw100/200 advances acquire; fraction-only
    churn ages stale; raw1000 fails closed; raw300/999 re-acquire only after
    advancing seconds; bounded SIGTERM publishes disabled status and exits.
-6. Build a manifest binding source commit, input source hashes, binary sizes
-   and SHA-256s; publish only the exact RAM-only bundle to the private vault.
+6. Bind the QEMU report to the exact tested D4 binary SHA-256 and recheck all
+   four stock runtime pins at gate entry. Build a manifest binding source
+   commit, input source hashes, binary sizes and SHA-256s; publish only the
+   exact RAM-only bundle to the private vault.
 7. Retrieve that exact private bundle on the owner laptop and verify every
    hash/ELF header before asking for a new stationary camera session.
 
 Source and fixture tests are not radio or physical-device acceptance. The
 Linux compile path of the Wi-Fi probe is not a live AP+STA demonstration.
 The prior32KiB SSH script roundtrip is not proof of new native ELF execution.
+
+### QEMU fixture namespace correction
+
+Initial manual runs `38831001784` / `38831397763` passed all three ARM
+cross-builds, ELF gates and pure stock-QEMU tests, but the descriptor-safe D4
+producer fixture did not create a status file. Synthetic syscall trace showed
+`open("/")` resolving to QEMU's prefix while `openat(rootfd,"tmp")` returned
+ENOENT: the minimal library-only prefix had no `tmp`, and descriptor-relative
+lookups cannot use QEMU's host-path fallback. This was a host fixture setup
+failure, not evidence that the camera runtime was fixed or broken.
+
+The gate now creates a real root-owned sticky `prefix/tmp` and private fixture
+children, uses corresponding guest `/tmp/...` paths, and runs the bounded
+synthetic test as root. No symlink bypass, target permissions relaxation,
+`stat` ABI replacement or production source change was used to make it pass.
+QEMU report success is still required; those failed runs did not publish a
+bundle.
 
 ## Next hardware session (not started by this preparation)
 
@@ -72,6 +91,35 @@ The prior32KiB SSH script roundtrip is not proof of new native ELF execution.
 
 ## Evidence status
 
-Preparation in progress. No target hardware was accessed for this work and
-no updated ARM binary has yet been uploaded to the camera. CI run and exact
-private delivery pins will be recorded after the gates actually pass.
+All preparation gates passed in manual CI **`38831681720`** on source
+`291cc3ed89a718e073104912918d0925cba02c0c`. General Linux/Chrome CI
+`38831681303` passed on the same source. All three ARM ELF checks and
+pure self-tests/help ran against the pinned stock libraries. The actual
+updated ARM D4 producer passed all six synthetic runtime checks listed above.
+No updated ARM binary has yet been uploaded or run on the camera.
+
+Private delivery:
+`deliverables/20261016-ram-debug-r38831681720/ram-bundle`, vault commit
+`c5efe860b5b33e7b11cca1dce0c5961d12dd8fe9`. Retrieved to
+`build/ram-debug-r38831681720/ram-bundle/`; local readback **3/3 PASS**, plus
+manifest/SHA256SUMS equality against the separately downloaded evidence.
+Every source pin matches the stated source commit. The QEMU runtime report
+is bound to the exact `c2m-signs` SHA-256 and all four stock runtime hashes.
+
+| Binary | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `c2m-signs` | 22868 | `0c5e5f08c100f5e8f734807e6f79f3d7b75245edaf20834ec2f7e1ba0c0a0512` |
+| `c2m-gps-probe` | 12144 | `9e5b8cca747b6be889822673a3e99485f99c3f9d7b0c7e99465a6c88bdfd3628` |
+| `c2m-nlprobe` | 25200 | `d4130a78e3d798fa901cffc6ef7e373b649677ad7909091eafad5e4be0393d15` |
+
+Manifest SHA-256:
+`1b5c9c51d85b027b03106d555d1ade79b73affd3ae52825eb0ce31701fe145cf`.
+Local proof: `build/ram-debug-r38831681720/local_readback.json`.
+
+A reviewed laptop-local runner is prepared but **not executed**:
+`build/run_ram_observers_reviewed.py`. Its only executable allowlist is the
+finite GPS observer and nl80211 interface/single-wiphy observer. It never
+runs the included `c2m-signs` producer or changes persistent configuration.
+Owner has been notified to perform a normal stationary restart/rejoin only
+when ready, without an updater card/flash. No camera network request was
+made during this preparation; hardware observation remains pending.
