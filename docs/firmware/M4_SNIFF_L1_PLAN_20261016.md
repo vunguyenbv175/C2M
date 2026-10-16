@@ -1,4 +1,4 @@
-# M4 RNDIS usb0 passive sniffer — V3 prepared, hardware capture pending — 2026-10-16
+# M4 RNDIS usb0 passive sniffer — V3 finite capture, L1 incomplete — 2026-10-16
 
 ## Goal
 
@@ -142,3 +142,24 @@ UUID/host pin/source IPv4/current USB legs and finite SSH window before the
 already prepared V3 run. Do not extend the old window to compensate for time
 spent on offline fixes. No replay, M4 widget support, full L1 acceptance or
 hardware-success claim is implied by these build/local checks.
+
+## Later fresh owner session — finite execution, not full L1
+
+Owner reported reconnected and original functions normal. New source discovery,
+UUID/host pin and active SSH passed. First13:21 preflight stopped before upload
+because the established26012 leg was absent (8080 and ADAS-owned24012 present).
+Read-only ownership/current-link follow-up found26012 had appeared; a new
+preflight passed the unchanged required26012+8080 gate. Exact V3 ran ONCE at
+`m4_sniff_v3_20261016_132219`:15 records,8 data prefixes retaining768B, exit0,
+exact RAM cleanup; no transmit or new application client. Pre/post original
+processes/assets/AP/recording and all three USB port pairs were preserved.
+Owner subsequently confirmed normal functions, M4 in3D. Hardware access stopped.
+
+Every data prefix was still truncated (96B versus108–204B TCP payload). Partial
+outer/inner MessagePack header structure and topic names are visible:
+`ped`/`vehicle` on26012 and `lane` on24012. No complete application frame or
+inner key value,8080 status message, sign/speed widget or replay was proven.
+See `M4_SNIFF_V3_HARDWARE_20261016.md` for exact lifecycle, preservation and
+private-manifest hashes. Further capture improvement must be prepared offline,
+retain complete bounded small payloads and distinguish ACK/work/byte/time
+budgets before a separately notified hardware session.

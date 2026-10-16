@@ -91,10 +91,15 @@ UART control was used in those diagnostics.
   actual output-byte budget and explicit prefix truncation/seq/ack metadata.
   Final V3 Linux7/7 + ARM/QEMU/import gates passed (`38857027117`, source
   `b40a276`); ELF11736B `58259c85…640f4e`, exact bundle/source readback and
-  local pinned-runner checks passed. A12:24 read-only preflight found the native
-  USB legs healthy, but the13:14 window check got TCP2222 connection refused
-  after correct bound UUID/local pin. No debug restart/extension or sniffer
-  upload/execution followed; a fresh notified owner session is needed. See
+  local pinned-runner checks passed. The13:14 SSH refusal was left alone;
+  owner later reconnected/reported normal functions for a fresh session.
+  V3 then ran once at13:22:15 records,768B retained payload, all8 data records
+  truncated, exit0 and exact RAM cleanup verified. Native recording/AP/D4 and
+  all three observed M4 legs remained healthy in pre/post snapshots; owner
+  confirmed normal with M4 in3D. ADAS-owned24012 carries a `lane` prefix in this
+  sample;26012 has `ped`/`vehicle` prefixes. No complete frame/schema,8080
+  status message, speed/sign widget or injection proven. Hardware access stopped;
+  see `../firmware/M4_SNIFF_V3_HARDWARE_20261016.md` and
   `../firmware/M4_SNIFF_L1_PLAN_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that

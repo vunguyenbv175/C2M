@@ -24,10 +24,19 @@ No pcap, module load, scan, RF, UART, config or firmware change was made.
 - `usb0` carried traffic in `/proc/net/dev` (RX and TX packet counters
   nonzero). Exact byte counts are private capture metadata, not reproduced here.
 
-This confirms the dual-path hypothesis: M4 connects directly to both
-`adas:26012` (libflow/MessagePack semantic scene candidate) and
+This confirms the dual-path hypothesis for that snapshot: M4 connects directly
+to both `adas:26012` (libflow/MessagePack semantic scene candidate) and
 `cardv:8080` (minieye-websocket JSON status candidate). It does **not** prove
-message schemas, which side draws2D versus3D, or any speed/sign widget.
+that these are the ONLY connections, message schemas, which side draws2D
+versus3D, or any speed/sign widget.
+
+**Later13:22 update:** fresh read-only ownership evidence also found a native
+M4 connection to `adas:24012`; all three legs were established before/after a
+finite V3 passive sample. A partial `lane` prefix was retained from24012 and
+`ped`/`vehicle` from26012, not complete frames or a general routing contract.
+The initial13:21 snapshot lacked the26012 established leg and correctly blocked
+upload until a later preflight reverified it. See
+`M4_SNIFF_V3_HARDWARE_20261016.md`; no extra application client/injection was used.
 
 Private evidence:
 `C2M_HW_20261012/07_m4/m4_passive_20261016_111525/`
