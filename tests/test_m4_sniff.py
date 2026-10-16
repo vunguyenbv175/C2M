@@ -216,6 +216,10 @@ def has_usb0() -> bool:
 
 
 HARNESS_TEMPLATE = r"""
+/* Feature macros precede EVERY system header in the include harness. */
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
