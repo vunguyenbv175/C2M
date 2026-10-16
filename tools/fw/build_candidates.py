@@ -1,22 +1,38 @@
 #!/usr/bin/env python3
-"""P4: one-command offline candidate builder (local, needs the original EN TAR).
+"""P4: one-command offline candidate builder (local, needs the original base TAR).
 
   python3 tools/fw/build_candidates.py --en-tar <EN.tar> --workdir build/candidates [--customer-b <B-customer.es>]
+  python3 tools/fw/build_candidates.py --base-tar <VI.tar> --base-profile vi --contract <private VI contract> --workdir build/work/candidates_vi [--customer-b <D5-customer.es>]
 
-Always builds Candidate A (EN_REPACK_GOLDEN) via the proven exact repack path
-and validates it --deep.
+Base profiles (--base-profile {en,vi}, default en):
+  - en: EN golden base (default; --contract defaults to the EN contract).
+  - vi: FULL VI base. The caller must pass --contract pointing at a
+    VI-derived private contract (package_contract.py output kept in
+    build/work PRIVATE, never docs/, because it embeds vendor
+    upgrade_script_text and raw tail bytes). The builder slices every
+    non-customer payload verbatim from the base TAR inner image, so a VI
+    run preserves the full unmodified VI core (kernel/rootfs/uboot/...);
+    EN core is never mixed into a VI build.
 
-Builds Candidate B (EN_ENHANCE_IDLE) ONLY when --customer-b is given (a
+Always builds Candidate A (byte-identical repack of the base TAR) via the
+proven exact repack path and validates it --deep (with --base-profile).
+
+Builds Candidate B (currently named EN_ENHANCE_IDLE.tar; for vi runs the
+workflow may rename it, e.g. D5) ONLY when --customer-b is given (a
 rebuilt customer.es produced on Linux by tools/fw/rebuild_customer.sh
 --mode mutated, fail-closed there). B assembly:
   1. new layout: same offsets up to customer.es; misc/oneed shifted by the
      customer delta; script fatload/ubi-write numerics regenerated;
   2. assemble_inner layout mode; 3. fresh MD5 file; 4. tar_assemble package
      mode; 5. package_contract re-derivation (B contract);
-  6. validate_firmware --deep on B; 7. candidate_diff vs EN contract.
+  6. validate_firmware --deep on B (with --base-profile);
+  7. candidate_diff vs base contract.
 
 Only customer.es (+ derived offsets/script/MD5) may differ — candidate_diff
-enforces it. No vendor binaries are written outside --workdir (gitignored).
+enforces it (it requires protected.cardv/protected.adas PASS in the deep
+report, which is meaningful per-profile because --base-profile is
+forwarded to both validations). No vendor binaries are written outside
+--workdir (gitignored).
 
 Without --customer-b the script prints the BLOCKED next step and exits 2
 (distinct from failure=1: A still built and valid).
@@ -109,26 +125,45 @@ def compute_b_layout(contract: dict, inner: bytes, new_customer: bytes) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--en-tar", type=Path, required=True)
+    base_src = ap.add_mutually_exclusive_group(required=True)
+    base_src.add_argument("--en-tar", type=Path, default=None,
+                          help="base EN TAR (compatible alias of --base-tar for en runs)")
+    base_src.add_argument("--base-tar", type=Path, default=None,
+                          help="base TAR for the selected --base-profile "
+                          "(mutually exclusive with --en-tar)")
+    ap.add_argument("--base-profile", choices=("en", "vi"), default="en",
+                    help="base firmware profile (default: en). 'vi' builds "
+                    "a FULL VI-base candidate; pass --contract pointing at "
+                    "a VI-derived private contract in build/work (never "
+                    "docs/). No custom protected-hash overrides exist.")
     ap.add_argument("--workdir", type=Path, default=Path("build/candidates"))
     ap.add_argument("--customer-b", type=Path, default=None)
     ap.add_argument("--contract", type=Path,
                     default=Path("docs/firmware/EN_PACKAGE_CONTRACT.json"))
     args = ap.parse_args()
+    base_tar: Path = args.base_tar if args.base_tar is not None else args.en_tar
+    if args.base_profile == "vi":
+        from validate_firmware import VI_TAR_SHA256
+        contract_path = (ROOT / args.contract).resolve()
+        if not any(contract_path.is_relative_to(ROOT / name) for name in ("build", "work")):
+            ap.error("VI contract must stay in private build/work")
+        if hashlib.sha256(base_tar.read_bytes()).hexdigest() != VI_TAR_SHA256:
+            ap.error("VI base TAR independent SHA256 pin mismatch")
     py = sys.executable
     wd = args.workdir
     wd.mkdir(parents=True, exist_ok=True)
     contract = json.loads((ROOT / args.contract).read_text(encoding="utf-8"))
 
     # ---- Candidate A (always) ----
-    run([py, "tools/fw/repack_firmware.py", "--tar", str(args.en_tar),
+    run([py, "tools/fw/repack_firmware.py", "--tar", str(base_tar),
          "--contract", str(args.contract),
          "--out", str(wd / "EN_REPACK_GOLDEN.tar"),
          "--report", str(wd / "repack_A.json")], "repack-A")
     run([py, "tools/fw/validate_firmware.py", "--tar", str(wd / "EN_REPACK_GOLDEN.tar"),
          "--contract", str(args.contract),
          "--report-json", str(wd / "validate_A_deep.json"),
-         "--report-md", str(wd / "validate_A_deep.md"), "--deep"], "validate-A")
+         "--report-md", str(wd / "validate_A_deep.md"),
+         "--deep", "--base-profile", args.base_profile], "validate-A")
     print("CANDIDATE-A: OK (byte-identical golden, VALID --deep)")
 
     if args.customer_b is None:
@@ -138,7 +173,9 @@ def main() -> int:
         return 2
 
     # ---- Candidate B ----
-    with tarfile.open(args.en_tar, "r") as tf:
+    # Every non-customer payload is sliced verbatim from the BASE inner
+    # image, so a vi run keeps the full unmodified VI core (never EN core).
+    with tarfile.open(base_tar, "r") as tf:
         inner = tf.extractfile(INNER).read()
         sysver = tf.extractfile("sysVer.txt").read()
         adas_up = tf.extractfile("adas_upgrade.sh").read()
@@ -183,7 +220,7 @@ def main() -> int:
                {"name": "minieye_firmware.md5", "file": str(wd / "minieye_firmware_B.md5")},
                {"name": "adas_upgrade.sh", "file": str(wd / "adas_upgrade_B.sh")}]
     (wd / "b_members.json").write_text(json.dumps(members, indent=2), encoding="utf-8")
-    run([py, "tools/fw/tar_assemble.py", "--mode", "package", "--tar", str(args.en_tar),
+    run([py, "tools/fw/tar_assemble.py", "--mode", "package", "--tar", str(base_tar),
          "--contract", str(args.contract), "--members-json", str(wd / "b_members.json"),
          "--out", str(wd / "EN_ENHANCE_IDLE.tar"), "--report", str(wd / "tar_B.json")],
         "tar-B")
@@ -193,7 +230,8 @@ def main() -> int:
     run([py, "tools/fw/validate_firmware.py", "--tar", str(wd / "EN_ENHANCE_IDLE.tar"),
          "--contract", str(wd / "EN_PACKAGE_CONTRACT_B.json"),
          "--report-json", str(wd / "validate_B_deep.json"),
-         "--report-md", str(wd / "validate_B_deep.md"), "--deep"], "validate-B")
+         "--report-md", str(wd / "validate_B_deep.md"),
+         "--deep", "--base-profile", args.base_profile], "validate-B")
     r = subprocess.run(
         [py, "tools/fw/candidate_diff.py", "--base", str(args.contract),
          "--cand", str(wd / "EN_PACKAGE_CONTRACT_B.json"),

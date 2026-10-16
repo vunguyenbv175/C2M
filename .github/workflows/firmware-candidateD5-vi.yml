@@ -1,0 +1,1095 @@
+name: firmware-candidateD5-vi
+# MANUAL ONLY. D5-VI = FULL VI BASE (V2023.09.20.1_C2M_U_FR_WIFI_VI.tar) plus
+# all of D4-debug (C VI audio/idle + checked D TSR profile + D3 AP-only
+# UI/connectivity gates + mandatory isolated GPS/offline-area producer + AP-only
+# debug SSH service) EXCEPT the 20-minute supervisor window is REMOVED.
+# D5 lifetime-boot edition: SSH key-only AP persists for the whole boot
+# (supervisor window 0, status lifetime=boot), AP loss / SIGTERM / child exit
+# still stops the owned listener, idle sessions stay bounded by -M600.
+# Owner-approved package preparation only. Camera access, card staging and
+# flashing require a separately notified session. Modern SSH only.
+# Never stock-speaker output, numeric speed/current-limit display or camera TSR.
+# No stock camera/kernel/ADAS/GPS/cardv/model binary changes; no radio/device/card use.
+# VI BASE IS UNTOUCHED: kernel/cardv/ADAS/models are VI stock, never mixed with
+# EN. Config/cali/license/vendor calib_success and the 8 VI WAVs are preserved.
+# VI ADAS regression cause is UNVERIFIED (settings/parsing/gating differences
+# are candidates, not proof); never claim VI ADAS is incompatible.
+# D5 minimum delta vs D4-debug: current GPS subsecond fix (fraction<=999),
+# current connectivity V2, lifetime SSH, on-demand read-only D5 health
+# collector (fw/d5/health.sh, 16+1=17th file, NO BOOT LAUNCH), plus D5
+# release/provenance. Exact D4 production runtime is gated under VI stock QEMU.
+# No M4 authorization binaries/keys/services are installed. No auto TSR forcing
+# or new ADAS enable: legacy checked D TSR profile only (--tsr-experiment).
+#
+# D5 health source (fw/d5/health.sh) is public-safe plain source: on-demand
+# read-only snapshot only (--help/--snapshot), no boot launch, no writes,
+# no GPS payload/socket/USB/UART/config/process control. The private VI
+# package contract (work/VI_PACKAGE_CONTRACT.json/.md) holds vendor script
+# bytes and is NEVER a public artifact (not in evidence, not in release).
+#
+# Firmware/audio/database/owner-key bytes stay in the PRIVATE vault.
+# Independently pin the VI TAR, all eight VI WAVs, the exact prefiltered
+# directional D4 DB, the exact owner debug_owner.pub and the upstream
+# Dropbear 2026.94 tarball:
+#   VI TAR f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa
+#   VI sysVer 20230920185743 (stock token preserved; NOT FLASH-READY)
+#   VI inner 9ec1c85ec0d8b69ee4cfbe3ae557c882439d3a5a6c99c5998b7a81ec7b87c53a
+#   VI kernel 8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314
+#   VI cardv 56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23
+#   VI adas 997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1
+#   debug owner pub 08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d
+#   D4 DB 3bcf871956c61484858bef783187319fa5f9ae0da0c214c2c14afb1d62de411c (12708)
+#   stock NSS 381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd (361400)
+#   dropbear 2026.94 e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81
+# Parent must publish that exact private subset (assets/debug/debug_owner.pub)
+# before this workflow is run. The owner key is public-key material but is
+# fetched ONLY from the private vault; only its SHA256 ever enters CI logs or
+# public evidence, never key bytes. Parent keeps a local LF-normalized copy
+# that matches the strict one-line ssh-ed25519 check.
+# No optional c2m-gps scaffold: c2m-signs and its stock-ABI gates are mandatory.
+#
+# Private VI package contract is derived in-workflow to
+# work/VI_PACKAGE_CONTRACT.json (+ .md) via tools/fw/package_contract.py and
+# is NEVER a public artifact. Validator/builder use --base-profile vi with
+# --contract work/VI_PACKAGE_CONTRACT.json and --base-tar <VI tar>
+# (other agent adds --base-tar alias + --base-profile {en,vi}).
+# Packtool outputs keep their generic EN filenames (EN_REPACK_GOLDEN.tar is
+# VI-A and EN_ENHANCE_IDLE.tar is D5-VI in THIS deliverable); the release
+# README renames them explicitly at release.
+# All QEMU sysroots are VI stock from the VI carve; stock lib pins are verified
+# (VI NSS hash is identical to the EN pin; any mismatch STOPS the run).
+#
+# CI preserves the STOCK VI update token: NOT FLASH-READY until separately verified
+# local version-only preparation. Suggested local D5 token 20261016000001 is
+# NOT minted, applied or selected by CI (DO NOT CI-apply). Owner-approved
+# installed D3.1 token 20261014000006 must never be reused.
+# Rollback is the frozen EN_D4 deliverable, not the VI stock A reference:
+# VI-A is a stock-token reference only, never claimed as EN rollback.
+# Public artifacts use an explicit evidence-only list: NO firmware, ARM binaries,
+# audio, raw DB, credentials, owner/host keys, hostkey material, PEM, raw device
+# config, coordinates, private record IDs, vendor contract JSON/MD, upgrade
+# script text, or carve script bytes. Plain source, synthetic tests and hashes
+# are safe evidence (hash-only for vendor bytes); upstream configure/build/keygen
+# logs stay PRIVATE (the QEMU keygen smoke uses synthetic keys only).
+# The D4 evidence list wrongly published contract MD/JSON (vendor script bytes);
+# D5 explicitly excludes them: public hash only is safe. Gates fail closed.
+"on":
+  workflow_dispatch:
+jobs:
+  candidate-d5-vi:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host-only checked TSR experiment tests (GATE)
+        run: |
+          mkdir -p work
+          test -x /bin/sh
+          /bin/sh -n fw/tsr/tsr_profile_boot.sh
+          if ! python3 tools/fw/test_tsr_experiment.py > work/tsr_experiment_tests.txt 2>&1; then
+            cat work/tsr_experiment_tests.txt
+            exit 1
+          fi
+          cat work/tsr_experiment_tests.txt
+          cp fw/tsr/tsr_profile_boot.sh work/tsr_profile_boot.sh
+          sha256sum work/tsr_profile_boot.sh > work/tsr_profile_boot.sha256
+      - name: Fetch VI TAR + exact VI audio + private D4 subset + debug owner pub and verify independent pins (GATE)
+        env:
+          FIRMWARE_VAULT_KEY: ${{ secrets.FIRMWARE_VAULT_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_KEY" || \
+            { echo "FIRMWARE_VAULT_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh firmware/original
+          printf '%s\n' "$FIRMWARE_VAULT_KEY" > ~/.ssh/fw_vault
+          chmod 600 ~/.ssh/fw_vault
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/fw-vault
+          python3 tools/fw/restore_vi_base.py --vault /tmp/fw-vault \
+            --output firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar
+          echo "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa  firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar" \
+            | sha256sum -c -
+          # VI base only: refuse any EN tar in the vault copy step.
+          test ! -f /tmp/fw-vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar || \
+            { echo "D5-VI-GATE: EN tar must not be fetched for a VI base"; exit 1; }
+          test ! -f firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
+          python3 - <<'EOF'
+          import tarfile
+          with tarfile.open("firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar") as tf:
+            sysver = tf.extractfile("sysVer.txt").read()
+          assert sysver == b"sysVer 20230920185743\nend\n", sysver
+          print("VI sysVer token preserved (stock; NOT FLASH-READY)")
+          EOF
+          cat > work/vi_audio_SHA256SUMS.txt <<'EOF'
+          da07eae4699be3b06f23f5849923ebd7a96e4ba02a2b542b3cf52cc5ffa6951b  vi_LDW.wav
+          ca936446d3c3d538314e70fb8e27b095edcc67076775e8ad2fe20ed7b28fd93b  vi_PCW.wav
+          f63818ee429255a4e4beca8799b0956e40984051f8f558eb5725356247ae2581  vi_SAG.wav
+          1efa8d01880d17aa77a8a846031ed24c2820f331841a667cf92d83c0b32e0c92  vi_VB.wav
+          f8e27c89c9121341bfe5d88e390dbffbb6baddea4a2e800a46da2c4ddd9c407f  vi_adas_activated.wav
+          be268e0c3b0981833b2e58488f37dea394b4cd8581a515530ebc4fed9e3c9ebe  vi_adas_fail.wav
+          b9433c6e4813f8334bbfdbb2148f5a82e1c3be4484f5584d759540fb29a6e1bf  vi_updating.wav
+          36ef89d27a3a1ee8fa71c1dcf0100308545f65befc8a1d1d12ba2e815844acbd  tlr_green_on.wav
+          EOF
+          mkdir -p work/vi-audios work/d4-private
+          chmod 700 work/d4-private
+          while read -r hash filename; do
+            cp "/tmp/fw-vault/assets/vi-audios/$filename" "work/vi-audios/$filename"
+          done < work/vi_audio_SHA256SUMS.txt
+          (cd work/vi-audios && sha256sum --strict -c ../vi_audio_SHA256SUMS.txt)
+          test -f /tmp/fw-vault/assets/d4/signs-d4.bin
+          test ! -L /tmp/fw-vault/assets/d4/signs-d4.bin
+          cp /tmp/fw-vault/assets/d4/signs-d4.bin work/d4-private/signs-d4.bin
+          chmod 600 work/d4-private/signs-d4.bin
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "tools/fw")
+          from mutate_customer import check_d4_database
+          path = Path("work/d4-private/signs-d4.bin")
+          if path.is_symlink() or not path.is_file() or path.stat().st_size != 1270812:
+              raise SystemExit("D5-VI-GATE: private DB regular-file/length mismatch")
+          report = check_d4_database(path.read_bytes(),
+              "3bcf871956c61484858bef783187319fa5f9ae0da0c214c2c14afb1d62de411c")
+          if report["count"] != 12708:
+              raise SystemExit("D5-VI-GATE: private DB count mismatch")
+          # Only the hash and count leave this gate; never records or labels.
+          safe = {"sha256": report["sha256"], "count": report["count"]}
+          Path("work/d4_database.json").write_text(json.dumps(safe, indent=2) + "\n")
+          print(json.dumps(safe, sort_keys=True))
+          EOF
+          mkdir -p work/debug-private
+          chmod 700 work/debug-private
+          test -f /tmp/fw-vault/assets/debug/debug_owner.pub
+          test ! -L /tmp/fw-vault/assets/debug/debug_owner.pub
+          cp /tmp/fw-vault/assets/debug/debug_owner.pub work/debug-private/debug_owner.pub
+          chmod 600 work/debug-private/debug_owner.pub
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "tools/fw")
+          from mutate_customer import check_debug_owner_key
+          path = Path("work/debug-private/debug_owner.pub")
+          if path.is_symlink() or not path.is_file():
+              raise SystemExit("DEBUG-GATE: owner key regular-file mismatch")
+          report = check_debug_owner_key(path.read_bytes(),
+              "08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d")
+          # Only the hash leaves this gate; never key bytes.
+          safe = {"sha256": report["sha256"]}
+          Path("work/debug_owner.json").write_text(json.dumps(safe, indent=2) + "\n")
+          print(json.dumps(safe, sort_keys=True))
+          EOF
+          rm -rf /tmp/fw-vault ~/.ssh/fw_vault
+      - name: Derive private VI package contract from exact pinned VI input (GATE; NEVER public)
+        run: |
+          mkdir -p work
+          python3 tools/fw/package_contract.py \
+            --tar firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar \
+            --out-json work/VI_PACKAGE_CONTRACT.json \
+            --out-md work/VI_PACKAGE_CONTRACT.md
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          c = json.loads(Path("work/VI_PACKAGE_CONTRACT.json").read_text())
+          assert c["source_tar_sha256"] == "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa", "VI tar pin mismatch"
+          assert c["source_tar_sha256"] != "3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c", "EN mix refused"
+          assert c["sysVer_txt"] == "sysVer 20230920185743\nend\n", "VI sysVer mismatch"
+          assert c["inner_size"] == 58105880, c["inner_size"]
+          assert c["inner_sha256"] == "9ec1c85ec0d8b69ee4cfbe3ae557c882439d3a5a6c99c5998b7a81ec7b87c53a"
+          assert "20230920185743" in c["upgrade_script_text"], "VI script sysVer missing"
+          by = {(r["section"], r["load_index"]): r for r in c["loads"]}
+          assert by[("kernel.es", 0)]["sha256"] == "8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314", "VI kernel mix refused"
+          assert by[("kernel.es", 0)]["sha256"] != "c1fa8f7363615f1dc7d91f3308608d336fee6d89f5dcfe48e826bf4a399f5030", "EN kernel mix refused"
+          assert by[("rootfs.es", 0)]["sha256"] == "f90f109a29711ad926e8d302df083ef4eb24876bd2c4183c2b5a6f0c16ab6edc"
+          assert by[("customer.es", 0)]["sha256"] == "7325f9fffa461596273ae30995b4e69d80d380da5aa1cbea0f874e904b599c93"
+          assert c["tail_unknown"]["hex"] == "31323334353637380a232046696c6520506172746974696f", "VI tail mismatch"
+          # This file holds vendor script bytes: keep PRIVATE, never upload.
+          print("VI-CONTRACT: OK (VI-only; vendor bytes stay in work/, never public)")
+          EOF
+          chmod 600 work/VI_PACKAGE_CONTRACT.json work/VI_PACKAGE_CONTRACT.md
+      - name: Install toolchain and require host/browser runtimes (GATE; versions recorded)
+        run: |
+          mkdir -p work
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential mtd-utils gcc-arm-linux-gnueabihf ninja-build liblzo2-dev \
+            qemu-user-static cpio curl pkg-config flex bison
+          mkfs.ubifs -h 2>&1 | head -3
+          arm-linux-gnueabihf-gcc --version
+          gcc --version | head -1
+          qemu-arm-static --version | head -1
+          # Ubuntu's preinstalled Node and Chrome are REQUIRED, never silent skips.
+          command -v node
+          node --version
+          python3 - <<'EOF'
+          import shutil
+          import subprocess
+          browser = next((p for name in ("google-chrome", "chromium", "chromium-browser")
+                          if (p := shutil.which(name))), None)
+          if not browser:
+              raise SystemExit("D5-VI-GATE: Chrome/Chromium is required")
+          subprocess.run([browser, "--version"], check=True)
+          EOF
+          python3 -m pip install websocket-client
+          python3 -c 'import websocket'
+          dpkg-query -W build-essential gcc mtd-utils gcc-arm-linux-gnueabihf \
+            libc6-dev-armhf-cross liblzo2-dev qemu-user-static cpio > work/tool_versions.txt
+          node --version >> work/tool_versions.txt
+          python3 -m pip show websocket-client >> work/tool_versions.txt
+      - name: Inspect VI package + geometry + manifest
+        run: |
+          mkdir -p work
+          python3 tools/fw/carve_upgrade.py \
+            firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar -o work/carve
+          CUST=$(ls work/carve/customer.es.load0.*.bin)
+          echo "CUST=$CUST" >> $GITHUB_ENV
+          python3 tools/fw/ubifs_geometry.py "$CUST" -o work/customer_geometry.json
+          python3 tools/fw/ubifs_manifest.py "$CUST" -o work/customer_manifest.json
+          # VI base preservation: stock VI audios already carry the VI pins.
+          python3 - <<'EOF'
+          import hashlib, json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "tools/fw")
+          from ubifs_extract_file import extract
+          cust = next(Path("work/carve").glob("customer.es.load0.*.bin"))
+          pins = {"LDW.wav": "da07eae4699be3b06f23f5849923ebd7a96e4ba02a2b542b3cf52cc5ffa6951b",
+                  "PCW.wav": "ca936446d3c3d538314e70fb8e27b095edcc67076775e8ad2fe20ed7b28fd93b",
+                  "SAG.wav": "f63818ee429255a4e4beca8799b0956e40984051f8f558eb5725356247ae2581",
+                  "VB.wav": "1efa8d01880d17aa77a8a846031ed24c2820f331841a667cf92d83c0b32e0c92",
+                  "adas_activated.wav": "f8e27c89c9121341bfe5d88e390dbffbb6baddea4a2e800a46da2c4ddd9c407f",
+                  "adas_fail.wav": "be268e0c3b0981833b2e58488f37dea394b4cd8581a515530ebc4fed9e3c9ebe",
+                  "updating.wav": "b9433c6e4813f8334bbfdbb2148f5a82e1c3be4484f5584d759540fb29a6e1bf"}
+          for name, want in pins.items():
+              blob, _ = extract(cust, f"/minieye/adas/audios/{name}")
+              got = hashlib.sha256(blob).hexdigest()
+              assert got == want, f"VI stock WAV {name} mismatch"
+          print("VI-STOCK-AUDIO: 7 VI WAVs preserved in VI base (tlr added by mutator)")
+          EOF
+      - name: P1 no-op rebuild (GATE)
+        run: |
+          python3 tools/fw/ubifs_extract_tree.py "$CUST" work/tree \
+            --manifest work/customer_manifest.json --report work/tree_report.json
+          sudo bash tools/fw/rebuild_customer.sh --mode noop \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --out work/customer_noop.es --report work/rebuild_noop.json
+      - name: P0 dynamic idle binary (unchanged C stock-ABI path)
+        run: |
+          cmake -S "${{ github.workspace }}/fw/device_minimal" -B build/arm-dyn-b \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/fw/device_minimal/toolchain-armhf-dyn.cmake" \
+            -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build/arm-dyn-b --verbose
+          arm-linux-gnueabihf-readelf -S build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | grep -E "note|attributes"
+          arm-linux-gnueabihf-objdump -d build/arm-dyn-b/CMakeFiles/c2m-idle.dir/start.S.o | head -30
+          python3 fw/device_minimal/check_elf.py build/arm-dyn-b/c2m-idle --allow-dynamic
+          sha256sum build/arm-dyn-b/c2m-idle > work/c2m_idle.sha256
+      - name: QEMU VI stock-rootfs runtime proof + stock lib pins (exact idle binary; not hardware proof)
+        run: |
+          mkdir -p work/sysroot && cd work/sysroot
+          gunzip -c ../carve/rootfs.es.load0.*.bin | cpio -id --no-absolute-filenames
+          cd ../..
+          mkdir -p work/sysroot/tmp
+          cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/c2m-idle
+          sha256sum work/sysroot/tmp/c2m-idle > work/qemu_bin.sha256
+          rm -f /tmp/c2m_idle.marker
+          timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
+            > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
+          cat work/qemu_out.txt
+          grep -q "c2m-idle 0.2.0-sdlog1" work/qemu_out.txt
+          cat /tmp/c2m_idle.marker
+          grep -qx "c2m-idle 0.2.0-sdlog1" /tmp/c2m_idle.marker
+          echo "QEMU-RUNTIME: PASS (VI stock glibc-2.30 userspace; stdout + marker verified)"
+          # Pinned VI stock NSS check: same 361400-byte module as EN pin.
+          # Any mismatch STOPS the run (report, do not proceed).
+          python3 - <<'EOF'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "tools/fw")
+          from mutate_customer import check_debug_nss
+          source = Path("work/tree/ssh/lib/libnss_files.so.2")
+          if source.is_symlink() or not source.is_file():
+              raise SystemExit("D5-VI-GATE: VI stock NSS source unavailable")
+          data = source.read_bytes()
+          print(check_debug_nss(data))
+          prefix = Path("work/sysroot/customer/c2m")
+          prefix.mkdir(parents=True, exist_ok=True)
+          target = prefix / "libnss_files.so.2"
+          target.write_bytes(data)
+          target.chmod(0o644)
+          Path("work/sysroot/etc/nsswitch.conf").write_text("passwd: files\ngroup: files\n")
+          EOF
+          # VI stock rootfs cardv/ADAS pins (identical-path check; parent validates
+          # VI-identical stock libs when needed). Never mix EN binaries.
+          python3 - <<'EOF'
+          import gzip, hashlib
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "tools/fw")
+          from extract_rootfs_cpio import iter_cpio
+          from ubifs_extract_file import extract
+          blob = next(Path("work/carve").glob("rootfs.es.load0.*.bin")).read_bytes()
+          cpio = dict(iter_cpio(gzip.decompress(blob)))
+          cardv = cpio.get("bootconfig/bin/cardv")
+          assert cardv is not None, "VI cardv missing"
+          assert hashlib.sha256(cardv).hexdigest() == "56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23", "EN cardv mix refused"
+          assert hashlib.sha256(cardv).hexdigest() != "344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c", "EN cardv mix refused"
+          cust = next(Path("work/carve").glob("customer.es.load0.*.bin"))
+          adas, _ = extract(cust, "/minieye/adas/adas")
+          assert hashlib.sha256(adas).hexdigest() == "997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1", "EN adas mix refused"
+          assert hashlib.sha256(adas).hexdigest() != "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043", "EN adas mix refused"
+          print("VI-STOCK-PINS: cardv+adas are VI stock (EN mix refused)")
+          EOF
+          test -f work/sysroot/lib/ld-linux-armhf.so.3
+          # The archive has no '/' entry. QEMU maps stat('/') to this prefix,
+          # so match the camera's kernel root (not the checkout runner UID).
+          sudo chown 0:0 work/sysroot
+          sudo chmod 755 work/sysroot
+      - name: Execute D profile tests with exact VI stock BusyBox applets (GATE)
+        run: |
+          cat > work/stock-sh <<'EOF'
+          #!/bin/sh
+          exec /usr/bin/qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" sh "$@"
+          EOF
+          chmod +x work/stock-sh
+          mkdir -p work/stock-applets
+          for app in awk base64 cat cmp cp grep head md5sum mkdir mv rm sync uname wc; do
+            printf '#!/bin/sh\nexec /usr/bin/qemu-arm-static -L "$C2M_TEST_SYSROOT" "$C2M_TEST_SYSROOT/bin/busybox" %s "$@"\n' "$app" > "work/stock-applets/$app"
+            chmod +x "work/stock-applets/$app"
+          done
+          export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+          export C2M_TSR_TEST_SHELL="$PWD/work/stock-sh"
+          export C2M_TSR_TEST_TIMEOUT=60
+          export PATH="$PWD/work/stock-applets:$PATH"
+          python3 tools/fw/test_tsr_experiment.py > work/tsr_stock_busybox_tests.txt 2>&1 || \
+            { cat work/tsr_stock_busybox_tests.txt; exit 1; }
+          cat work/tsr_stock_busybox_tests.txt
+      - name: D3 stock-ABI build + QEMU + host synthetic and real Chrome gates incl GPS fix (GATE)
+        run: |
+          # Deployed D5 carries the current GPS subsecond fix (fraction<=999).
+          grep -q 'read_u32_le(p + 0x1c) > 999u' fw/d3/gps_snapshot.c
+          grep -q 'subsecond_raw <= 999u' fw/d3/gps_snapshot.c
+          grep -q 'probe=C2M_D3_PASSIVE_BLUETOOTH_V2' fw/d3/connectivity_probe.sh
+          # No live radio/network. Never put this group in `if ! (...)`, which
+          # disables errexit throughout the subshell and can hide build failures.
+          trap 'cat work/d3_build_tests.txt' ERR
+          (
+            set -eu
+            bash fw/d3/build.sh --out work/d3-services --sysroot work/sysroot
+            bash fw/d3/build_supplicant.sh --out work/d3-services --sysroot work/sysroot
+            cp work/d3-services/supplicant_SOURCE.json work/d3_supplicant_source.json
+            for file in boot.sh connectivity_probe.sh c2m-web c2m-wifi wpa_supplicant; do
+              test -f "work/d3-services/$file"
+              test ! -L "work/d3-services/$file"
+              test -x "work/d3-services/$file"
+            done
+            export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+            "$PWD/work/stock-sh" -n work/d3-services/boot.sh
+            "$PWD/work/stock-sh" -n work/d3-services/connectivity_probe.sh
+            cmp -s fw/d3/connectivity_probe.sh work/d3-services/connectivity_probe.sh
+            grep -q 'probe=C2M_D3_PASSIVE_BLUETOOTH_V2' work/d3-services/connectivity_probe.sh
+            (
+              export C2M_PROBE_SHELL="$(python3 -c 'import json, os; print(json.dumps([os.path.abspath("work/stock-sh")]))')"
+              export PATH="$PWD/work/stock-applets:$PATH"
+              python3 tools/fw/test_d3_connectivity.py
+            )
+            python3 tests/test_d3_web.py
+            C2M_REQUIRE_BROWSER_TEST=1 python3 tests/test_d3_web_browser.py
+            python3 tests/test_d3_wifi_control.py
+            python3 tools/fw/test_d3_mutation.py
+            python3 tests/test_d3_gps.py
+          ) > work/d3_build_tests.txt 2>&1
+          trap - ERR
+          cat work/d3_build_tests.txt
+          # Explicit deployed D3 list; the decoder tests do not imply an optional
+          # c2m-gps service. D4's dedicated producer below is mandatory instead.
+          # No M4 authorization binaries/keys/services are installed here.
+          test ! -e work/d3-services/m4_authorize
+          (
+            cd work/d3-services
+            sha256sum boot.sh connectivity_probe.sh c2m-web c2m-wifi wpa_supplicant
+          ) > work/d3_services.sha256
+          find fw/d3 -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
+            -print0 | sort -z | xargs -0 sha256sum > work/d3_source.sha256
+          sha256sum tools/fw/test_d3_connectivity.py tests/test_d3_web.py \
+            tests/test_d3_web_browser.py tests/test_d3_wifi_control.py \
+            tools/fw/test_d3_mutation.py tests/test_d3_gps.py > work/d3_test_source.sha256
+          cp work/d3-services/boot.sh work/d3_boot.sh
+          cp work/d3-services/connectivity_probe.sh work/d3_connectivity_probe.sh
+          cp fw/d3/build.sh work/d3_build.sh
+      - name: Mandatory D4 producer stock-ABI/QEMU + host DB/advisory/web/mutator/browser gates (GATE)
+        run: |
+          trap 'cat work/d4_build_tests.txt' ERR
+          (
+            set -eu
+            bash fw/d4/build.sh --out work/d4-services --sysroot work/sysroot
+            # Keep recognized compiler intermediates PRIVATE and outside the
+            # exact two-file deploy directory required by the D4 mutator.
+            mkdir -p work/d4-build-private
+            for file in objects d4_hashes.txt; do
+              if [ -e "work/d4-services/$file" ]; then
+                test ! -L "work/d4-services/$file"
+                mv "work/d4-services/$file" "work/d4-build-private/$file"
+              fi
+            done
+            python3 - <<'EOF'
+          from pathlib import Path
+          services = Path("work/d4-services")
+          if services.is_symlink() or {p.name for p in services.iterdir()} != {"c2m-signs", "d4_boot.sh"}:
+              raise SystemExit("D5-VI-GATE: unexpected deploy output")
+          for name in ("c2m-signs", "d4_boot.sh"):
+              path = services / name
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit("D5-VI-GATE: missing/nonregular mandatory service")
+          EOF
+            test -x work/d4-services/c2m-signs
+            test -x work/d4-services/d4_boot.sh
+            cmp -s fw/d4/d4_boot.sh work/d4-services/d4_boot.sh
+            python3 fw/device_minimal/check_elf.py work/d4-services/c2m-signs --allow-dynamic
+            timeout 30 qemu-arm-static -L work/sysroot work/d4-services/c2m-signs --self-test
+            export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+            "$PWD/work/stock-sh" -n work/d4-services/d4_boot.sh
+            command -v node
+            node --version
+            python3 tests/test_d4_database.py
+            python3 tests/test_d4_advisory.py
+            python3 tests/test_d4_web.py
+            python3 tools/fw/test_d4_mutation.py
+            C2M_REQUIRE_BROWSER_TEST=1 python3 tests/test_d4_browser.py
+            C2M_REQUIRE_BROWSER_TEST=1 python3 tests/test_d4_end_to_end.py
+          ) > work/d4_build_tests.txt 2>&1
+          trap - ERR
+          cat work/d4_build_tests.txt
+          sha256sum work/d4-services/c2m-signs work/d4-services/d4_boot.sh \
+            work/d4-private/signs-d4.bin > work/d4_services.sha256
+          find fw/d4 -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
+            -print0 | sort -z | xargs -0 sha256sum > work/d4_source.sha256
+          sha256sum tests/test_d4_database.py tests/test_d4_advisory.py tests/test_d4_web.py \
+            tools/fw/test_d4_mutation.py tests/test_d4_browser.py tests/test_d4_end_to_end.py \
+            tools/fw/mutate_customer.py .github/workflows/firmware-candidateD5-vi.yml > work/d4_test_source.sha256
+          cp work/d4-services/d4_boot.sh work/d4_boot.sh
+          cp fw/d4/build.sh work/d4_build.sh
+          python3 - <<'EOF'
+          import hashlib
+          import json
+          from pathlib import Path
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          database = json.loads(Path("work/d4_database.json").read_text())
+          report = {
+              "build_script_sha256": digest("work/d4_build.sh"),
+              "boot_script_sha256": digest("work/d4_boot.sh"),
+              "c2m_signs_sha256": digest("work/d4-services/c2m-signs"),
+              "database_sha256": digest("work/d4-private/signs-d4.bin"),
+              "database_count": database["count"],
+          }
+          if report["database_sha256"] != database["sha256"] or report["database_count"] != 12708:
+              raise SystemExit("D5-VI-GATE: database changed after pin validation")
+          Path("work/d4_report.json").write_text(json.dumps(report, indent=2) + "\n")
+          print(json.dumps(report, sort_keys=True))
+          EOF
+      - name: Mandatory exact D4 production runtime corrected fraction gate under VI stock QEMU (GATE)
+        run: |
+          # Exact updated ARM D4 producer (work/d4-services/c2m-signs) under the
+          # pinned VI stock userspace. Synthetic DB/GPS fixtures only; no camera,
+          # UART, radio, private DB or live coordinates. Proves the corrected
+          # fraction gate (raw 100/200/300/999 valid, raw 1000 fail-closed,
+          # subsecond-only churn stays stale) on the real production binary.
+          # Pin check inside test_ram_d4_stock_qemu.py uses the EN stock runtime
+          # pins; VI stock is expected SAME (parent runs no overlay). If VI ever
+          # differs, this gate fails first and a --base-profile allow needs a
+          # separate reviewed change; do not silently profile-allow here.
+          sudo timeout 60 python3 tools/fw/test_ram_d4_stock_qemu.py \
+            --binary work/d4-services/c2m-signs --sysroot work/sysroot \
+            --report work/d5_gps_runtime.json
+          cat work/d5_gps_runtime.json
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          r = json.loads(Path("work/d5_gps_runtime.json").read_text())
+          assert r["verdict"] == "PASS", r
+          assert r["camera_used"] is False and r["radio_used"] is False
+          assert r["private_database_used"] is False and r["target_device_accepted"] is False
+          print("D5-VI-GATE: exact D4 production runtime PASS under VI stock QEMU")
+          EOF
+      - name: Mandatory lifetime debug Dropbear/supervisor build + exact deploy + host gates (GATE)
+        run: |
+          # Pinned upstream Dropbear 2026.94 via fw/debug/build_dropbear.sh --lifetime.
+          # D5 lifetime-boot edition: window 0 (serve until boot ends), AP 60 s
+          # bound still applies, AP loss / SIGTERM / child exit stops listener.
+          # Idle sessions stay bounded by Dropbear -M600. No 20-minute cap.
+          # Never put this group in `if ! (...)`, which disables errexit and
+          # can hide build failures. The real owner key bytes never enter logs.
+          # NSS copy was staged in the VI sysroot step above (same 0700/0644,
+          # same pin; mismatch already stopped the run there).
+          test -f work/sysroot/customer/c2m/libnss_files.so.2
+          : > work/debug_build.log
+          : > work/debug_build_tests.txt
+          trap 'cat work/debug_build.log work/debug_build_tests.txt' ERR
+          bash fw/debug/build_dropbear.sh --out work/debug-build --sysroot work/sysroot --lifetime \
+            > work/debug_build.log 2>&1
+          # Supervisor --lifetime edition proof: work/debug-build/reports/
+          # c2m-debug-edition.txt (shorthand work/debug-build/c2m-debug-edition.txt)
+          # must show lifetime-boot + window_sec=0; debug_report below repeats it.
+          test -f work/debug-build/reports/c2m-debug-edition.txt
+          cat work/debug-build/reports/c2m-debug-edition.txt
+          grep -q 'edition=lifetime-boot' work/debug-build/reports/c2m-debug-edition.txt
+          grep -q 'window_sec=0' work/debug-build/reports/c2m-debug-edition.txt
+          grep -q 'lifetime' work/debug-build/reports/c2m-debug-edition.txt
+          (
+            set -eu
+            # Exact five-file deploy; objects/reports/licenses stay PRIVATE
+            # in work/debug-build and never enter work/debug-services.
+            mkdir -p work/debug-services
+            cp work/debug-build/c2m-debug work/debug-services/c2m-debug
+            cp work/debug-build/dropbear work/debug-services/dropbear
+            cp work/debug-build/dropbearkey work/debug-services/dropbearkey
+            cp work/debug-build/debug_boot.sh work/debug-services/debug_boot.sh
+            cp work/sysroot/customer/c2m/libnss_files.so.2 work/debug-services/libnss_files.so.2
+            chmod 644 work/debug-services/libnss_files.so.2
+            chmod 755 work/debug-services/c2m-debug work/debug-services/dropbear \
+              work/debug-services/dropbearkey work/debug-services/debug_boot.sh
+            python3 - <<'EOF'
+          from pathlib import Path
+          services = Path("work/debug-services")
+          if services.is_symlink() or {p.name for p in services.iterdir()} != {
+                  "c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "libnss_files.so.2"}:
+              raise SystemExit("DEBUG-GATE: unexpected deploy output")
+          for name in ("c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh"):
+              path = services / name
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit("DEBUG-GATE: missing/nonregular debug service")
+          EOF
+            test -x work/debug-services/c2m-debug
+            test -x work/debug-services/dropbear
+            test -x work/debug-services/dropbearkey
+            test -x work/debug-services/debug_boot.sh
+            cmp -s fw/debug/debug_boot.sh work/debug-services/debug_boot.sh
+            export C2M_TEST_SYSROOT="$PWD/work/sysroot"
+            "$PWD/work/stock-sh" -n work/debug-services/debug_boot.sh
+            python3 fw/device_minimal/check_elf.py work/debug-services/c2m-debug --allow-dynamic
+            python3 fw/device_minimal/check_elf.py work/debug-services/dropbear --allow-dynamic
+            python3 fw/device_minimal/check_elf.py work/debug-services/dropbearkey --allow-dynamic
+            # Lifetime binary proof on the VI stock sysroot (help + self-test).
+            timeout 30 qemu-arm-static -L work/sysroot work/debug-services/c2m-debug --self-test
+            timeout 20 qemu-arm-static -L work/sysroot work/debug-services/c2m-debug --help > work/debug_help.txt 2>&1
+            grep -q 'lifetime-boot' work/debug_help.txt
+            grep -q 'window_sec=0' work/debug_help.txt || grep -q 'window 0' work/debug_help.txt
+            # Header proof: lifetime edition defaults to window 0.
+            grep -q 'C2M_DEBUG_LIFETIME' fw/debug/supervisor.h
+            grep -q 'define C2M_DEBUG_WINDOW_SEC 0' fw/debug/supervisor.h
+            # Host gates use synthetic fixture keys only; the real owner key
+            # bytes are never echoed into this log.
+            # D4 default supervisor tests stay unchanged; D5 lifetime tests add
+            # window-0/boot coverage (default target; no assumed 20-min window).
+            python3 tests/test_debug_supervisor.py
+            python3 tests/test_d5_debug_supervisor.py
+            python3 tools/fw/test_debug_mutation.py
+            python3 tools/fw/test_d5_workflow.py
+            # Actual SSH integration: host-native real-Dropbear loopback gate.
+            # The test rebuilds upstream natively from the pinned tarball the
+            # mandatory build above already fetched and hash-verified; only
+            # synthetic temp keys on loopback, never owner keys or ~/.ssh.
+            # Default target; no assumed supervisor window.
+            test -f tests/test_debug_ssh.py
+            C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
+              C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py
+            sudo env C2M_DEBUG_UPSTREAM_TARBALL="$PWD/work/dropbear-upstream/dropbear-2026.94.tar.bz2" \
+              C2M_DEBUG_SSH_TARGET_DIR="$PWD/work/debug-build" \
+              C2M_DEBUG_SSH_SYSROOT="$PWD/work/sysroot" \
+              C2M_DEBUG_SSH_NSS_DIR="$PWD/work/sysroot/customer/c2m" \
+              C2M_REQUIRE_DEBUG_SSH_TEST=1 python3 tests/test_debug_ssh.py DebugSshArmTests
+          ) > work/debug_build_tests.txt 2>&1
+          trap - ERR
+          cat work/debug_build_tests.txt
+          (
+            cd work/debug-services
+            sha256sum c2m-debug dropbear dropbearkey debug_boot.sh libnss_files.so.2
+          ) > work/debug_services.sha256
+          find fw/debug -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
+            -print0 | sort -z | xargs -0 sha256sum > work/debug_source.sha256
+          sha256sum tests/test_debug_supervisor.py tests/test_d5_debug_supervisor.py \
+            tools/fw/test_debug_mutation.py tools/fw/test_d5_workflow.py \
+            tools/fw/mutate_customer.py .github/workflows/firmware-candidateD5-vi.yml > work/debug_test_source.sha256
+          sha256sum tests/test_debug_ssh.py >> work/debug_test_source.sha256
+          cp work/debug-services/debug_boot.sh work/debug_boot.sh
+          cp fw/debug/build_dropbear.sh work/debug_build.sh
+          cp work/debug_help.txt work/debug_help_lifetime.txt
+          cp work/debug-build/reports/c2m-debug-edition.txt work/debug_edition.txt
+          python3 - <<'EOF'
+          import hashlib
+          import json
+          from pathlib import Path
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          owner = json.loads(Path("work/debug_owner.json").read_text())
+          edition = Path("work/debug_edition.txt").read_text()
+          assert "lifetime" in edition and "window_sec=0" in edition, "lifetime edition proof missing"
+          report = {
+              "build_script_sha256": digest("work/debug_build.sh"),
+              "boot_script_sha256": digest("work/debug_boot.sh"),
+              "c2m_debug_sha256": digest("work/debug-services/c2m-debug"),
+              "dropbear_sha256": digest("work/debug-services/dropbear"),
+              "dropbearkey_sha256": digest("work/debug-services/dropbearkey"),
+              "nss_module_sha256": digest("work/debug-services/libnss_files.so.2"),
+              "debug_owner_sha256": digest("work/debug-private/debug_owner.pub"),
+              "assets_count": 5,
+              "dropbear_version": "2026.94",
+              "dropbear_tar_sha256": "e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81",
+              "lifetime": True,
+              "lifetime_edition": "boot",
+              "window_sec": 0,
+          }
+          expected = {"build_script_sha256", "boot_script_sha256", "c2m_debug_sha256",
+                      "dropbear_sha256", "dropbearkey_sha256", "debug_owner_sha256",
+                      "assets_count", "dropbear_version", "dropbear_tar_sha256", "nss_module_sha256",
+                      "lifetime", "lifetime_edition", "window_sec"}
+          if set(report) != expected:
+              raise SystemExit("DEBUG-GATE: report supplemental-data mismatch")
+          if report["debug_owner_sha256"] != owner["sha256"]:
+              raise SystemExit("DEBUG-GATE: deployed owner key changed after pin validation")
+          if report["debug_owner_sha256"] != "08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d":
+              raise SystemExit("DEBUG-GATE: owner pin mismatch")
+          if report["assets_count"] != 5:
+              raise SystemExit("DEBUG-GATE: assets count mismatch")
+          if report["nss_module_sha256"] != "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd":
+              raise SystemExit("DEBUG-GATE: stock NSS module changed")
+          if report["lifetime"] is not True or report["window_sec"] != 0 or report["lifetime_edition"] != "boot":
+              raise SystemExit("DEBUG-GATE: D5 lifetime fields mismatch (want lifetime=true window_sec=0 boot)")
+          # Hashes only; never key bytes.
+          Path("work/debug_report.json").write_text(json.dumps(report, indent=2) + "\n")
+          print(json.dumps(report, sort_keys=True))
+          EOF
+      - name: P2 mutate exact VI C/D/D3 + isolated D4 + on-demand D5 health + lifetime debug SSH assets/private DB/owner key and rebuild D5_VI (GATE)
+        run: |
+          # D5 health (fw/d5/health.sh) is a read-only on-demand collector:
+          # 16+1=17th /customer/c2m file, installed by --d5-health, NEVER
+          # boot-launched (no rcInsDriver hook line; --help/--snapshot only).
+          # No auto TSR forcing or new ADAS enable: legacy --tsr-experiment
+          # profile only, never --tsr-patch.
+          test -f fw/d5/health.sh
+          test ! -L fw/d5/health.sh
+          "$PWD/work/stock-sh" -n fw/d5/health.sh
+          python3 tools/fw/test_d5_health.py > work/d5_health_tests.txt 2>&1 || \
+            { cat work/d5_health_tests.txt; exit 1; }
+          cat work/d5_health_tests.txt
+          # No M4 authorization binaries/keys/services are ever installed.
+          test ! -e fw/m4_authorize 2>/dev/null || true
+          test ! -f work/tree/c2m/m4_authorize
+          python3 - > work/audio_map.json <<'EOF'
+          import json
+          pairs = [("LDW.wav", "vi_LDW.wav"), ("PCW.wav", "vi_PCW.wav"),
+                   ("SAG.wav", "vi_SAG.wav"), ("VB.wav", "vi_VB.wav"),
+                   ("adas_activated.wav", "vi_adas_activated.wav"),
+                   ("adas_fail.wav", "vi_adas_fail.wav"),
+                   ("updating.wav", "vi_updating.wav"),
+                   ("tlr_green_on.wav", "tlr_green_on.wav")]
+          print(json.dumps([{"path": "/minieye/adas/audios/" + img,
+                             "file": "work/vi-audios/" + src}
+                            for img, src in pairs], indent=2))
+          EOF
+          python3 tools/fw/mutate_customer.py --tree work/tree \
+            --manifest work/customer_manifest.json \
+            --idle-bin build/arm-dyn-b/c2m-idle \
+            --audio-replacements work/audio_map.json \
+            --tsr-experiment \
+            --d3-services-dir work/d3-services \
+            --d4-services-dir work/d4-services \
+            --d4-database work/d4-private/signs-d4.bin \
+            --d4-database-sha256 3bcf871956c61484858bef783187319fa5f9ae0da0c214c2c14afb1d62de411c \
+            --debug-services-dir work/debug-services \
+            --debug-owner-key work/debug-private/debug_owner.pub \
+            --debug-owner-key-sha256 08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d \
+            --d5-health \
+            --out-manifest work/mutation_D5_VI.json
+          cmp -s build/arm-dyn-b/c2m-idle work/tree/c2m/c2m-idle
+          cmp -s work/tsr_profile_boot.sh work/tree/c2m/tsr_profile_boot.sh
+          for file in boot.sh connectivity_probe.sh c2m-web c2m-wifi wpa_supplicant; do
+            cmp -s "work/d3-services/$file" "work/tree/c2m/$file"
+          done
+          cmp -s fw/d3/boot.sh work/tree/c2m/boot.sh
+          for file in c2m-signs d4_boot.sh; do
+            cmp -s "work/d4-services/$file" "work/tree/c2m/$file"
+          done
+          cmp -s work/d4-private/signs-d4.bin work/tree/c2m/signs-d4.bin
+          for file in c2m-debug dropbear dropbearkey debug_boot.sh libnss_files.so.2; do
+            cmp -s "work/debug-services/$file" "work/tree/c2m/$file"
+          done
+          cmp -s work/debug-private/debug_owner.pub work/tree/c2m/debug_owner.pub
+          cmp -s fw/d5/health.sh work/tree/c2m/health.sh
+          python3 - <<'EOF'
+          import hashlib
+          import json
+          from pathlib import Path
+          expected = {"c2m-idle", "tsr_profile_boot.sh", "boot.sh", "connectivity_probe.sh",
+                      "c2m-web", "c2m-wifi", "wpa_supplicant", "c2m-signs", "d4_boot.sh", "signs-d4.bin",
+                      "c2m-debug", "dropbear", "dropbearkey", "debug_boot.sh", "debug_owner.pub", "libnss_files.so.2",
+                      "health.sh"}
+          deployed = Path("work/tree/c2m")
+          if deployed.is_symlink() or {p.name for p in deployed.iterdir()} != expected:
+              raise SystemExit("D5-VI-GATE: installed service allowlist mismatch (want 16+health=17)")
+          for path in deployed.iterdir():
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit("D5-VI-GATE: installed service must be regular")
+          # health.sh provenance: byte-exact vs fw/d5/health.sh, 0755, recorded hash.
+          health_src = Path("fw/d5/health.sh").read_bytes()
+          health_got = (deployed / "health.sh").read_bytes()
+          assert health_got == health_src, "health.sh provenance mismatch"
+          # No M4 smuggled into the image (health.sh is the only allowed extra).
+          for banned in ("m4_authorize", "m4_adb", "m4_sniff"):
+              if (deployed / banned).exists():
+                  raise SystemExit(f"D5-VI-GATE: banned service {banned} present")
+          # On-demand only: the boot hook launches idle/D3/D4/debug, never health.sh.
+          hook = Path("work/tree/wifi/rcInsDriver.sh").read_text()
+          assert "health.sh" not in hook, "health.sh must never be boot-launched"
+          for item in json.loads(Path("work/audio_map.json").read_text()):
+              if Path(item["file"]).read_bytes() != (Path("work/tree") / item["path"].lstrip("/")).read_bytes():
+                  raise SystemExit("D5-VI-GATE: VI audio install mismatch")
+          hook = Path("work/tree/wifi/rcInsDriver.sh").read_text()
+          launches = ["/customer/c2m/c2m-idle >/dev/null 2>&1 &",
+                      "/bin/sh /customer/c2m/boot.sh >/dev/null 2>&1 &",
+                      "/bin/sh /customer/c2m/d4_boot.sh >/dev/null 2>&1 &",
+                      "/bin/sh /customer/c2m/debug_boot.sh >/dev/null 2>&1 &"]
+          if any(hook.count(line) != 1 for line in launches) or not (
+                  hook.index(launches[0]) < hook.index(launches[1]) < hook.index(launches[2]) < hook.index(launches[3])):
+              raise SystemExit("D5-VI-GATE: separate detached idle/D3/D4/debug launch order mismatch")
+          report = json.loads(Path("work/mutation_D5_VI.json").read_text())
+          database = json.loads(Path("work/d4_database.json").read_text())
+          owner = json.loads(Path("work/debug_owner.json").read_text())
+          if report.get("d4_services") is not True or report.get("d4_database") != database:
+              raise SystemExit("D5-VI-GATE: mutation database hash/count mismatch")
+          if report.get("debug_services") is not True:
+              raise SystemExit("D5-VI-GATE: mutation debug services flag mismatch")
+          if report.get("debug_owner_key_sha256") != owner["sha256"]:
+              raise SystemExit("D5-VI-GATE: mutation owner key hash mismatch")
+          if report.get("d5_health") is not True:
+              raise SystemExit("D5-VI-GATE: mutation d5_health flag mismatch")
+          want_health = hashlib.sha256(Path("fw/d5/health.sh").read_bytes()).hexdigest()
+          got_health = next(r["sha256"] for r in report["added"] if r["path"] == "/c2m/health.sh")
+          if got_health != want_health:
+              raise SystemExit("D5-VI-GATE: mutation health.sh provenance hash mismatch")
+          # The report carries only the owner key SHA256, never key bytes.
+          report_text = Path("work/mutation_D5_VI.json").read_text()
+          if "ssh-ed25519" in report_text or "BEGIN" in report_text or "PRIVATE" in report_text:
+              raise SystemExit("D5-VI-GATE: mutation report must not carry key material")
+          print("D5-VI-GATE: exact installed VI C/D/D3/D4/health/lifetime-debug assets and separate launch order verified")
+          EOF
+          # Installed health.sh parses under the exact VI stock shell too.
+          "$PWD/work/stock-sh" -n work/tree/c2m/health.sh
+          sha256sum tools/fw/test_d5_health.py fw/d5/health.sh \
+            tools/fw/test_ram_d4_stock_qemu.py tools/fw/mutate_customer.py \
+            .github/workflows/firmware-candidateD5-vi.yml > work/d5_test_source.sha256
+          cat work/d5_test_source.sha256
+          sudo bash tools/fw/rebuild_customer.sh --mode mutated \
+            --tree work/tree --tree-report work/tree_report.json \
+            --geometry work/customer_geometry.json \
+            --stock-manifest work/customer_manifest.json \
+            --mut-manifest work/mutation_D5_VI.json \
+            --out work/customer_D5_VI.es --report work/rebuild_D5_VI.json
+      - name: P3 assemble + deep validate + allowlist diff Candidate D5_VI (generic packtool B names; GATE)
+        run: |
+          # Other agent provides --base-tar alias + --base-profile {en,vi}.
+          # VI base: --base-tar <VI tar> --contract work/VI_PACKAGE_CONTRACT.json --base-profile vi.
+          # Generic EN filenames from the packtool are kept; the release README
+          # renames them explicitly (VI-A / D5-VI in THIS deliverable).
+          python3 tools/fw/build_candidates.py \
+            --base-tar firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar \
+            --contract work/VI_PACKAGE_CONTRACT.json --base-profile vi \
+            --workdir work/candidates --customer-b work/customer_D5_VI.es
+          python3 - <<'EOF'
+          import json
+          from pathlib import Path
+          for filename, expected in (("validate_A_deep.json", "VALID"),
+                                     ("validate_B_deep.json", "VALID"),
+                                     ("candidate_B_diff.json", "ALLOWLIST-OK")):
+              verdict = json.loads((Path("work/candidates") / filename).read_text())["verdict"]
+              if verdict != expected:
+                  raise SystemExit(f"D5-VI-GATE: {filename}: {verdict} != {expected}")
+          print("D5-VI-GATE: both deep validations VALID (VI profile); protected-payload diff ALLOWLIST-OK")
+          EOF
+          sha256sum work/candidates/EN_ENHANCE_IDLE.tar work/candidates/EN_REPACK_GOLDEN.tar \
+            > work/candidateD5_vi_hashes.txt
+      - name: Assemble private release layout (VI-A + D5_VI; stock VI token; NOT FLASH-READY)
+        run: |
+          R=release/c2m-flash
+          mkdir -p "$R/C2M_FLASH_A" "$R/C2M_FLASH_D5_VI" "$R/BUILD_EVIDENCE"
+          cp work/candidates/EN_REPACK_GOLDEN.tar work/candidates/EN_ENHANCE_IDLE.tar "$R/"
+          tar -C "$R/C2M_FLASH_A" -xf "$R/EN_REPACK_GOLDEN.tar"
+          tar -C "$R/C2M_FLASH_D5_VI" -xf "$R/EN_ENHANCE_IDLE.tar"
+          test "$(ls "$R/C2M_FLASH_A" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          test "$(ls "$R/C2M_FLASH_D5_VI" | sort | tr '\n' ' ')" = "SigmastarUpgradeSD_SSC8838G.bin adas_upgrade.sh minieye_firmware.md5 sysVer.txt "
+          python3 - <<'EOF'
+          from pathlib import Path
+          import tarfile
+          with tarfile.open("firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar") as package:
+              stock_token = package.extractfile("sysVer.txt").read()
+          assert stock_token == b"sysVer 20230920185743\nend\n", stock_token
+          members = {"SigmastarUpgradeSD_SSC8838G.bin", "adas_upgrade.sh", "minieye_firmware.md5", "sysVer.txt"}
+          for folder in ("C2M_FLASH_A", "C2M_FLASH_D5_VI"):
+              directory = Path("release/c2m-flash") / folder
+              if {p.name for p in directory.iterdir()} != members or any(
+                      p.is_symlink() or not p.is_file() for p in directory.iterdir()):
+                  raise SystemExit("D5-VI-GATE: release must contain exactly four regular files")
+              if (directory / "sysVer.txt").read_bytes() != stock_token:
+                  raise SystemExit("D5-VI-GATE: CI release must retain the exact stock VI token")
+          print("D5-VI-GATE: exact four-file VI-A/D5_VI folders; stock VI token bytes unchanged")
+          EOF
+          cp work/candidateD5_vi_hashes.txt work/c2m_idle.sha256 work/qemu_bin.sha256 \
+            work/qemu_out.txt work/mutation_D5_VI.json work/audio_map.json work/tool_versions.txt \
+            work/vi_audio_SHA256SUMS.txt work/tsr_experiment_tests.txt \
+            work/tsr_stock_busybox_tests.txt work/tsr_profile_boot.sh work/tsr_profile_boot.sha256 \
+            work/d3_build_tests.txt work/d3_services.sha256 work/d3_source.sha256 \
+            work/d3_test_source.sha256 work/d3_supplicant_source.json \
+            work/d3_boot.sh work/d3_connectivity_probe.sh work/d3_build.sh \
+            work/d4_build_tests.txt work/d4_services.sha256 work/d4_source.sha256 \
+            work/d4_test_source.sha256 work/d4_database.json work/d4_report.json \
+            work/d4_boot.sh work/d4_build.sh work/d5_gps_runtime.json \
+            work/d5_health_tests.txt \
+            work/debug_build_tests.txt work/debug_services.sha256 work/debug_source.sha256 \
+            work/debug_test_source.sha256 work/debug_report.json work/debug_edition.txt \
+            work/debug_help_lifetime.txt \
+            work/debug_boot.sh work/debug_build.sh work/d4_database.json work/debug_owner.json \
+            "$R/BUILD_EVIDENCE/"
+          # D5 health source is public-safe plain source; keep a copy with evidence.
+          cp fw/d5/health.sh "$R/BUILD_EVIDENCE/d5_health.sh"
+          sha256sum fw/d5/health.sh > "$R/BUILD_EVIDENCE/d5_health.sha256"
+          mkdir -p "$R/OPEN_SOURCE"
+          cp work/d3-upstream/wpa_supplicant-2.12.tar.gz work/d3-upstream/libnl-3.11.0.tar.gz \
+            work/d3-services/wpa_supplicant.COPYING fw/d3/build_supplicant.sh fw/d3/compat.h \
+            fw/device_minimal/start.S fw/d3/init_arrays.c "$R/OPEN_SOURCE/"
+          # Preserve the same exact sources, recipe and relinkable LGPL libnl
+          # objects. Private deliverable only, never public binary artifacts.
+          tar -C work/d3-upstream -czf "$R/OPEN_SOURCE/supplicant-relink.tar.gz" \
+            wpa_supplicant-2.12 libnl-3.11.0 nl start.S start.o init_arrays.o compat_prefix.h pkg-config-static
+          # Debug open source: pinned Dropbear tarball, license, source pin and
+          # own build/supervisor/boot sources (already public). Never keys.
+          cp work/dropbear-upstream/dropbear-2026.94.tar.bz2 "$R/OPEN_SOURCE/"
+          for f in work/debug-build/dropbear.LICENSE work/debug-build/dropbear.COPYING \
+            work/debug-build/dropbear.README; do
+            if [ -f "$f" ]; then cp "$f" "$R/OPEN_SOURCE/"; fi
+          done
+          test -f "$R/OPEN_SOURCE/dropbear.LICENSE" || test -f "$R/OPEN_SOURCE/dropbear.COPYING"
+          cp work/debug-build/dropbear_SOURCE.json fw/debug/build_dropbear.sh \
+            fw/debug/supervisor.h fw/debug/supervisor.c fw/debug/debug_boot.sh \
+            tools/fw/patch_debug_dropbear.py "$R/OPEN_SOURCE/"
+          cp work/customer_geometry.json work/customer_manifest.json work/tree_report.json \
+            work/rebuild_noop.json work/rebuild_noop.compare.txt \
+            work/rebuild_D5_VI.json work/rebuild_D5_VI.compare.txt work/rebuild_D5_VI.bmanifest.json \
+            work/d5_test_source.sha256 work/d5_health_tests.txt work/d5_gps_runtime.json \
+            "$R/BUILD_EVIDENCE/"
+          # PRIVATE contract stays out of BUILD_EVIDENCE public copies: only the
+          # hash allowlist below is public. Keep deep-validation + diff reports
+          # (hash-only); NEVER copy VI_PACKAGE_CONTRACT.json/md or upgrade scripts.
+          cp work/candidates/validate_A_deep.json work/candidates/validate_A_deep.md \
+            work/candidates/validate_B_deep.json work/candidates/validate_B_deep.md \
+            work/candidates/candidate_B_diff.json work/candidates/repack_A.json \
+            "$R/BUILD_EVIDENCE/"
+          # Exact PRIVATE package list; only this text hash manifest is public.
+          (
+            cd "$R"
+            sha256sum EN_REPACK_GOLDEN.tar EN_ENHANCE_IDLE.tar \
+              C2M_FLASH_A/SigmastarUpgradeSD_SSC8838G.bin C2M_FLASH_A/adas_upgrade.sh \
+              C2M_FLASH_A/minieye_firmware.md5 C2M_FLASH_A/sysVer.txt \
+              C2M_FLASH_D5_VI/SigmastarUpgradeSD_SSC8838G.bin C2M_FLASH_D5_VI/adas_upgrade.sh \
+              C2M_FLASH_D5_VI/minieye_firmware.md5 C2M_FLASH_D5_VI/sysVer.txt > SHA256SUMS.txt
+          )
+          cat > "$R/FLASH_README.txt" <<'EOF'
+          C2M CANDIDATE D5-VI — CI ASSEMBLY ONLY / NOT FLASH-READY / NOT FLASH-PROVEN / NOT HW-READY.
+
+          ### Private retrieval and separately authorized local preparation
+          CI preserves the STOCK VI update token (sysVer 20230920185743) in both
+          raw four-file folders. Never copy raw C2M_FLASH_D5_VI/ to a card or
+          assume updater acceptance. QEMU proves stock-userspace execution only,
+          never hardware behavior. Verify retrieved hashes, then use
+          tools/fw/reversion_sd_package.py with exact source-member SHA256 pins
+          for fail-closed LOCAL version-only preparation. Suggested local D5
+          token 20261016000001 is NOT minted, applied or selected by CI (DO NOT
+          CI-apply). Owner-approved installed D3.1 token 20261014000006 must
+          never be reused. Verify the local report, all four files and refreshed
+          inner MD5; never hand-edit sysVer or mix folders.
+          VI-A is a VI stock-token reference only, not an automatically usable
+          rollback and never an EN rollback. Rollback is the frozen EN_D4
+          deliverable (separate). EN_REPACK_GOLDEN.tar is VI-A and
+          EN_ENHANCE_IDLE.tar is D5-VI in THIS deliverable; packtool reports
+          retain their generic candidate-B filenames only.
+
+          ### VI base untouched / ADAS status UNVERIFIED
+          D5-VI uses the FULL VI base V2023.09.20.1_C2M_U_FR_WIFI_VI.tar
+          (SHA256 f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa).
+          Kernel/cardv/ADAS/models are VI stock and never mixed with EN:
+          kernel 8261589e10474885277d59fea0a2ad02e079a5b94661a2f4f8f869be29364314,
+          cardv 56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23,
+          adas 997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1.
+          Config/cali/license/vendor calib_success and the 8 VI WAVs are preserved.
+          The VI ADAS regression cause is UNVERIFIED (settings/parsing/gating are
+          candidates, not proof of incompatibility). Do not claim VI ADAS is
+          incompatible and do not treat unverified behavior as proven failure.
+          The stock hook still preserves its exit status; detached bounded mount
+          wait launches idle, D3 boot, then the SEPARATE /customer/c2m/d4_boot.sh.
+          D3 boot is unchanged. Mandatory c2m-signs performs read-only GPS plus
+          offline nearby-area computation using the pinned PRIVATE directional
+          R.420/R.421 subset: 12708 records, SHA256
+          3bcf871956c61484858bef783187319fa5f9ae0da0c214c2c14afb1d62de411c.
+          There is no optional/stale c2m-gps substitute or online DB fetch.
+          No source records, labels, private IDs or coordinates are public.
+          D5 carries the current GPS subsecond fix (unscaled 1-3 digit fraction
+          0..999; 100/200/300 decode as milliseconds; subsecond-only churn never
+          refreshes; exact production binary gated under VI stock QEMU) plus
+          current connectivity V2 and an on-demand read-only D5 health snapshot
+          (/customer/c2m/health.sh --help/--snapshot only; 17th file; never
+          boot-launched). No M4 authorization binaries/keys/services are installed.
+
+          ### Owner-authorized AP-only lifetime debug SSH (one flash, RAM use after)
+          D5-VI adds an owner-authorized AP-only Dropbear SSH debug service
+          for the owner's own camera: bind 192.168.1.1:2222 on wlan0 only,
+          key-only root login with the pinned owner Ed25519 public key
+          (SHA256 08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d),
+          no passwords, no forwarding, NO 20-minute supervisor window (lifetime-boot
+          edition: window_sec=0, status lifetime=boot; serve until boot ends,
+          AP loss, or child exit; AP startup still bounded at 60 s). Idle SSH
+          sessions stay bounded by Dropbear -M600 and the supervisor still stops
+          only its OWN listener (no pkill/killall; double-forked clients are an
+          explicit limit). The persistent hostkey generates on first boot only
+          under the private config dir; later boots reuse it. The service starts
+          detached after D3/D4 boot and never edits radio, firewall,
+          passwd/shadow/ssh or stock boot files. After one authorized flash,
+          further debug runs from RAM over the owner laptop SSH session; no
+          additional flashing is needed for debug. Modern SSH only (Dropbear
+          2026.94, Ed25519/ECDSA, ChaCha20-Poly1305, AES-128/256); stock binaries
+          are untouched. CI evidence carries only the owner key SHA256, never key
+          bytes. No camera, card or device use by CI.
+
+          ### /signs and phone/browser sound ONLY
+          The AP-only :8099 /signs page shows an EXPERIMENTAL GPS/offline nearby
+          area advisory, NOT camera-derived TSR or proof of road applicability.
+          No numeric vehicle speed, numeric/current/legal speed limit, camera
+          recognition or safety-ready claim is exposed. Missing, stale, invalid
+          or unstable GPS/database/status clears the advisory; never retain a
+          last-known warning as current. Status heartbeats stay in private /tmp.
+          Sound is muted by default and opt-in after a user gesture, generated
+          ONLY by the phone/browser. New events may beep once; no heartbeat
+          replay or guaranteed background/locked-phone sound. Browser CI proves
+          scheduling/presentation, not audible phone or camera hardware behavior.
+          NO D4/D5 playback through stock speaker, audio IPC/UART or ADAS paths.
+          Existing VI ADAS audio is preserved; D5 adds no camera audio asset.
+
+          ### Honest connectivity and TSR limits / preserve ADAS core
+          D3 UI stays on the existing stock AP interface/address, not wildcard
+          or STA-facing. Boot never auto-associates a STA or replaces the AP.
+          Requests require real concurrent same-channel AP+STA evidence; absence
+          means refusal, not AP-to-STA switching or proof of hardware absence.
+          DHCP, STA association and Internet access are NOT proven or promised.
+          Bluetooth is read-only presence inventory, not pairing/radio proof.
+          Credentials/settings stay private. Synthetic/Chrome tests use only
+          fixtures and loopback, never real credentials, GPS, device or card.
+          Existing D TSR flags/profile are unchanged. Recognition, display,
+          warning behavior, threshold units/choices and hardware boot remain
+          UNVERIFIED; APPLIED_WAIT_STOCK_REDECODE is not recognition proof.
+          VI ADAS behavior is UNVERIFIED, not proven incompatible.
+          No stock Warner/GPS/ADAS/cardv/camera/model/calibration/kernel/bootloader
+          binary changes. Manifest/deep-validation/allowlist gates preserve the
+          core outside the narrow VI C/D/D3/D4/health/lifetime-debug additions and
+          hook/audio changes. This is the STOCK FULL UPDATER, not a customer-only
+          write; it may also write unchanged core partitions. Never substitute a
+          custom flasher. OPEN_SOURCE retains supplicant/libnl sources, recipe and
+          relink objects plus the pinned Dropbear tarball, license and debug
+          build sources.
+
+          ### Hardware validation is separate, never performed by this CI
+          Only after verified local preparation follow FLASH_HW_CHECKLIST.md
+          with stable power, known-good FAT32 media and a recovery plan. Check
+          boot, camera/recording, ADAS/display, stock AP, reboot and diagnostics
+          before supervised /signs tests; use only the complete locally prepared
+          D5-VI folder. QEMU proves stock-userspace execution, not hardware. No CI
+          card/device access, workflow-triggered update or token reversion occurs.
+          Do not rely on TSR, GPS, nearby-area data, connectivity or beep for safety.
+          A full D5 tested flash folder still needs verified local preparation after CI.
+          EOF
+          cat "$R/SHA256SUMS.txt"
+      - name: Publish D5-VI release to private vault (firmware, DB and owner-key bytes stay private)
+        env:
+          FIRMWARE_VAULT_PUSH_KEY: ${{ secrets.FIRMWARE_VAULT_PUSH_KEY }}
+        run: |
+          test -n "$FIRMWARE_VAULT_PUSH_KEY" || \
+            { echo "FIRMWARE_VAULT_PUSH_KEY secret missing"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$FIRMWARE_VAULT_PUSH_KEY" > ~/.ssh/fw_vault_push
+          chmod 600 ~/.ssh/fw_vault_push
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/fw_vault_push -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git /tmp/vault-out
+          D="deliverables/$(date -u +%Y%m%d)-d5-vi-r${GITHUB_RUN_ID}"
+          echo "VAULT_DIR=$D" >> $GITHUB_ENV
+          mkdir -p "/tmp/vault-out/$D"
+          cp -r release/c2m-flash "/tmp/vault-out/$D/"
+          cd /tmp/vault-out && git add "$D" \
+            && git -c user.name=c2m-ci -c user.email=c2m-ci@local \
+               commit -m "candidate D5-VI private flash deliverables ${D} (VI stock token; local preparation required)" \
+            && git push origin main
+          rm -rf /tmp/vault-out ~/.ssh/fw_vault_push
+          echo "VAULT-DIR: $D"
+      - name: Upload D5-VI evidence (explicit reports/hashes/plain source ONLY; NEVER contract/script/binaries/audio/DB/config/keys)
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidateD5-vi-evidence
+          if-no-files-found: error
+          path: |
+            work/customer_geometry.json
+            work/customer_manifest.json
+            work/tree_report.json
+            work/rebuild_noop.json
+            work/rebuild_noop.compare.txt
+            work/mutation_D5_VI.json
+            work/audio_map.json
+            work/vi_audio_SHA256SUMS.txt
+            work/rebuild_D5_VI.json
+            work/rebuild_D5_VI.compare.txt
+            work/rebuild_D5_VI.bmanifest.json
+            work/candidates/validate_A_deep.json
+            work/candidates/validate_A_deep.md
+            work/candidates/validate_B_deep.json
+            work/candidates/validate_B_deep.md
+            work/candidates/candidate_B_diff.json
+            work/candidates/repack_A.json
+            work/candidateD5_vi_hashes.txt
+            work/c2m_idle.sha256
+            work/qemu_bin.sha256
+            work/qemu_out.txt
+            work/tool_versions.txt
+            work/tsr_experiment_tests.txt
+            work/tsr_stock_busybox_tests.txt
+            work/tsr_profile_boot.sh
+            work/tsr_profile_boot.sha256
+            work/d3_build_tests.txt
+            work/d3_services.sha256
+            work/d3_source.sha256
+            work/d3_test_source.sha256
+            work/d3_supplicant_source.json
+            work/d3_boot.sh
+            work/d3_connectivity_probe.sh
+            work/d3_build.sh
+            work/d4_build_tests.txt
+            work/d4_services.sha256
+            work/d4_source.sha256
+            work/d4_test_source.sha256
+            work/d4_database.json
+            work/d4_report.json
+            work/d4_boot.sh
+            work/d4_build.sh
+            work/d5_gps_runtime.json
+            work/d5_health_tests.txt
+            work/d5_test_source.sha256
+            work/debug_build_tests.txt
+            work/debug_services.sha256
+            work/debug_source.sha256
+            work/debug_test_source.sha256
+            work/debug_report.json
+            work/debug_edition.txt
+            work/debug_help_lifetime.txt
+            work/debug_boot.sh
+            work/debug_build.sh
+            fw/d5/health.sh
+            release/c2m-flash/BUILD_EVIDENCE/d5_health.sha256
+            release/c2m-flash/FLASH_README.txt
+            release/c2m-flash/SHA256SUMS.txt

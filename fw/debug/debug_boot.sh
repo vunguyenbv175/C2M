@@ -6,8 +6,8 @@
 # There is intentionally no once-guard and no retry loop: the supervisor's
 # locked run dir (supervisor.lock) is the duplicate guard (a second copy
 # exits already_running), and the supervisor itself retries AP readiness
-# for 60 s inside its 20-minute window. A repeat hook call just re-execs
-# into that lock. The supervisor enforces AP-only binding
+# for 60 s. D4 builds have a 20-minute cap; D5 lifetime builds have none.
+# A repeat hook call just re-execs into that lock. The supervisor enforces AP-only binding
 # (192.168.1.1:2222 on wlan0, SO_BINDTODEVICE via -l wlan0) and key-only
 # root auth. No routes, firewall rules, passwd/shadow/ssh changes,
 # process-killer invocations, shells, or radio reconfiguration happen here.
@@ -37,7 +37,8 @@ grep -qs '^ssh-ed25519 [A-Za-z0-9+/]\{68\}\( [!-~]\{1,256\}\)\?$' "$_owner" || e
 export LD_LIBRARY_PATH=/customer/c2m:/lib
 
 # Detached low-priority supervisor. It re-validates everything, generates
-# the persistent hostkey on first boot only, and stops after 20 minutes.
+# the persistent hostkey on first boot only. D4 expires at 20 minutes;
+# D5 has no listener deadline. Both stop on AP loss / signal / child exit.
 if command -v nice >/dev/null 2>&1; then
     nice -n 10 "$_bin" --serve >/dev/null 2>&1 &
 else

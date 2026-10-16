@@ -86,6 +86,10 @@ jobs:
           python3 tests/test_debug_supervisor.py
           python3 tests/test_debug_ssh.py
           python3 tools/fw/test_debug_mutation.py
+          python3 tests/test_d5_debug_supervisor.py
+          python3 tests/test_vi_package_validation.py
+          python3 tools/fw/test_d5_health.py
+          python3 tools/fw/test_d5_workflow.py
           python3 tools/fw/test_reversion_sd_package.py
       - name: D3 real-browser loopback form regression (no device access)
         env:

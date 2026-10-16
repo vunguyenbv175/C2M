@@ -19,15 +19,22 @@
 #          sees the real status. Compiled macro proof (gcc -dM -E on
 #          options.h) runs before make; QEMU -V must exit 0, -h exits are
 #          asserted (dropbear 0/1, dropbearkey 0).
-# Run from repo root: sh fw/debug/build_dropbear.sh --out DIR --sysroot ROOT
+# Run from repo root: sh fw/debug/build_dropbear.sh --out DIR --sysroot ROOT [--lifetime]
+#   --lifetime selects the D5 boot-lifetime supervisor edition
+#   (-DC2M_DEBUG_LIFETIME=1, default window 0, no supervisor deadline).
+#   Default (no flag) is the D4 20-minute window edition. The helper keeps
+#   the same install name c2m-debug in both editions; the edition is
+#   recorded in reports/c2m-debug-edition.txt plus a preprocessor proof.
 set -eu
 out=
 sysroot=
+lifetime=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --out) out=$2; shift 2 ;;
         --sysroot) sysroot=$2; shift 2 ;;
-        *) echo 'usage: build_dropbear.sh --out DIR --sysroot STOCK_ROOTFS' >&2; exit 2 ;;
+        --lifetime) lifetime=1; shift 1 ;;
+        *) echo 'usage: build_dropbear.sh --out DIR --sysroot STOCK_ROOTFS [--lifetime]' >&2; exit 2 ;;
     esac
 done
 [ -n "$out" ] || { echo 'missing --out' >&2; exit 2; }
@@ -381,12 +388,42 @@ headers = '''#define _POSIX_C_SOURCE 200809L
 '''
 destination.write_text(headers+s,encoding='utf-8')
 PY
+# D5 lifetime edition: same c2m-debug helper name, explicit macro.
+# Default (lifetime=0) keeps the D4 20-minute window; --lifetime sets
+# C2M_DEBUG_LIFETIME=1 (default window 0, no supervisor deadline).
+supervisor_defs=""
+if [ "$lifetime" = 1 ]; then
+    supervisor_defs="-DC2M_DEBUG_LIFETIME=1"
+fi
+# shellcheck disable=SC2086
 arm-linux-gnueabihf-gcc -std=c99 -Os -Wall -Wextra -Werror \
     -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
     -D_TIME_BITS=32 -U_FILE_OFFSET_BITS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 \
-    -fno-stack-protector -fno-pie \
+    -fno-stack-protector -fno-pie $supervisor_defs \
     -I "$root/fw/d3" -I "$root/fw/debug" \
     -c "$out/objects/supervisor_compat.c" -o "$out/objects/supervisor.o"
+# Compiled edition proof: preprocessor must show the selected lifetime
+# macro and the matching default window before linking.
+printf '#include "supervisor.h"\nC2M_DEBUG_LIFETIME C2M_DEBUG_WINDOW_SEC\n' > "$work/supervisor_edition_probe.c"
+# shellcheck disable=SC2086
+arm-linux-gnueabihf-gcc -dM -E $supervisor_defs -I "$root/fw/debug" \
+    -x c "$work/supervisor_edition_probe.c" > "$out/reports/c2m-debug-macros-full.txt" 2>"$out/reports/c2m-debug-macros-err.txt" \
+    || { cat "$out/reports/c2m-debug-macros-err.txt"; exit 1; }
+grep "^#define C2M_DEBUG_LIFETIME " "$out/reports/c2m-debug-macros-full.txt" > "$out/reports/c2m-debug-macros.txt" \
+    || { echo 'C2M_DEBUG_LIFETIME macro missing in preprocessor output' >&2; exit 1; }
+grep "^#define C2M_DEBUG_WINDOW_SEC " "$out/reports/c2m-debug-macros-full.txt" >> "$out/reports/c2m-debug-macros.txt" \
+    || { echo 'C2M_DEBUG_WINDOW_SEC macro missing in preprocessor output' >&2; exit 1; }
+cat "$out/reports/c2m-debug-macros.txt"
+if [ "$lifetime" = 1 ]; then
+    grep -q "^#define C2M_DEBUG_LIFETIME 1$" "$out/reports/c2m-debug-macros.txt" || { echo 'lifetime edition macro proof FAIL' >&2; exit 1; }
+    grep -q "^#define C2M_DEBUG_WINDOW_SEC 0$" "$out/reports/c2m-debug-macros.txt" || { echo 'lifetime default window proof FAIL' >&2; exit 1; }
+    printf 'edition=lifetime-boot\nwindow_sec=0\nlifetime_macro=1\n' > "$out/reports/c2m-debug-edition.txt"
+else
+    grep -q "^#define C2M_DEBUG_LIFETIME 0$" "$out/reports/c2m-debug-macros.txt" || { echo 'D4 edition macro proof FAIL' >&2; exit 1; }
+    grep -q "^#define C2M_DEBUG_WINDOW_SEC 1200$" "$out/reports/c2m-debug-macros.txt" || { echo 'D4 default window proof FAIL' >&2; exit 1; }
+    printf 'edition=window-1200\nwindow_sec=1200\nlifetime_macro=0\n' > "$out/reports/c2m-debug-edition.txt"
+fi
+cat "$out/reports/c2m-debug-edition.txt"
 arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
     -nostartfiles -no-pie -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 \
     -Wl,--no-undefined -Wl,-z,noexecstack fw/device_minimal/start.S \

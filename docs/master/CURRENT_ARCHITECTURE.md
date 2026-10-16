@@ -2,7 +2,17 @@
 
 **Status:** active owner architecture, updated after EN/VI deep reverse  
 **Known-good baseline:** `V2023.08.03.1_C2M_U_FR_WIFI_EN.tar`  
-**Regression/donor build:** `V2023.09.20.1_C2M_U_FR_WIFI_VI.tar`
+**Owner-requested D5 base:** `V2023.09.20.1_C2M_U_FR_WIFI_VI.tar`.
+Owner clarified2026-10-16 that prior VI ADAS symptoms may have reflected
+settings unfamiliarity; VI regression/incompatibility is NOT established.
+
+**D5-VI preparation:** full VI core plus all D4 services, GPS fraction0..999
+correction, key-only AP SSH with no20-minute listener deadline and on-demand
+read-only health command. Device-specific config/calibration/license and vendor
+greeting semantics retained; no ADB/WS injection or automatic resets. Separate
+manual build/validation, private retrieval and local version preparation;
+no camera access/card staging/flash authorized by package creation. See
+`../firmware/CANDIDATE_D5_VI_20261016.md` for scope and hardware acceptance.
 
 ## Decision
 

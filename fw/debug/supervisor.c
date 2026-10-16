@@ -190,12 +190,19 @@ static int valid_bind(const char *addr, int port, int loopback)
 }
 
 /* Pure production gate: any override flag is invalid without an explicit
- * --loopback-test, regardless of flag order. No filesystem/network I/O. */
+ * --loopback-test, regardless of flag order. No filesystem/network I/O.
+ * Window 0 (boot-lifetime, no supervisor deadline) is valid ONLY in the
+ * lifetime edition (built with -DC2M_DEBUG_LIFETIME=1, D5 production);
+ * the default D4 edition rejects 0. */
 int c2m_debug_cli_valid(int loopback, int any_override, const char *bind,
                         int port, int window_sec, int poll_ms)
 {
     if (port < 1 || port > 65535) return 0;
+#if C2M_DEBUG_LIFETIME
+    if (window_sec < 0 || window_sec > 86400) return 0;
+#else
     if (window_sec < 1 || window_sec > 86400) return 0;
+#endif
     if (poll_ms < 50 || poll_ms > 5000) return 0;
     if (!valid_bind(bind, port, loopback)) return 0;
     if (any_override && !loopback) return 0;
@@ -367,11 +374,39 @@ int c2m_debug_self_test(void)
               !c2m_debug_cli_valid(1, 0, "192.168.1.1", 2222, 1200, 1000),
           &failures);
     check("cli_bad_bounds_rejected",
+#if C2M_DEBUG_LIFETIME
+          /* Lifetime edition: window 0 is the valid boot-lifetime value,
+           * so 0 must NOT be in the rejected set here (covered by
+           * cli_lifetime_zero_allowed below). Other bounds still reject. */
+          !c2m_debug_cli_valid(1, 1, "127.0.0.1", 0, 2, 100) &&
+              !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 86401, 100) &&
+              !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 2, 49) &&
+              !c2m_debug_cli_valid(1, 1, NULL, 2222, 2, 100),
+#else
           !c2m_debug_cli_valid(1, 1, "127.0.0.1", 0, 2, 100) &&
               !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 0, 100) &&
               !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 2, 49) &&
               !c2m_debug_cli_valid(1, 1, NULL, 2222, 2, 100),
+#endif
           &failures);
+#if C2M_DEBUG_LIFETIME
+    check("cli_lifetime_zero_allowed",
+          c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, 0, 1000) &&
+              c2m_debug_cli_valid(1, 1, "127.0.0.1", 2223, 0, 100) &&
+              c2m_debug_cli_valid(1, 0, "127.0.0.1", 2222, 0, 1000) &&
+              !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, 0, 1000) &&
+              !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 86401, 100),
+          &failures);
+    check("lifetime_default_window_zero", C2M_DEBUG_WINDOW_SEC == 0,
+          &failures);
+#else
+    check("cli_zero_rejected_d4_default",
+          !c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, 0, 1000) &&
+              !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 0, 100),
+          &failures);
+    check("d4_default_window_1200", C2M_DEBUG_WINDOW_SEC == 1200,
+          &failures);
+#endif
     /* Stock table vectors from actual EN cpio facts (/tmp,/var,/customer
      * 0775 1001:1001; / kernel default 0755 root; UBIFS /customer 0755). */
     check("stock_root",
@@ -437,7 +472,13 @@ static void usage(FILE *f)
           "  Status is starting until OUR child provably holds the bound\n"
           "  listener (/proc/net/tcp inode in the child PID fd set); only\n"
           "  then is active published. Startup AP readiness retries up to\n"
+#if C2M_DEBUG_LIFETIME
+          "  60 s with no supervisor deadline (lifetime-boot edition:\n"
+          "  default window 0, status window_sec=0 lifetime=boot; AP loss\n"
+          "  still stops the owned listener, SIGTERM stops, no restart).\n",
+#else
           "  60 s inside the overall 20-minute window.\n",
+#endif
           f);
 }
 
@@ -649,7 +690,11 @@ static int write_all(int fd, const void *data, size_t n)
 }
 
 /* Atomically publish status. Status dir must already be safe; the file
- * itself is 0600 owned by euid. Never follows symlinks. */
+ * itself is 0600 owned by euid. Never follows symlinks. D4 schema kept:
+ * version/state/reason/key_fp/window_sec/bind unchanged; a lifetime line
+ * is appended for explicit semantics (window_sec=0 -> lifetime=boot for
+ * the D5 lifetime-boot edition, else lifetime=window). D4 readers ignore
+ * the unknown key. */
 static int publish_status(const struct serve_cfg *c, const char *state,
                           const char *reason, const char *fp)
 {
@@ -682,9 +727,12 @@ static int publish_status(const struct serve_cfg *c, const char *state,
     snprintf(tmp, sizeof(tmp), ".c2m-debug-status-%ld-%u.tmp", (long)getpid(), ++serial);
     fd = openat(dirfd, tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd < 0) goto done;
-    n = snprintf(text, sizeof(text),
-                 "version=1\nstate=%s\nreason=%s\nkey_fp=%s\nwindow_sec=%d\nbind=%s\n",
-                 state, reason, fp, c->window_sec, bind);
+    {
+        const char *lifetime = (c->window_sec == 0) ? "boot" : "window";
+        n = snprintf(text, sizeof(text),
+                     "version=1\nstate=%s\nreason=%s\nkey_fp=%s\nwindow_sec=%d\nlifetime=%s\nbind=%s\n",
+                     state, reason, fp, c->window_sec, lifetime, bind);
+    }
     if (n < 0 || (size_t)n >= sizeof(text)) goto done;
     if (write_all(fd, text, (size_t)n) || fsync(fd)) goto done;
     if (renameat(dirfd, tmp, dirfd, base)) goto done;
@@ -1203,6 +1251,7 @@ static int serve(const struct serve_cfg *c)
     struct passwd *pw;
     pid_t child = -1;
     int64_t serve_start = 0, deadline = 0;
+    int has_deadline = 0;
     int staged = 0;
     int execpipe[2] = { -1, -1 };
     int rc = 1;
@@ -1218,7 +1267,13 @@ static int serve(const struct serve_cfg *c)
         fputs("c2m-debug: clock unavailable\n", stderr);
         return 1;
     }
-    deadline = serve_start + (int64_t)c->window_sec * 1000;
+    /* D5 lifetime-boot edition: window_sec==0 means no supervisor deadline
+     * (serve until SIGTERM/AP loss/child exit). Valid only when built with
+     * C2M_DEBUG_LIFETIME=1; the D4 gate above already rejects 0 otherwise.
+     * Startup AP readiness stays bounded at 60 s and AP loss later still
+     * stops the owned listener. No autorestart loops: AP must be ready. */
+    has_deadline = (c->window_sec > 0);
+    deadline = has_deadline ? serve_start + (int64_t)c->window_sec * 1000 : 0;
 
     runfd = safe_dir(c->run_dir, 1, 1);
     configfd = safe_dir(c->config_dir, 1, 1);
@@ -1289,9 +1344,10 @@ static int serve(const struct serve_cfg *c)
         rc = 1;
         goto out;
     }
-    /* Startup AP readiness: retry up to 60 s (poll interval) inside the
-     * same overall window, so a still-coming-up AP is not permanently
-     * missed at boot. */
+    /* Startup AP readiness: retry up to 60 s (poll interval). In the
+     * windowed (D4) edition this sits inside the same overall window;
+     * in the lifetime-boot (D5) edition there is no deadline but the
+     * 60 s AP bound still applies. No autorestart on failure. */
     {
         int64_t ap_start = now_ms();
         struct timespec pause;
@@ -1304,7 +1360,7 @@ static int serve(const struct serve_cfg *c)
         while (ap_valid(c)) {
             int64_t now = now_ms();
             if (now < 0 || now - ap_start >= C2M_DEBUG_STARTUP_AP_MS ||
-                now >= deadline) {
+                (has_deadline && now >= deadline)) {
                 publish_status(c, "inactive", "ap_not_validated", fp);
                 fputs("c2m-debug: AP not validated; refusing to listen\n",
                       stderr);
@@ -1566,7 +1622,11 @@ static int serve(const struct serve_cfg *c)
             goto out;
         }
     }
-    /* Parent supervises within the overall window from serve start. */
+    /* Parent supervises within the overall window from serve start
+     * (D4), or with no deadline in the lifetime-boot edition (D5:
+     * window_sec==0). Either way AP loss stops the owned listener and
+     * there are no autorestart loops. Idle sessions stay bounded by
+     * Dropbear -M600 (session timeout, not the listener lifetime). */
     rc = 0;
     while (!g_stop) {
         pid_t r;
@@ -1590,7 +1650,7 @@ static int serve(const struct serve_cfg *c)
             rc = 1;
             break;
         }
-        if (now >= deadline) {
+        if (has_deadline && now >= deadline) {
             stop_group(child);
             while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
             }

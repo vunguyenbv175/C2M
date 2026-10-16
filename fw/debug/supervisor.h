@@ -22,9 +22,14 @@
  *
  * Build (host test):
  *   cc -std=c99 -O2 -Wall -Wextra -Werror fw/debug/supervisor.c -o c2m-debug
+ *   cc -std=c99 -O2 -Wall -Wextra -Werror -DC2M_DEBUG_LIFETIME=1 \
+ *     fw/debug/supervisor.c -o c2m-debug-lifetime   (D5 boot-lifetime)
  * Build (camera ARM glibc 2.30, separate build agent):
  *   arm-linux-gnueabihf-gcc -std=c99 -Os -Wall -Wextra \
  *     fw/debug/supervisor.c -o c2m-debug
+ *   sh fw/debug/build_dropbear.sh --out DIR --sysroot ROOT --lifetime
+ *     adds -DC2M_DEBUG_LIFETIME=1 for the same c2m-debug helper name and
+ *     records the edition in reports/c2m-debug-edition.txt.
  * Do not add time64 (_TIME_BITS), libnl, crypto, or shell dependencies.
  * Portable: --help and --self-test compile on Windows (C99, no I/O, and
  *   safe_dir/serve are compiled out there); --serve is Linux-only and
@@ -76,13 +81,26 @@
  *   socket inode. No TCP connect probe is used (no auth-session overhead,
  *   no interference with Dropbear, and a foreign listener on the same
  *   port cannot satisfy the owned-PID fd check). Startup AP readiness is
- *   retried up to 60 s inside the same overall 20-minute cap.
+ *   retried up to 60 s inside the same overall 20-minute cap (D4), or
+ *   with no supervisor deadline in the lifetime-boot edition (D5) where
+ *   the 60 s AP bound still applies.
  *
  * Lifetime/limits (documented, not over-promised):
- *   - Supervisor enforces a 20-minute (1200 s) window from serve start
- *     (startup retries included), then SIGTERMs its OWN dropbear process
- *     group (no pkill/killall) and publishes expired. Dropbear -M600
- *     additionally bounds idle sessions.
+ *   - Default (D4) supervisor enforces a 20-minute (1200 s) window from
+ *     serve start (startup retries included), then SIGTERMs its OWN
+ *     dropbear process group (no pkill/killall) and publishes expired.
+ *     Dropbear -M600 additionally bounds idle sessions.
+ *   - Lifetime-boot edition (D5, built with -DC2M_DEBUG_LIFETIME=1 via
+ *     build_dropbear.sh --lifetime): default window 0 means serve until
+ *     boot ends (SIGTERM), AP loss, or child exit -- no supervisor
+ *     deadline during boot/lifetime. Status reports window_sec=0 plus
+ *     lifetime=boot (windowed builds report lifetime=window). This is a
+ *     supervisor-listener lifetime only; idle SSH sessions stay bounded
+ *     by -M600, and no indefinite-operation claim is made beyond the
+ *     owned-listener guarantee below. AP startup stays bounded at 60 s;
+ *     AP loss stops the owned listener (failed). No autorestart loops:
+ *     AP must be ready; a second supervisor exits already_running on the
+ *     run-dir lock.
  *   - Group signals go to -childpid only after verifying, on our still-
  *     unreaped child (no PID reuse possible), that getpgid(child)==child;
  *     otherwise only the single PID is signaled. The supervisor can only
@@ -103,7 +121,10 @@
  * touching wlan0/radio, permits non-root (fixtures own their temp dirs),
  * and omits -l wlan0. --ap-state-file contains "up" (valid) or anything
  * else (invalid) to simulate AP change with no radio; it also requires
- * --loopback-test.
+ * --loopback-test. --window-sec 0 (boot-lifetime, no deadline) is valid
+ * only in the lifetime edition (C2M_DEBUG_LIFETIME=1); D4 rejects 0.
+ * Status always carries lifetime=boot when window_sec=0 else
+ * lifetime=window (D4 readers ignore the key).
  */
 
 #define C2M_DEBUG_DROPBEAR "/customer/c2m/dropbear"
@@ -120,7 +141,14 @@
 #define C2M_DEBUG_BIND_PORT 2222
 #define C2M_DEBUG_IFACE "wlan0"
 #define C2M_DEBUG_LOOPBACK_ADDR "127.0.0.1"
+#ifndef C2M_DEBUG_LIFETIME
+#define C2M_DEBUG_LIFETIME 0
+#endif
+#if C2M_DEBUG_LIFETIME
+#define C2M_DEBUG_WINDOW_SEC 0
+#else
 #define C2M_DEBUG_WINDOW_SEC 1200
+#endif
 #define C2M_DEBUG_POLL_MS 1000
 #define C2M_DEBUG_STARTUP_AP_MS 60000
 #define C2M_DEBUG_PROOF_MS 5000
@@ -135,6 +163,7 @@ int c2m_debug_self_test(void);
 int c2m_debug_parse_owner(const char *line, char fp_out[17]);
 /* Pure CLI gate: production (loopback==0) accepts zero overrides; any
  * override flag without --loopback-test is invalid regardless of order.
+ * Window 0 (boot-lifetime) is valid only when C2M_DEBUG_LIFETIME=1.
  * No filesystem or network I/O. Returns nonzero when valid. */
 int c2m_debug_cli_valid(int loopback, int any_override, const char *bind,
                         int port, int window_sec, int poll_ms);

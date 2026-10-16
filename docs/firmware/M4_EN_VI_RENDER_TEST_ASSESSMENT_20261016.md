@@ -1,5 +1,15 @@
 # M4 EN / VI render test assessment — 2026-10-16 (offline, no flash)
 
+## Later owner clarification / D5 request
+
+Owner subsequently clarified that the earlier VI ADAS observation may have been
+unfamiliar settings, not firmware failure. Historical VI-regression wording below
+is not a diagnosis. Owner now explicitly requests preparation of full-VI-based
+D5 for all D4 functions and lifetime AP SSH, not as a proven M4 sign fix. That
+new request supersedes this report's no-flash recommendation as a reason to
+refuse package preparation; actual flashing/hardware acceptance remain separate.
+See `CANDIDATE_D5_VI_20261016.md`.
+
 ## Scope and boundary
 
 - OFFLINE ONLY on `C:\Code\C2M`. No camera / SSH / private-network / radio /

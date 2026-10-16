@@ -4,7 +4,19 @@
 **Repository:** `vunguyenbv175/C2M`  
 **Status:** static-analysis conclusion before decisive on-device A/B test
 
-## 1. Executive conclusion
+## Owner clarification — 2026-10-16 (supersedes causal framing below)
+
+The owner now says the earlier VI ADAS observation may have reflected unfamiliar
+settings, not a firmware problem. Therefore the historical good/bad differential
+and “regression build” labels below are NOT a confirmed firmware diagnosis.
+Treat VI ADAS behavior as **unverified with settings/configuration confounding**.
+The static binary differences remain evidence, but cannot establish a runtime
+failure or its cause. Owner explicitly requests a full-VI-based D5 package;
+preparation is authorized, flashing and hardware acceptance remain separate.
+Do not force calibration/reset or overwrite device-specific configuration to
+make a presumed failure disappear.
+
+## 1. Executive conclusion (historical)
 
 The two vendor firmware packages should now be treated as a **good/bad differential pair**:
 

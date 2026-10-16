@@ -267,8 +267,12 @@ def main() -> int:
                     help="AP-only Ed25519 owner public key OpenSSH line")
     ap.add_argument("--debug-owner-key-sha256",
                     help="mandatory exact 64-hex SHA256 of the owner public key")
+    ap.add_argument("--d5-health", action="store_true",
+                    help="install fixed read-only on-demand D5 health.sh (requires D4)")
     ap.add_argument("--out-manifest", type=Path, required=True)
     args = ap.parse_args()
+    if args.d5_health and args.d4_services_dir is None:
+        ap.error("D5 health requires the complete D4 services/database")
 
     d4_assets: dict[str, bytes] = {}
     d4_database = None
@@ -517,6 +521,14 @@ def main() -> int:
         assets.update({name: (data, 0o755) for name, data in d3_assets.items()})
         assets.update({name: (data, D4_MODES[name]) for name, data in d4_assets.items()})
         assets.update({name: (data, DEBUG_MODES[name]) for name, data in debug_assets.items()})
+        if args.d5_health:
+            source = Path(__file__).resolve().parents[2] / "fw/d5/health.sh"
+            if has_symlink(source) or not source.is_file():
+                raise ValueError("D5 health source must be a regular file")
+            data = source.read_bytes()
+            if not 1 <= len(data) <= 16384 or b"\r" in data or not data.startswith(b"#!/bin/sh\n"):
+                raise ValueError("D5 health source must be bounded LF shell")
+            assets["health.sh"] = (data, 0o755)
         if has_symlink(idle.parent) or (idle.parent.exists() and not idle.parent.is_dir()):
             raise ValueError("c2m must be a nonsymlink directory")
         for name in assets:
@@ -720,6 +732,12 @@ def main() -> int:
         doc["debug_services"] = True
         doc["debug_owner_key_sha256"] = debug_owner["sha256"]
         doc["added"].extend(debug_added)
+    if args.d5_health:
+        data = assets["health.sh"][0]
+        doc["d5_health"] = True
+        doc["added"].append({"path": "/c2m/health.sh", "type": "reg", "mode": 0o755,
+                             "mode_oct": "0o755", "uid": 1001, "gid": 1001,
+                             "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     if d4_added or debug_added:
         with args.out_manifest.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(doc, indent=2))

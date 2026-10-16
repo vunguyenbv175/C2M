@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """WS3: Independent firmware validator (separate from the builder).
 
-Validates a candidate EN package against the package contract. Produces a
-human-readable (.md) and machine-readable (.json) report with verdict:
+Validates a candidate package against its base-profile package contract.
+Produces a human-readable (.md) and machine-readable (.json) report with
+verdict:
 
   VALID | INVALID | INCOMPLETE_EVIDENCE
 
@@ -19,14 +20,26 @@ Checks (package layer, no trust in builder internals):
   gap fill 0xFF | UNKNOWN tail exact match | byte accounting |
   adas_upgrade.sh SHA | protected-component hashes (--deep only)
 
-Protected EN components (--deep): cardv + adas SHA-256 re-extracted from the
+Protected components (--deep): cardv + adas SHA-256 re-extracted from the
 candidate's own rootfs/customer payloads (read-only UBIFS/cpio path).
+Selected by --base-profile (default "en"); the VI pins below were derived
+by read-only extraction from the exact trusted VI TAR
+(f28cad04...b081b8d3cfa), never from user-supplied hashes. There are no
+caller-supplied hash-override flags by design.
 Without --deep these rows are INCOMPLETE (validator says so explicitly).
 
 Usage:
   python3 tools/fw/validate_firmware.py --tar build/EN_REPACK_GOLDEN.tar \\
       --contract docs/firmware/EN_PACKAGE_CONTRACT.json \\
       --report-json build/validate_report.json --report-md build/validate_report.md [--deep]
+  python3 tools/fw/validate_firmware.py --tar <VI_candidate>.tar \\
+      --contract <private VI contract in build/work, never docs/> \\
+      --report-json build/work/validate_vi.json --report-md build/work/validate_vi.md \\
+      --deep --base-profile vi
+
+NOTE: package_contract.py output embeds vendor upgrade_script_text and raw
+tail bytes, so VI-derived contracts must stay in build/work (PRIVATE) and
+must never be committed under docs/.
 """
 from __future__ import annotations
 import argparse
@@ -40,11 +53,36 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 INNER = "SigmastarUpgradeSD_SSC8838G.bin"
 END_MARKER = b"% <- this is end of script symbol"
 
-# Golden protected-component hashes (EN baseline, independently verified).
-PROTECTED = {
+# Golden protected-component hashes, selected by --base-profile.
+# EN pins are the long-standing independently verified baseline (default).
+# VI pins were derived by read-only UBIFS/cpio extraction from the exact
+# trusted VI TAR (SHA-256 f28cad04...b081b8d3cfa); cardv matches the
+# previously recorded VI value, adas was extracted the same way. No
+# caller-supplied hash overrides exist by design.
+VI_TAR_SHA256 = "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa"
+PROTECTED_EN = {
     "cardv_sha256": "344b4a3fdc1cfbb13e6d1ee8a45cd2c9c99b8d63d1f90e8c193a1cc89a288a8c",
     "adas_sha256": "0dcc69828078e4e243b17ca9508d15ca6b47a3c2f6ec59d6c20bc5b5e9c94043",
 }
+PROTECTED_VI = {
+    "cardv_sha256": "56db44d98c9af96ef38319e95374e505a128010e91ff773d2c35843d4be9bf23",
+    "adas_sha256": "997b71c27edcd49c2b0465333f53274e73ec1086023af972a39a22dfa95527d1",
+}
+# Legacy name: exact EN baseline (backward compatible default).
+PROTECTED = PROTECTED_EN
+
+
+def protected_for_profile(name: str) -> dict:
+    """Return the hardcoded protected pins for a base profile.
+
+    Only "en" and "vi" exist; anything else fails closed. There is
+    deliberately no path for a caller to supply arbitrary hashes.
+    """
+    if name == "en":
+        return dict(PROTECTED_EN)
+    if name == "vi":
+        return dict(PROTECTED_VI)
+    raise ValueError(f"unknown base-profile: {name!r} (want 'en' or 'vi')")
 
 
 def sha256_bytes(d: bytes) -> str:
@@ -59,7 +97,16 @@ def main() -> int:
     ap.add_argument("--report-md", type=Path, required=True)
     ap.add_argument("--deep", action="store_true",
                     help="also re-extract cardv/adas from candidate payloads")
+    ap.add_argument("--base-profile", choices=("en", "vi"), default="en",
+                    help="base firmware profile selecting the hardcoded "
+                    "protected cardv/adas pins (default: en). Use 'vi' only "
+                    "with a VI-derived private contract (build/work, never "
+                    "docs/). No custom hash overrides exist.")
     args = ap.parse_args()
+    try:
+        protected = protected_for_profile(args.base_profile)
+    except ValueError as exc:
+        ap.error(str(exc))
 
     contract = json.loads(args.contract.read_text(encoding="utf-8"))
     rows: list[dict] = []
@@ -161,8 +208,8 @@ def main() -> int:
             if cardv is None:
                 check("protected.cardv", False, "cardv not found in candidate rootfs cpio")
             else:
-                check("protected.cardv", sha256_bytes(cardv) == PROTECTED["cardv_sha256"],
-                      f"cardv sha {sha256_bytes(cardv)[:16]}… vs golden {PROTECTED['cardv_sha256'][:16]}…")
+                check("protected.cardv", sha256_bytes(cardv) == protected["cardv_sha256"],
+                      f"cardv sha {sha256_bytes(cardv)[:16]}… vs golden {protected['cardv_sha256'][:16]}…")
             with tempfile.NamedTemporaryFile(delete=False, suffix=".customer.es") as f:
                 f.write(cust_blob)
                 tmp = Path(f.name)
@@ -170,8 +217,8 @@ def main() -> int:
                 adas, _ = ubifs_extract(tmp, "/minieye/adas/adas")
             finally:
                 tmp.unlink(missing_ok=True)
-            check("protected.adas", sha256_bytes(adas) == PROTECTED["adas_sha256"],
-                  f"adas sha {sha256_bytes(adas)[:16]}… vs golden {PROTECTED['adas_sha256'][:16]}…")
+            check("protected.adas", sha256_bytes(adas) == protected["adas_sha256"],
+                  f"adas sha {sha256_bytes(adas)[:16]}… vs golden {protected['adas_sha256'][:16]}…")
         except Exception as e:
             deep_incomplete.append(f"deep extraction failed: {e}")
             check("protected.deep", False, f"INCOMPLETE: {e}")
@@ -194,7 +241,8 @@ def _finish(args, rows, verdict: str, incomplete_notes: list[str]) -> int:
     doc = {"target": str(args.tar), "contract": str(args.contract),
            "verdict": verdict, "checks": rows,
            "incomplete_notes": incomplete_notes,
-           "protected_golden": PROTECTED}
+           "base_profile": args.base_profile,
+           "protected_golden": protected_for_profile(args.base_profile)}
     args.report_json.parent.mkdir(parents=True, exist_ok=True)
     args.report_json.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     md = [f"# Firmware validation report — `{verdict}`\n",
