@@ -86,7 +86,9 @@ class PortableProbeTests(unittest.TestCase):
         source = SOURCE.read_text(encoding="utf-8")
         for error in ("ap_nl80211_query_failed", "ap_name_missing_or_invalid",
                       "ap_type_missing_or_invalid", "ap_frequency_missing_or_invalid",
-                      "capability_nl80211_query_failed", "capability_proof_unavailable"):
+                      "capability_nl80211_query_failed", "capability_proof_unavailable",
+                      "capability_combinations_empty", "capability_combinations_unadvertised",
+                      "capability_missing_or_malformed"):
             self.assertIn('"' + error + '"', source)
         self.assertIn('w->supported = -1;', source)
         self.assertIn('STARTUP_PROBE_ATTEMPTS 30', source)
@@ -160,6 +162,18 @@ int main(void) {
     CHECK(capability_probe_result(&w, 0, &proof) == -1 && w.supported == -1);
     proof.replies = 1; proof.seen = 2;
     CHECK(capability_probe_result(&w, 0, &proof) == -1 && w.supported == -1);
+    proof.replies = 1; proof.seen = 1; proof.supported = 1;
+    proof.error = "capability_combinations_empty";
+    CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
+    CHECK(!strcmp(w.error, "capability_combinations_empty"));
+    CHECK(strcmp(probe_state(w.supported), "unsupported") != 0);
+    proof.error = "capability_combinations_unadvertised";
+    CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
+    CHECK(!strcmp(w.error, "capability_combinations_unadvertised"));
+    CHECK(strcmp(probe_state(w.supported), "unsupported") != 0);
+    memset(&proof, 0, sizeof(proof)); proof.replies = 1;
+    CHECK(capability_probe_result(&w, 0, &proof) == -1 && w.supported == -1);
+    CHECK(!strcmp(w.error, "capability_combinations_unadvertised"));
     memset(&w, 0, sizeof(w)); w.supported = -1; w.error = "ap_nl80211_query_failed";
     startup_probe_record(&w, 1000);
     CHECK(w.startup_probe_attempts == 1 && !strcmp(w.state, "unknown") && w.startup_probe_retry);
@@ -241,7 +255,11 @@ class WifiControlTests(unittest.TestCase):
                      "separate_combinations_not_combined", "shared_limit_one_blocked",
                      "missing_combinations_blocked", "missing_channels_blocked",
                      "valid_then_malformed_blocked", "duplicate_scalar_blocked",
-                     "beacon_constraint_unverified", "config_directive_injection_blocked"):
+                     "beacon_constraint_unverified", "config_directive_injection_blocked",
+                     "combinations_empty_blocked", "combinations_empty_propagated",
+                     "combinations_unadvertised_blocked", "combinations_unadvertised_propagated",
+                     "combinations_absent_fallback_error", "wiphy_valid_insufficient_is_no",
+                     "combinations_duplicate_malformed"):
             self.assertIn("PASS " + case, result.stdout)
         self.assertIn("self_test=passed", result.stdout)
         self.assertEqual(result.stderr, "")
@@ -378,6 +396,38 @@ int main(int argc, char **argv) {
         CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
         CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
         CHECK(!strcmp(w.error, "capability_proof_unavailable"));
+        /* Live bytes=0: top combinations attr present with zero payload. */
+        fixture_init(&m); CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 0) == 0);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_combinations_empty"));
+        CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
+        CHECK(!strcmp(w.error, "capability_combinations_empty"));
+        CHECK(strcmp(probe_state(w.supported), "unsupported") != 0);
+        /* Valid reply with no combinations attr: unadvertised unknown. */
+        fixture_init(&m); CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_combinations_unadvertised"));
+        CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
+        CHECK(!strcmp(w.error, "capability_combinations_unadvertised"));
+        CHECK(strcmp(probe_state(w.supported), "unsupported") != 0);
+        /* Defensive fallback without callback error stays unadvertised. */
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180; proof.replies = 1;
+        CHECK(capability_probe_result(&w, 0, &proof) == -1 && w.supported == -1);
+        CHECK(!strcmp(w.error, "capability_combinations_unadvertised"));
+        /* Duplicate combinations attr stays malformed unknown. */
+        fixture_init(&m); CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 0) == 0);
+        combo = fixture_begin(&m, NL80211_ATTR_INTERFACE_COMBINATIONS);
+        fixture_combo(&m, 1, 1, 1, 0, 2, 1, 1); fixture_end(&m, combo);
+        combo = fixture_begin(&m, NL80211_ATTR_INTERFACE_COMBINATIONS);
+        fixture_combo(&m, 2, 1, 1, 0, 2, 1, 1); fixture_end(&m, combo);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 2412;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_missing_or_malformed"));
+        CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
+        CHECK(!strcmp(w.error, "capability_missing_or_malformed"));
 
         memset(&w, 0, sizeof(w)); w.supported = -1; w.error = "ap_nl80211_query_failed";
         startup_probe_record(&w, 1000);

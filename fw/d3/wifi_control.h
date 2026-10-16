@@ -31,7 +31,11 @@
  * capacity for one AP and one managed interface, total >=2 and channels >=1.
  * Current wlan0 frequency is mandatory, including for one-channel hardware.
  * Missing/malformed capabilities and any existing c2msta0 fail closed and are
- * reported as unknown, never as physical hardware absence. A complete valid
+ * reported as unknown, never as physical hardware absence. An advertised but
+ * zero-payload combinations attr reports capability_combinations_empty and a
+ * valid reply with no combinations attr reports
+ * capability_combinations_unadvertised; both stay sta_supported=unknown and
+ * never authorize VIF/association. A complete valid
  * combination that lacks AP+managed capacity is the only sta_supported=no
  * result. For association the controller additionally refuses other
  * interfaces on the AP PHY, creates ONLY its own c2msta0, restricts

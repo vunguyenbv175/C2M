@@ -397,7 +397,8 @@ class LocalhostTests(unittest.TestCase):
     def test_controller_observation_errors_are_explicit_not_hardware_absence(self) -> None:
         errors = ("ap_nl80211_query_failed", "ap_name_missing_or_invalid",
                   "ap_type_missing_or_invalid", "ap_frequency_missing_or_invalid",
-                  "capability_missing_or_malformed", "capability_nl80211_query_failed",
+                  "capability_missing_or_malformed", "capability_combinations_empty",
+                  "capability_combinations_unadvertised", "capability_nl80211_query_failed",
                   "capability_proof_unavailable")
         for error in errors:
             with self.subTest(error=error):

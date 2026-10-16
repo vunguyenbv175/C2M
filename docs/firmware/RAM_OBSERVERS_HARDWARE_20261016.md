@@ -97,7 +97,10 @@ Final AP HTTP returned `ap_active=true`; SSH listener remained in its normal
 finite window. Recording status was1, new video segment filenames/metadata
 advanced, and stock `cardv`, ADAS and lane workers were present. This supports
 continued operation but is not decoded-video/audio/calibration acceptance.
-No audio/warning/M4 control or second cardv `:8080` observer was used.
+No audio/warning/M4 control or second cardv `:8080` observer was used. After
+the probes and final read-only checks, the owner explicitly confirmed that
+app/live view, recording and Vietnamese ADAS were still normal. Camera access
+was stopped before local driver/source analysis.
 
 Next tasks:
 

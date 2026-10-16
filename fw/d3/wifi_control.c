@@ -362,8 +362,17 @@ static int wiphy_reply(int cmd, const void *p, size_t n, void *out) {
                 r->error = "capability_missing_or_malformed"; return -1;
             }
         } else if (a.type == NL80211_ATTR_INTERFACE_COMBINATIONS) {
+            if (r->seen++) {
+                r->error = "capability_missing_or_malformed"; return -1;
+            }
+            /* Top attr present with zero payload: driver sent the header
+             * but no combination bytes (live: bytes=0). Unknown, never a
+             * hardware-absence proof and never VIF/association evidence. */
+            if (!a.n) {
+                r->error = "capability_combinations_empty"; return -1;
+            }
             result = prove_combinations(a.p, a.n, r->freq);
-            if (r->seen++ || result == PROOF_MALFORMED) {
+            if (result == PROOF_MALFORMED) {
                 r->error = "capability_missing_or_malformed"; return -1;
             }
             if (result == PROOF_UNVERIFIED) {
@@ -374,6 +383,11 @@ static int wiphy_reply(int cmd, const void *p, size_t n, void *out) {
     }
     if (it.bad || !have_phy || phy != r->phy) {
         r->error = "capability_missing_or_malformed"; return -1;
+    }
+    /* Valid reply with no combinations attr at all: unadvertised.
+     * Unknown, never hardware-absence proof. */
+    if (!r->seen) {
+        r->error = "capability_combinations_unadvertised"; return -1;
     }
     return 0;
 }
@@ -390,8 +404,11 @@ static const char *ap_probe_error(int result, const struct iface *ap) {
 static int capability_probe_result(struct worker *w, int query_failed, const struct proof *r) {
     w->supported = -1;
     if (query_failed || r->error || r->replies != 1 || r->seen != 1) {
-        w->error = r->error ? r->error : query_failed ? "capability_nl80211_query_failed" :
-            "capability_missing_or_malformed";
+        if (r->error) w->error = r->error;
+        else if (query_failed) w->error = "capability_nl80211_query_failed";
+        else if (r->replies == 1 && !r->seen)
+            w->error = "capability_combinations_unadvertised";
+        else w->error = "capability_missing_or_malformed";
         return -1;
     }
     if (r->supported != 0 && r->supported != 1) { w->error = "capability_proof_unavailable"; return -1; }
@@ -894,10 +911,20 @@ static int test_result(const char *name, int actual, int expected) {
     if (actual != expected) { fprintf(stderr, "FAIL %s: %d != %d\n", name, actual, expected); return 1; }
     printf("PASS %s\n", name); return 0;
 }
+static int test_str(const char *name, const char *actual, const char *expected) {
+    if (!actual || strcmp(actual, expected)) {
+        fprintf(stderr, "FAIL %s: %s != %s\n", name, actual ? actual : "(null)", expected);
+        return 1;
+    }
+    printf("PASS %s\n", name); return 0;
+}
 int c2m_wifi_self_test(void) {
     struct msg m;
     struct nlattr bad;
     struct iface v;
+    struct proof proof;
+    struct worker worker;
+    size_t combo_outer;
     char config[512], ssid[65], psk[65];
     int failures = 0;
     fixture_init(&m); fixture_combo(&m, 1, 1, 1, 0, 2, 1, 1);
@@ -935,6 +962,54 @@ int c2m_wifi_self_test(void) {
     failures += test_result("private_config_subset", parse_config(config, ssid, psk), 0);
     snprintf(config, sizeof(config), "network={\nssid=74657374\npsk=%064d\n}\nctrl_interface=/tmp/public\n", 0);
     failures += test_result("config_directive_injection_blocked", parse_config(config, ssid, psk), -1);
+    /* Empty top combinations attr (live bytes=0) is unknown, not malformed. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_empty_blocked", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_empty_error", proof.error, "capability_combinations_empty");
+    memset(&worker, 0, sizeof(worker)); worker.supported = 1;
+    failures += test_result("combinations_empty_unknown", capability_probe_result(&worker, 1, &proof), -1);
+    failures += test_result("combinations_empty_stays_unknown", worker.supported, -1);
+    failures += test_str("combinations_empty_propagated", worker.error, "capability_combinations_empty");
+    /* Valid reply with no combinations attr at all is unadvertised unknown. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_unadvertised_blocked", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_unadvertised_error", proof.error, "capability_combinations_unadvertised");
+    memset(&worker, 0, sizeof(worker)); worker.supported = 1;
+    failures += test_result("combinations_unadvertised_unknown", capability_probe_result(&worker, 1, &proof), -1);
+    failures += test_result("combinations_unadvertised_stays_unknown", worker.supported, -1);
+    failures += test_str("combinations_unadvertised_propagated", worker.error, "capability_combinations_unadvertised");
+    /* Defensive fallback without a callback error stays unadvertised unknown. */
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180; proof.replies = 1;
+    memset(&worker, 0, sizeof(worker)); worker.supported = 1;
+    failures += test_result("combinations_absent_fallback_unknown", capability_probe_result(&worker, 0, &proof), -1);
+    failures += test_result("combinations_absent_fallback_stays_unknown", worker.supported, -1);
+    failures += test_str("combinations_absent_fallback_error", worker.error, "capability_combinations_unadvertised");
+    /* A complete valid combination without AP+STA capacity is still the only no. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    combo_outer = fixture_begin(&m, NL80211_ATTR_INTERFACE_COMBINATIONS);
+    fixture_combo(&m, 1, 1, 1, 0, 1, 1, 1); fixture_end(&m, combo_outer);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("wiphy_valid_insufficient_ok", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), 0);
+    memset(&worker, 0, sizeof(worker)); worker.supported = -1;
+    failures += test_result("wiphy_valid_insufficient_no", capability_probe_result(&worker, 0, &proof), -1);
+    failures += test_result("wiphy_valid_insufficient_is_no", worker.supported, 0);
+    /* Duplicate combinations attr stays malformed unknown, never empty/no. */
+    /* Rebuild a valid-then-duplicate payload explicitly. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    combo_outer = fixture_begin(&m, NL80211_ATTR_INTERFACE_COMBINATIONS);
+    fixture_combo(&m, 1, 1, 1, 0, 2, 1, 1); fixture_end(&m, combo_outer);
+    combo_outer = fixture_begin(&m, NL80211_ATTR_INTERFACE_COMBINATIONS);
+    fixture_combo(&m, 2, 1, 1, 0, 2, 1, 1); fixture_end(&m, combo_outer);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_duplicate_malformed", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_duplicate_error", proof.error, "capability_missing_or_malformed");
     wipe(config, sizeof(config)); wipe(psk, sizeof(psk)); wipe(ssid, sizeof(ssid));
     printf("self_test=%s\n", failures ? "failed" : "passed"); return failures ? 1 : 0;
 }
