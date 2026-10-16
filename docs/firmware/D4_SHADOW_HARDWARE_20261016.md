@@ -81,7 +81,10 @@ UTC), and the exact existing freshness rejection branch. These are a proposed
 local diagnostic improvement, not new evidence explaining this run or license
 to weaken the gate. A later local implementation is documented in
 `D4_SHADOW_DIAGNOSTICS_20261016.md`; it adds no explanation retrospectively to
-these samples. No additional hardware test is requested by this report.
+these samples. A later separately notified v2 hardware run is recorded in
+`D4_SHADOW_V2_HARDWARE_20261016.md`: GPS10/10 valid, ready/fresh at2–10, no stale
+reproduced. It does not establish the cause of the earlier samples. No
+additional hardware test is requested by this report.
 
 ## Complete split-wiphy observation
 

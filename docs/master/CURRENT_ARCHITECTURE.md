@@ -70,8 +70,11 @@ UART control was used in those diagnostics.
   is not stable corrected runtime or deployment; see
   `../firmware/D4_SHADOW_HARDWARE_20261016.md`. Same-poll diagnostic shadow v2
   later passed Linux/Chrome and exact stock ARM/QEMU (`38842722272` attempt2 /
-  `38842731209`), with local4/4 bundle readback; v2 is not hardware-executed.
-  See `../firmware/D4_SHADOW_DIAGNOSTICS_20261016.md`.
+  `38842731209`), with local4/4 bundle readback. V2 then completed one notified
+  hardware run:10/10 GPS reads OK, fresh/ready at2–10, no stale reproduced.
+  This does not explain the old transient or establish continuous reliability.
+  Installed D4 remains old and untouched; owner confirmed original functions
+  normal. See `../firmware/D4_SHADOW_V2_HARDWARE_20261016.md`.
 - AP+STA remains UNKNOWN: single/ordinary wiphy query advertises an empty
   interface-combinations payload. Exact RTL8821CS module has VIF code but no
   proven safe concurrent runtime. Do not force STA at the cost of AP.

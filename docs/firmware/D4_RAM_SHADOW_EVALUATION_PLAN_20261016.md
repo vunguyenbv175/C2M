@@ -17,9 +17,11 @@ build. Output labels simulated delivery, actual completed sample count and
 completion reason. Signals/errors cannot report full success. The stock-QEMU
 shipping-binary no-DB/sentinel gate and exact report-to-binary packaging gate
 passed in manual CI `38836577606` on source `a7cf680` (observer v1).
-Later local v2 same-poll diagnostics are tracked separately in
+Later v2 same-poll diagnostics are tracked separately in
 `D4_SHADOW_DIAGNOSTICS_20261016.md`; v1 build/hardware proof must not be
-attributed to the changed v2 binary.
+attributed to the changed v2 binary. V2 subsequently passed its own gates
+and completed one notified live run with10/10 valid reads, fresh at2–10;
+see `D4_SHADOW_V2_HARDWARE_20261016.md`. The earlier stale cause remains unknown.
 
 ## Verified delivery and evidence limits
 

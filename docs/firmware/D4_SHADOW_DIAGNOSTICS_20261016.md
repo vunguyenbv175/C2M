@@ -140,7 +140,8 @@ the live channel. Explicit hardware mode additionally requires a new notified
 parked/healthy owner confirmation and freshly discovered camera-facing IPv4.
 The helper rechecks UUID and strict SSH host pin before each live command.
 
-Reviewed hardware sequence, **not executed**:
+Reviewed hardware sequence (initially local-only; later executed once in the
+separately notified session documented below):
 
 - Read-only preflight debug/AP bind, tmpfs, installed producer and private DB
   hashes, recorder/ADAS presence/status and one producer PID.
@@ -158,7 +159,15 @@ checks passed. Parser used exact private QEMU stdout plus **simulated** wrapper
 lifecycle markers, not hardware evidence. Proof:
 `build/ram-debug-r38842731209/v2_runner_local_checks.json`.
 
-No v2 binary has been hardware-executed and no camera access occurred during
-this preparation. A passing build is not target acceptance. Notify owner
-before any new stationary camera session; no flash, installed D4 change,
-audio/browser beep, AP/STA operation or cardv/M4 observer is needed for it.
+No camera access occurred during build/retrieval/preparation. Subsequently,
+after a separately notified reconnection and explicit owner parked/healthy
+confirmation, the exact v2 shadow completed one live10-sample run: DB valid12708,
+GPS10/10 OK, warming_up at1 then ready/fresh/advancing at2–10, no active event.
+Cleanup and unchanged installed producer/DB were verified; owner confirmed
+original functions still normal. See `D4_SHADOW_V2_HARDWARE_20261016.md`.
+The earlier transient stale did not reproduce and remains unexplained; this is
+not continuous stability, real advisory, web/beep or deployment acceptance.
+
+Hardware access is stopped. Notify owner before any new stationary camera
+session; no flash, installed D4 change, audio/browser beep, AP/STA operation
+or cardv/M4 observer is authorized by the completed diagnostic result.
