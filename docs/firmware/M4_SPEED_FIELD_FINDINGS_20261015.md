@@ -12,8 +12,12 @@ renderer lacks or cannot support a widget. It is not a failure of the2D mode.
 On2026-10-16 the owner supplied2D/3D photos plus advertising illustrations and
 clarified that **a top warning bar does exist, appearing during warnings; the
 main value seen is collision-related seconds/countdown**. A photo with the bar
-hidden does not prove a missing bar or broken layout. Do not identify the
-advertising `0.5` as vehicle speed. See `M4_OWNER_VISUAL_FINDINGS_20261016.md`.
+hidden does not prove a missing bar or broken layout. A later annotated ad
+labels `0.5` “Chỉ số khoảng cách an toàn”; owner confirms collision-related
+seconds, not vehicle speed. Exact native TTC/headway mapping remains unknown.
+M4 has one top button for2D/3D switching and no reported version-menu access;
+do not request hidden-menu/long-press/reset experiments. See
+`M4_OWNER_VISUAL_FINDINGS_20261016.md`.
 
 This narrows the missing behavior to the 3D presentation path, but does not by
 itself prove which process draws the 2D digits. They may be camera-burned video
@@ -101,12 +105,14 @@ camera firmware and host-side `M4Adapter` scaffold are not M4 UI firmware.
 `C2M_HW_20261012/07_m4/` has no physical-link capture; synthetic fixtures do
 not count as one. The actual component rendering 3D remains unverified.
 
-Needed next: identify the physical M4 model/firmware and obtain either a
-verified stock layout control, or the matching renderer image/source with a
-safe update/recovery path. Photos of the same screen in 2D and 3D plus its
-model/version information are the lowest-risk first evidence. A comparison
-with an existing recorded clip can help distinguish video-burned OSD from a
-screen-only overlay; no moving-vehicle test or live connection is required.
+Needed next: identify the actual renderer/receiver and obtain a verified stock
+speed/sign display control or matching renderer documentation/source. A renderer
+update is not assumed necessary; any later update would need its own proven
+recovery path. Owner has now supplied2D/3D photos and confirmed the single top
+button only switches modes; no version menu is reported, so stop asking for
+one and keep M4 version UNKNOWN. Continue offline from known firmware/sender
+paths. An existing recorded clip could distinguish video-burned OSD from a
+screen-only overlay without inducing warnings or another camera session.
 
 Owner has disconnected camera Wi-Fi and asked to be notified before it is
 needed again. Continue offline; no further camera probes until explicitly

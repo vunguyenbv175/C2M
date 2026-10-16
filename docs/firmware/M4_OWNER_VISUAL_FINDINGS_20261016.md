@@ -30,13 +30,26 @@ collision warning or moving-vehicle test is requested to demonstrate it.
 | Owner image2,3D | Own-car graphic and forward blue region on light background; no warning bar visible in this snapshot | Permanent lack of a bar, lack of all live ADAS data, renderer ownership or missing pixels |
 | Owner later clarification | Top bar appears for warnings; owner mainly sees collision-related seconds/countdown | Exact native field, units/rounding/validity mapping, or whether it is formally TTC versus another warning metric |
 | Owner historical2D/3D report |2D shows vehicle speed; owner has never seen vehicle speed or a sign in3D | A speed/sign widget disabled in settings versus absent support, missing input or another conditional display policy |
-| Advertising images3–4 | Illustrations have orange bars, vehicle/pedestrian/lane-like symbols, numeral `0.5`, and circular40/60 badges | Current owner's model/version supports those elements, live recognition, field meanings, units, event lifetime or actual operating footage |
+| Advertising images3–4 | Illustrations have orange bars, vehicle/pedestrian/lane-like symbols, numeral `0.5`, and circular40/60 badges | Current owner's model/version supports those elements, live recognition, native field mappings, units, event lifetime or actual operating footage |
+| Later annotated advertising image5 plus owner explanation | `0.5` is labelled “Chỉ số khoảng cách an toàn”; owner identifies collision-related seconds, not vehicle speed | Native TTC versus headway mapping; vehicle-speed support in3D or real sign display |
 
-Do not label advertising `0.5` as vehicle speed. The later report of a
-collision countdown makes a warning-related value plausible, but does not map
-the illustration to any native field. Circular numbered badge artwork is a
-reason to investigate intended sign/limit display, not evidence of working TSR
-on this unit, an installed widget or a supported injection command.
+Owner subsequently supplied a fifth, annotated advertising illustration.
+Its arrow explicitly labels the `0.5` field **“Chỉ số khoảng cách an toàn”**
+(safe-distance indicator). Owner states this is the collision countdown in
+seconds, not vehicle speed. This establishes the advertised UI role as a
+safety/following-distance warning value; do not retain vehicle speed as an
+alternative interpretation of that numeral.
+
+The image/owner explanation does not yet map the field to native `ttc`,
+`headway` or another scalar, including exact units/rounding/validity/lifetime.
+Time-to-collision and time headway are different quantities; do not equate
+these internal fields merely from a marketing label. This protocol distinction
+does not reopen the resolved question of whether `0.5` denotes vehicle speed.
+
+The annotated illustration does not demonstrate a vehicle-speed widget in3D.
+Circular40/60 badge artwork in the earlier advertisements remains separate:
+it is a reason to investigate intended sign/limit display, not evidence of
+working TSR on this unit, an installed widget or a supported injection command.
 
 ## Separate feature questions
 
@@ -61,15 +74,24 @@ control, matching M4 renderer/layout assets or M4 update package. Existing
 These are limits of the recovered material, not proof of hardware incapability
 or that changing M4 firmware is necessary. No production code was changed.
 
-## Lowest-risk next evidence
+## Physical control and missing identity evidence
 
-Actual M4 model and firmware/software version, if exposed by an existing normal
-menu or an easily visible label, are the most useful missing identifiers for
-matching documentation/assets to the advertising. Camera firmware version alone
-is not necessarily the M4 renderer version. An original advertising product
-link/claimed model can help distinguish model-specific promises from generic
-illustrations. No disassembly, reset, calibration, flash or device query is
-needed for those facts. If there is no version page, record it as unknown.
+Owner clarified that the M4 has **one button on top**, used to switch between
+the two screen types (2D live video and3D ADAS). No settings/version menu is
+reported. Stop requesting a version page that the owner has no known way to
+access. M4 firmware/software version remains UNKNOWN, not inferred from camera
+firmware, advertising or exterior shape. The normal physical toggle is proven
+by owner use; its internal message/renderer implementation is still unverified.
+
+Do not try guessed long-press/double-press/hidden-menu sequences, reset, remove
+the screen or alter calibration to obtain identity information. No assumption
+that the button enables speed/sign widgets or maps to `ScreenModeSet/theme`.
+
+Continue the offline investigation with the exact camera firmware, known
+sender paths and available documentation. An original advertising product
+link/claimed model or an already-visible label would be optional corroborating
+identity evidence, not a prerequisite requiring hardware manipulation. Camera
+firmware version alone is not necessarily the M4 renderer version.
 
 A photo/video of the bar when it occurs naturally can later help distinguish
 warning values from speed/sign output, but do not create a hazard or ask the

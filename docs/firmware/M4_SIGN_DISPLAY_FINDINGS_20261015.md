@@ -124,11 +124,15 @@ OSD will fix it” nor “M4 firmware must be replaced” is yet proven.
   correlated with it, removal on stale/lost input, bounded repetition, and
   intact recording/ADAS. No deliberate speeding or hazardous warning induction.
 
-Lowest-risk next evidence is photos of the 2D/3D layouts and M4 model/version
-information, followed by matching renderer documentation/image or a genuinely
-non-competing native-link observation. No Wi-Fi connection is needed for
-those initial photos/version details. Keep license/calibration IDs, precise
-GPS coordinates and Wi-Fi credentials out of public photos/reports.
+Owner has now supplied2D/3D photos and advertising examples. A later annotated
+ad identifies `0.5` as “Chỉ số khoảng cách an toàn”, not vehicle speed; owner
+reports a collision-related countdown. M4 has a single top button switching2D
+and3D, with no reported settings/version menu. Do not keep requesting a version
+page or guess hidden button sequences; retain M4 version UNKNOWN. Continue
+offline with exact firmware/sender evidence and matching renderer documentation
+if available. Any later native-link observation must be genuinely non-competing
+and separately authorized. Keep license/calibration IDs, precise GPS coordinates
+and Wi-Fi credentials out of public photos/reports.
 
 For a later owner-approved physical test, record separately: observed real
 sign class/value; native decoded result and freshness; visible M4 icon/value
