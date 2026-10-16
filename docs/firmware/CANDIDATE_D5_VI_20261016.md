@@ -59,6 +59,17 @@ pins exactly (loader/libc/libm/libgcc). The D5 workflow must recheck these from
 the pinned VI archive, never substitute EN sysroot bytes. Matching userspace
 ABI plus QEMU tests do not prove hardware/kernel/ADAS functionality.
 
+First D5 CI38898326900 stopped at no-op rebuild because the legacy tool
+uniformly chowned EN1001:1001 onto mixed VI1000/1001 files. This failed result
+is retained. Rebuild now applies per-entry stock ownership, including explicit
+root inode1 (VI1000:1000/0755), instead of weakening manifest comparisons.
+Exact VI `/tmp` and config ancestry tuples were also added to the isolated
+services; the production producer must run its QEMU fixture with VI `/tmp`
+1000:1000/0755 rather than normalize it to root1777. No target permissions
+are changed to satisfy these checks. The default D4 branch's concurrent120-
+minute listener change is retained; D5 still selects the separate lifetime
+edition. None of these offline checks diagnoses the previous ADAS symptom.
+
 ## Validation and release boundaries
 
 Required: VI input pin, derived PRIVATE package contract, no-op customer rebuild,

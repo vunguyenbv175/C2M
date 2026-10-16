@@ -81,12 +81,27 @@ static int directory_ok(const struct stat *s, const char *prefix, int fixture)
 {
     mode_t mode = s->st_mode & 07777;
     if (!S_ISDIR(s->st_mode)) return 0;
-    /* The only writable shared ancestry exception is sticky, root /tmp.
-     * Its children still need no-follow/type/owner checks. */
-    if (!strcmp(prefix, "/tmp")) return s->st_uid == 0 && mode == 01777;
+    /* Exact stock ancestry trust (verified raw cpio facts; never chmod here).
+     * EN /tmp is 0775 1001:1001; VI /tmp,/var,/customer is 0755 1000:1000;
+     * live tmpfs /tmp is root sticky 01777 (likely 0755 root observed).
+     * Only these exact path+uid+gid+mode tuples are trusted as shared
+     * ancestors; there is NO generic uid-1000/1001 writable trust and gid
+     * is always checked. Children still need no-follow/type/owner checks. */
+    if (!strcmp(prefix, "/tmp")) {
+        if (s->st_uid == 0 && s->st_gid == 0 &&
+            (mode == 01777 || mode == 0755)) return 1;
+        if (s->st_uid == 1001 && s->st_gid == 1001 && mode == 0775)
+            return 1; /* EN cpio fact, preserved */
+        if (s->st_uid == 1000 && s->st_gid == 1000 && mode == 0755)
+            return 1; /* VI cpio fact */
+        return 0; /* exact /tmp branch never takes a fixture override */
+    }
     if (s->st_uid == 0 && !(mode & 0022)) return 1;
-    if (s->st_uid == 1001 && mode == 0755 &&
-        (!strcmp(prefix, "/customer") || !strcmp(prefix, "/customer/c2m"))) return 1;
+    if (mode == 0755 && !strcmp(prefix, "/customer") &&
+        ((s->st_uid == 1001 && s->st_gid == 1001) ||
+         (s->st_uid == 1000 && s->st_gid == 1000))) return 1;
+    if (s->st_uid == 1001 && s->st_gid == 1001 && mode == 0755 &&
+        !strcmp(prefix, "/customer/c2m")) return 1;
     return fixture && s->st_uid == geteuid() && !(mode & 0022);
 }
 

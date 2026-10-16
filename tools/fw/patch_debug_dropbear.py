@@ -3,12 +3,16 @@
 
 1. Keep MULTIUSER enabled for normal Linux, but restrict login to server UID.
 2. Permit only the exact known /tmp ancestor policy used by the supervisor:
-   root-owned sticky /tmp, or stock EN /tmp mode0775 uid/gid1001. Every
-   private child and authorized_keys file retains upstream permission checks.
+   root-owned sticky /tmp, stock EN /tmp mode0775 uid/gid1001, or fresh
+   actual VI raw-cpio /tmp mode0755 uid/gid1000 (exact pair only; 0755
+   carries no group/other-write bit so the PERM mask needs no new
+   exception). Every private child and authorized_keys file retains
+   upstream permission checks.
 
 No account/shell, key signature, group or privilege checks are bypassed.
-The vendor UID1001 trust is inherited from root-run stock firmware, NOT a
-hardened security boundary against a hostile local vendor-UID process.
+The vendor UID1000/1001 trust is inherited from root-run stock firmware,
+NOT a hardened security boundary against a hostile local vendor-UID
+process. No generic UID1000 trust beyond the exact /tmp 0755 entry.
 """
 from pathlib import Path
 import argparse
@@ -27,8 +31,10 @@ OWNER_OLD = '''if (filestat.st_uid != ses.authstate.pw_uid
 OWNER_NEW = '''if (filestat.st_uid != ses.authstate.pw_uid
 \t\t\t&& filestat.st_uid != 0 &&
 \t\t\t!(strcmp(filename, "/tmp") == 0 && S_ISDIR(filestat.st_mode) &&
-\t\t\t  filestat.st_uid == 1001 && filestat.st_gid == 1001 &&
-\t\t\t  (filestat.st_mode & 07777) == 0775)) {'''
+\t\t\t  ((filestat.st_uid == 1001 && filestat.st_gid == 1001 &&
+\t\t\t    (filestat.st_mode & 07777) == 0775) ||
+\t\t\t   (filestat.st_uid == 1000 && filestat.st_gid == 1000 &&
+\t\t\t    (filestat.st_mode & 07777) == 0755)))) {'''
 
 
 def apply(source: Path) -> None:

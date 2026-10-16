@@ -53,19 +53,23 @@
  * skipped, never unlinked (only the unique name this call reserved is
  * ever removed). Never touches stock hostkeys or /etc/passwd|shadow|ssh.
  *
- * Stock-ancestor trust policy (actual EN rootfs cpio facts, parent doc:
- *   /tmp, /var, /customer at 0775 1001:1001; / has no entry so kernel
+ * Stock-ancestor trust policy (actual rootfs cpio facts, parent doc:
+ *   EN: /tmp, /var, /customer at 0775 1001:1001; fresh actual VI raw cpio:
+ *   /tmp, /var, /customer at 0755 1000:1000; / has no entry so kernel
  *   default 0755 root:root; customer UBIFS flashes /customer as 0755):
  *   exact known paths /, /tmp, /var, /customer, /customer/minieye,
- *   /customer/minieye/config: /tmp,/var,/customer accept 0775 1001:1001
- *   or 0755 root; /customer additionally 0755 known set (UBIFS fact);
+ *   /customer/minieye/config: /tmp,/var accept 0775 1001:1001 (EN fact),
+ *   0755 root, or exactly 0755 1000:1000 (VI raw cpio fact); /customer
+ *   accepts 0775 1001:1001 or 0755 known set (UBIFS fact + VI fact);
  *   minieye/config 0755/0775 known set; plus the exact package path
  *   /customer/c2m with uid/gid exactly 1001:1001 and mode exactly 0755
  *   (dropbear/dropbearkey/owner-pub install dir; no group/other writes).
  *   These stock UIDs run all
  *   vendor code and are trusted exactly like root-run vendor code here;
- *   they are NOT a security boundary against an arbitrary uid-1001
- *   process: package-asset checks (dropbear/dropbearkey/owner pub) stay
+ *   they are NOT a security boundary against an arbitrary uid-1000/1001
+ *   process: no generic UID-1000 trust beyond the exact /tmp+/var 0755
+ *   entries (plus pre-existing known-set 0755 branches); package-asset
+ *   checks (dropbear/dropbearkey/owner pub) stay
  *   exact (uid 0, euid, or the exact 1000:1000 / 1001:1001 pair, single
  *   link, regular, no group/other writes). Ancestors are always walked
  *   with O_NOFOLLOW (safe_dir, also applied to asset/key parent dirs);
@@ -169,10 +173,11 @@ int c2m_debug_cli_valid(int loopback, int any_override, const char *bind,
                         int port, int window_sec, int poll_ms);
 /* Pure stock-ancestor table: exact path + uid/gid/mode integers (0755 and
  * 0775 passed as octal literals). Returns nonzero when the ancestor is a
- * known stock fact: / at 0755 root; /tmp,/var at 0775 1001:1001 (actual
- * cpio) or 0755 root; /customer at 0775 1001:1001 (actual cpio) or 0755
- * (UBIFS flash fact + legacy set); minieye/config at 0755/0775 known set;
- * /customer/c2m exact 1001:1001 0755. No filesystem I/O. */
+ * known stock fact: / at 0755 root; /tmp,/var at 0775 1001:1001 (EN cpio),
+ * 0755 root, or exactly 0755 1000:1000 (VI raw cpio); /customer at 0775
+ * 1001:1001 (EN cpio) or 0755 known set (UBIFS flash + VI fact + legacy);
+ * minieye/config at 0755/0775 known set; /customer/c2m exact 1001:1001
+ * 0755. No filesystem I/O. */
 int c2m_debug_stock_path_ok(const char *path, unsigned uid, unsigned gid,
                             unsigned mode);
 

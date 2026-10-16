@@ -80,7 +80,19 @@ def build_manifest(image_path: Path) -> dict:
     nodes = scan_nodes(image)
     entries = path_index(latest_dentries(nodes))
     inodes = latest_inodes(nodes)
-    rows = []
+    root_meta = inodes.get(1)
+    if root_meta is None:
+        raise SystemExit("manifest: root inode metadata missing (ino 1)")
+    if ((root_meta["mode"] >> 12) & 0o17) != 0o4:
+        raise SystemExit("manifest: root inode must be dir (ino 1)")
+    rows = [{
+        "path": "/", "inode": 1, "type": "dir",
+        "mode": root_meta["mode"] & 0o7777,
+        "mode_oct": oct(root_meta["mode"] & 0o7777),
+        "uid": root_meta["uid"], "gid": root_meta["gid"],
+        "size": root_meta["size"], "mtime": root_meta["mtime"],
+        "ctime_info": root_meta["ctime"], "atime_info": root_meta["atime"],
+    }]
     reg_jobs = [(int(entries[p]["target"]), inodes[int(entries[p]["target"])]["size"])
                 for p in sorted(entries)
                 if inodes.get(int(entries[p]["target"])) is not None

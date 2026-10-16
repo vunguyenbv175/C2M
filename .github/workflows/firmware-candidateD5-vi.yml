@@ -90,6 +90,9 @@ jobs:
             exit 1
           fi
           cat work/tsr_experiment_tests.txt
+          python3 tests/test_tree_ownership.py
+          python3 tests/test_d4_stock_paths.py
+          python3 tests/test_d3_vi_paths.py
           cp fw/tsr/tsr_profile_boot.sh work/tsr_profile_boot.sh
           sha256sum work/tsr_profile_boot.sh > work/tsr_profile_boot.sha256
       - name: Fetch VI TAR + exact VI audio + private D4 subset + debug owner pub and verify independent pins (GATE)
@@ -503,7 +506,7 @@ jobs:
           # separate reviewed change; do not silently profile-allow here.
           sudo timeout 60 python3 tools/fw/test_ram_d4_stock_qemu.py \
             --binary work/d4-services/c2m-signs --sysroot work/sysroot \
-            --report work/d5_gps_runtime.json
+            --report work/d5_gps_runtime.json --tmp-profile vi
           cat work/d5_gps_runtime.json
           python3 - <<'EOF'
           import json
@@ -780,6 +783,9 @@ jobs:
           "$PWD/work/stock-sh" -n work/tree/c2m/health.sh
           sha256sum tools/fw/test_d5_health.py fw/d5/health.sh \
             tools/fw/test_ram_d4_stock_qemu.py tools/fw/mutate_customer.py \
+            tools/fw/apply_tree_ownership.py tools/fw/ubifs_manifest.py tools/fw/rebuild_customer.sh \
+            tools/fw/verify_b_manifest.py tools/fw/restore_vi_base.py \
+            tests/test_tree_ownership.py tests/test_d4_stock_paths.py tests/test_d3_vi_paths.py \
             .github/workflows/firmware-candidateD5-vi.yml > work/d5_test_source.sha256
           cat work/d5_test_source.sha256
           sudo bash tools/fw/rebuild_customer.sh --mode mutated \
@@ -1094,3 +1100,14 @@ jobs:
             release/c2m-flash/BUILD_EVIDENCE/d5_health.sha256
             release/c2m-flash/FLASH_README.txt
             release/c2m-flash/SHA256SUMS.txt
+      - name: Show bounded safe test logs on failure
+        if: failure()
+        run: |
+          for f in work/d3_build_tests.txt work/d4_build_tests.txt work/debug_build_tests.txt work/d5_health_tests.txt; do
+            if [ -f "$f" ]; then tail -c 32000 "$f"; fi
+          done
+      - name: Cleanup private runtime and vault credentials
+        if: always()
+        run: |
+          rm -f ~/.ssh/fw_vault ~/.ssh/fw_vault_push
+          sudo rm -rf /tmp/fw-vault /tmp/vault-out work/sysroot

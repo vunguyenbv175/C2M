@@ -23,13 +23,20 @@ esac; done
 [ "$MODE" = "noop" ] || [ "$MODE" = "mutated" ] || { echo "bad --mode"; exit 2; }
 command -v mkfs.ubifs >/dev/null || { echo "REBUILD-FAIL: mkfs.ubifs not found (apt install mtd-utils)"; exit 1; }
 command -v python3 >/dev/null || { echo "REBUILD-FAIL: python3 missing"; exit 1; }
-[ "$(id -u)" = "0" ] || { echo "REBUILD-FAIL: must run as root (uid/gid fidelity needs chown 1001)"; exit 1; }
+[ "$(id -u)" = "0" ] || { echo "REBUILD-FAIL: must run as root (uid/gid fidelity needs chown)"; exit 1; }
 if [ -n "$TREE_REPORT" ]; then
   FB=$(python3 -c "import json;print(len(json.load(open('$TREE_REPORT')).get('symlink_fallbacks',[])))")
   [ "$FB" = "0" ] || { echo "REBUILD-FAIL: tree has $FB symlink fallbacks (extract on Linux)"; exit 1; }
 fi
-# uid/gid fidelity: stock image is uniformly 1001:1001 (manifest-proven).
-chown -R 1001:1001 "$TREE"
+# uid/gid fidelity: per-manifest ownership (VI 1000/1001 mixture preserved;
+# EN stays uniform 1001:1001). Preflights all paths/uids/modes before any
+# chown, never chmods, never follows symlinks.
+if [ "$MODE" = "noop" ]; then
+  python3 tools/fw/apply_tree_ownership.py --tree "$TREE" --stock-manifest "$STOCK_MANIFEST"
+else
+  [ -n "$MUT_MANIFEST" ] || { echo "mutated mode needs --mut-manifest"; exit 2; }
+  python3 tools/fw/apply_tree_ownership.py --tree "$TREE" --stock-manifest "$STOCK_MANIFEST" --mut-manifest "$MUT_MANIFEST"
+fi
 MIN_IO=$(python3 -c "import json;print(json.load(open('$GEO'))['min_io_size'])")
 LEB_SZ=$(python3 -c "import json;print(json.load(open('$GEO'))['leb_size'])")
 MAX_LEB=$(python3 -c "import json;print(json.load(open('$GEO'))['max_leb_cnt'])")
@@ -56,6 +63,7 @@ import json,sys
 _, rep, out, sha, size, tool, tsha, tver = sys.argv
 json.dump({"mode": "REBUILD-REPORT", "image": out, "sha256": sha, "size": int(size),
            "tool": tool, "tool_sha256": tsha, "tool_version_info": tver,
+           "ownership": "APPLIED", "ownership_tool": "tools/fw/apply_tree_ownership.py",
            "verdict": "REBUILD-OK"}, open(rep, "w"), indent=2)
 EOF
 echo "REBUILD-OK: $OUT sha=$OUT_SHA size=$OUT_SIZE"

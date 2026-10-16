@@ -211,8 +211,9 @@ int c2m_debug_cli_valid(int loopback, int any_override, const char *bind,
 
 /* Pure stock-ancestor table (uid/gid/mode integers only, no stat calls),
  * so self-test covers it portably with vectors. Facts: EN cpio has /tmp,
- * /var, /customer at 0775 1001:1001; / has no entry (kernel default 0755
- * root:root); customer UBIFS flashes /customer as 0755 chown 1001. */
+ * /var, /customer at 0775 1001:1001; fresh actual VI rootfs raw cpio has
+ * /tmp, /var, /customer at 0755 1000:1000; / has no entry (kernel default
+ * 0755 root:root); customer UBIFS flashes /customer as 0755 chown 1001. */
 int c2m_debug_stock_path_ok(const char *path, unsigned uid, unsigned gid,
                             unsigned mode)
 {
@@ -224,8 +225,11 @@ int c2m_debug_stock_path_ok(const char *path, unsigned uid, unsigned gid,
         return uid == 0 && gid == 0 && mode == 0755;
     if (!strcmp(path, "/tmp") || !strcmp(path, "/var")) {
         if (mode == 0775)
-            return uid == 1001 && gid == 1001; /* actual cpio fact */
-        return uid == 0 && gid == 0 && mode == 0755;
+            return uid == 1001 && gid == 1001; /* EN cpio fact, preserved */
+        if (mode == 0755)
+            return (uid == 0 && gid == 0) ||
+                (uid == 1000 && gid == 1000); /* root + VI raw cpio fact */
+        return 0;
     }
     if (!strcmp(path, "/customer")) {
         if (mode == 0775)
@@ -411,8 +415,10 @@ int c2m_debug_self_test(void)
     check("d4_default_window_7200", C2M_DEBUG_WINDOW_SEC == 7200,
           &failures);
 #endif
-    /* Stock table vectors from actual EN cpio facts (/tmp,/var,/customer
-     * 0775 1001:1001; / kernel default 0755 root; UBIFS /customer 0755). */
+    /* Stock table vectors from EN cpio facts (/tmp,/var,/customer 0775
+     * 1001:1001; / kernel default 0755 root; UBIFS /customer 0755) plus
+     * fresh actual VI raw cpio facts (/tmp,/var,/customer 0755 1000:1000;
+     * /customer 1000:1000 0755 already covered via known-set branch). */
     check("stock_root",
           c2m_debug_stock_path_ok("/", 0, 0, 0755) &&
               !c2m_debug_stock_path_ok("/", 0, 0, 0775) &&
@@ -423,15 +429,23 @@ int c2m_debug_self_test(void)
     check("stock_tmp_cpio_fact",
           c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0775) &&
               c2m_debug_stock_path_ok("/tmp", 0, 0, 0755) &&
+              c2m_debug_stock_path_ok("/tmp", 1000, 1000, 0755) &&
               !c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0755) &&
               !c2m_debug_stock_path_ok("/tmp", 1000, 1000, 0775) &&
               !c2m_debug_stock_path_ok("/tmp", 0, 0, 0775) &&
-              !c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0777),
+              !c2m_debug_stock_path_ok("/tmp", 1001, 1001, 0777) &&
+              !c2m_debug_stock_path_ok("/tmp", 1000, 0, 0755) &&
+              !c2m_debug_stock_path_ok("/tmp", 0, 1000, 0755) &&
+              !c2m_debug_stock_path_ok("/tmp", 1000, 1001, 0755) &&
+              !c2m_debug_stock_path_ok("/tmp", 1000, 1000, 0777),
           &failures);
     check("stock_var_cpio_fact",
           c2m_debug_stock_path_ok("/var", 1001, 1001, 0775) &&
               c2m_debug_stock_path_ok("/var", 0, 0, 0755) &&
+              c2m_debug_stock_path_ok("/var", 1000, 1000, 0755) &&
               !c2m_debug_stock_path_ok("/var", 1001, 1001, 0755) &&
+              !c2m_debug_stock_path_ok("/var", 1000, 1000, 0775) &&
+              !c2m_debug_stock_path_ok("/var", 1000, 0, 0755) &&
               !c2m_debug_stock_path_ok("/var", 1001, 1001, 0777),
           &failures);
     check("stock_customer_both_facts",
@@ -559,18 +573,25 @@ static int absolute_path(const char *in, char *out, size_t size)
     return (n < 0 || (size_t)n >= size) ? -1 : 0;
 }
 
-/* Stock-ancestor trust policy, driven by ACTUAL EN rootfs cpio facts
- * (parent-parsed image: cpio entries /tmp 0775 1001:1001,
- * /var 0775 1001:1001, /customer 0775 1001:1001; demo.sh may tmpfs-mount
- * /tmp differently, which this table does NOT chase -- the cpio fact is
- * accepted, demo mounts stay covered only by the generic sticky-root
- * rule below). / has no cpio entry (archive starts at dev); the kernel
- * rootfs default is 0755 root:root, so / stays exactly that, unchanged.
+/* Stock-ancestor trust policy, driven by actual rootfs cpio facts
+ * (EN image: cpio entries /tmp 0775 1001:1001, /var 0775 1001:1001,
+ * /customer 0775 1001:1001; fresh actual VI raw cpio: /tmp,/var,/customer
+ * 0755 1000:1000; demo.sh may tmpfs-mount /tmp differently, which this
+ * table does NOT chase -- the cpio facts are accepted, demo mounts stay
+ * covered only by the generic sticky-root rule below). / has no cpio
+ * entry (archive starts at dev); the kernel rootfs default is 0755
+ * root:root, so / stays exactly that, unchanged.
  * Customer UBIFS is produced by mkfs from an input tree with 0755 chown
  * 1001, so on flash /customer is actually 0755; both 0755 and the 0775
  * cpio fact are accepted and documented here for the parent doc record.
+ * VI /tmp+/var accept exactly 0755 1000:1000 (no group/other writes, so
+ * no sticky exception needed) alongside the EN 0775 1001:1001 fact.
  * This trusts the vendor UID set, not a hardened multiuser boundary:
- * the camera already runs vendor code as root and uid 1001.
+ * the camera already runs vendor code as root and uid 1000/1001.
+ * No generic UID-1000 trust beyond these exact /tmp+/var 0755 entries
+ * (and the pre-existing known-set 0755 branches): package assets stay
+ * exact and private leaves stay exactly 0700 owned by euid (root in
+ * production).
  * Ancestors are never chmodded and intermediate ancestors never created.
  * /tmp stickiness is NOT broadened here: any non-sticky
  * group/other-writable ancestor outside this exact table still fails

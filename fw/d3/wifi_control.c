@@ -446,7 +446,10 @@ static int ap_unchanged(struct worker *w) {
         strcmp(ap.name, C2M_WIFI_AP) || if_nametoindex(C2M_WIFI_AP) != ap.index ? -1 : 0;
 }
 /* Traverse every component with O_NOFOLLOW. Only root-owned sticky writable
- * ancestors (notably /tmp) are allowed. Never mkdir intermediate ancestors. */
+ * ancestors plus the exact stock tuples in stock_config_ancestor
+ * (/tmp VI 0755 1000:1000, /tmp EN 0775 1001:1001, /customer 0755
+ * 1000:1000/1001:1001, /customer/minieye(+/config) VI 0755 1000:1000 and
+ * EN 0775 1001:1001) are allowed. Never mkdir intermediate ancestors. */
 static int absolute_path(const char *in, char *out, size_t size) {
     char cwd[PATH_MAX];
     int n;
@@ -456,14 +459,36 @@ static int absolute_path(const char *in, char *out, size_t size) {
     return n < 0 || (size_t)n >= size ? -1 : 0;
 }
 static int stock_config_ancestor(const char *path, const struct stat *st) {
-    /* Exact golden EN ownership, not a general group-writable exception. The
+    /* Exact golden ownership, not a general group-writable exception. The
      * vendor UID 1001 config writer is part of the trusted stock boundary.
+     * VI facts are read-only verified from the exact local VI base
+     * (V2023.09.20.1_C2M_U_FR_WIFI_VI.tar): rootfs cpio /tmp,/var,/customer
+     * are 0755 1000:1000 and customer UBIFS /minieye,/minieye/config are
+     * 0755 1000:1000. EN /tmp 0775 1001:1001 is the preserved EN cpio fact.
      * Never change its mode/owner just to make our private child work. */
-    if (st->st_uid != 1001 || st->st_gid != 1001) return 0;
-    if (!strcmp(path, "/customer")) return (st->st_mode & 07777) == 0755;
-    return (st->st_mode & 07777) == 0775 &&
-        (!strcmp(path, "/customer/minieye") ||
-         !strcmp(path, "/customer/minieye/config"));
+    if (!strcmp(path, "/tmp")) {
+        if (st->st_uid == 1000 && st->st_gid == 1000)
+            return (st->st_mode & 07777) == 0755;
+        if (st->st_uid == 1001 && st->st_gid == 1001)
+            return (st->st_mode & 07777) == 0775;
+        return 0;
+    }
+    if (!strcmp(path, "/customer")) {
+        if (st->st_uid == 1000 && st->st_gid == 1000)
+            return (st->st_mode & 07777) == 0755;
+        if (st->st_uid == 1001 && st->st_gid == 1001)
+            return (st->st_mode & 07777) == 0755;
+        return 0;
+    }
+    if (!strcmp(path, "/customer/minieye") ||
+        !strcmp(path, "/customer/minieye/config")) {
+        if (st->st_uid == 1000 && st->st_gid == 1000)
+            return (st->st_mode & 07777) == 0755;
+        if (st->st_uid == 1001 && st->st_gid == 1001)
+            return (st->st_mode & 07777) == 0775;
+        return 0;
+    }
+    return 0;
 }
 static int safe_dir(const char *path, int private_leaf, int create) {
     char copy[PATH_MAX], walk[PATH_MAX] = "", *part, *save;

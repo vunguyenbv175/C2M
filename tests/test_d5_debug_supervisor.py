@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "fw" / "debug" / "supervisor.c"
 HEADER = ROOT / "fw" / "debug" / "supervisor.h"
 BUILD_SCRIPT = ROOT / "fw" / "debug" / "build_dropbear.sh"
+PATCH = ROOT / "tools" / "fw" / "patch_debug_dropbear.py"
 LINUX = sys.platform.startswith("linux")
 
 
@@ -149,6 +150,11 @@ class EditionSourceTests(unittest.TestCase):
         self.assertLess(idx0, idx7200)
         self.assertIn("lifetime=boot", header)
         self.assertIn("--lifetime", header)
+        # VI raw-cpio facts added alongside EN baseline (no revert).
+        self.assertIn("1000", header)
+        self.assertIn("0755 1000:1000", header)
+        self.assertIn("0775 1001:1001", header)
+        self.assertIn("/tmp", header)
 
     def test_build_script_lifetime_flag_and_edition_report(self) -> None:
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
@@ -211,6 +217,26 @@ class EditionSourceTests(unittest.TestCase):
             self.assertIn("c2m-debug self-test: OK", r5.stdout)
             self.assertIn("cli_lifetime_zero_allowed", r5.stdout)
             self.assertIn("lifetime_default_window_zero", r5.stdout)
+            # VI stock vectors run in both editions (same PASS names, extended).
+            for out in (r4.stdout, r5.stdout):
+                self.assertIn("PASS stock_tmp_cpio_fact", out)
+                self.assertIn("PASS stock_var_cpio_fact", out)
+                self.assertIn("PASS stock_root", out)
+            # Static: supervisor table carries the exact VI 1000:1000 0755
+            # /tmp+/var exception alongside the EN 0775 1001 baseline.
+            source = SOURCE.read_text(encoding="utf-8")
+            self.assertIn('!strcmp(path, "/tmp")', source)
+            self.assertIn("uid == 1000 && gid == 1000", source)
+            self.assertIn("uid == 1001 && gid == 1001", source)
+            # Static: dropbear patch keeps upstream OLD contexts and adds the
+            # exact VI 1000:1000 0755 /tmp owner exception (PERM needs none:
+            # 0755 has no group/other-write bit).
+            patch = PATCH.read_text(encoding="utf-8")
+            self.assertIn("filestat.st_uid == 1001", patch)
+            self.assertIn("0775", patch)
+            self.assertIn("filestat.st_uid == 1000", patch)
+            self.assertIn("0755", patch)
+            self.assertIn("C2M_DEBUG_TMP_ANCESTOR", patch)
 
     def test_d4_default_rejects_zero_cli_no_io(self) -> None:
         with tempfile.TemporaryDirectory(prefix="c2m-d5-cli-") as tmp:

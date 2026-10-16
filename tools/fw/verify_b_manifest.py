@@ -54,6 +54,10 @@ def main() -> int:
             elif a.get("sha256") != exp["new_sha256"] or a.get("size") != exp["new_size"]:
                 bad.append(f"REPLACED-MISMATCH {p}: got sha {a.get('sha256')} "
                            f"size {a.get('size')}, want {exp['new_sha256']} {exp['new_size']}")
+            if a is not None:
+                for k in ("type", "mode", "uid", "gid"):
+                    if s.get(k) != a.get(k):
+                        bad.append(f"REPLACED-METADATA {p} {k}: {s.get(k)!r} -> {a.get(k)!r}")
             continue
         a = actual.get(p)
         if a is None:
@@ -73,8 +77,8 @@ def main() -> int:
                 if r.get(k) != a.get(k):
                     bad.append(f"ADDED-DIR-MISMATCH {p} {k}: {a.get(k)!r} -> {r.get(k)!r}")
             continue
-        for k in ("type", "mode", "size", "sha256"):
-            if r.get(k) != a.get(k):
+        for k in ("type", "mode", "size", "sha256", "uid", "gid"):
+            if k in a and r.get(k) != a.get(k):
                 bad.append(f"ADDED-MISMATCH {p} {k}: {a.get(k)!r} -> {r.get(k)!r}")
     h = actual.get(hook)
     if h is None:

@@ -3,6 +3,9 @@
 
 Synthetic DB/GPS paths only; no camera, UART, radio, private DB or real route.
 The production binary runs in fixture mode, not with camera default paths.
+Static analysis only, not HW proof: guest /tmp metadata is synthetic per
+--tmp-profile, standing in for verified raw cpio facts (VI 0755 1000:1000,
+EN 0775 1001:1001, live tmpfs sticky root). Never chmods the host real /tmp.
 """
 from __future__ import annotations
 
@@ -10,12 +13,20 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import shutil
 import struct
 import subprocess
 import tempfile
 import time
+
+TMP_PROFILES = {
+    # Exact D4 directory_ok tuples only; no silent normalization.
+    "sticky": (0, 0, 0o1777),  # live tmpfs root (default; existing behavior)
+    "vi": (1000, 1000, 0o755),  # VI raw cpio fact
+    "en": (1001, 1001, 0o775),  # EN raw cpio fact, preserved
+}
 
 
 def gps(second: int, raw: int) -> bytes:
@@ -65,6 +76,9 @@ def main() -> int:
     parser.add_argument("--binary", required=True, type=Path)
     parser.add_argument("--sysroot", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
+    parser.add_argument("--tmp-profile", choices=sorted(TMP_PROFILES), default="sticky",
+                        help="guest /tmp metadata: sticky (root 1777, default), "
+                             "vi (1000:1000 0755 cpio fact), en (1001:1001 0775 cpio fact)")
     args = parser.parse_args()
     args.report.parent.mkdir(parents=True, exist_ok=True)
     if os.name != "posix":
@@ -88,19 +102,36 @@ def main() -> int:
     if os.geteuid() != 0:
         raise SystemExit("Run this synthetic QEMU fixture gate with sudo; /tmp trust policy requires root")
     # QEMU -L maps open("/") to the prefix; subsequent descriptor-relative
-    # openat(dirfd, "tmp") cannot fall back to the host /tmp. Put fixtures
-    # under an actual root-owned sticky prefix/tmp, not a symlink, without
-    # weakening the production descriptor/owner checks to suit the host.
+    # openat(dirfd, "tmp") cannot fall back to the host /tmp. Fixtures live
+    # under the PRIVATE sysroot prefix/tmp only (sudo chown there is allowed;
+    # the host real /tmp and any camera path are never touched). The exact
+    # /tmp branch of directory_ok never takes a fixture override, so the
+    # guest /tmp MUST be one of the exact stock tuples below; fixture
+    # subdirs (root 0700, euid root under sudo) pass via the unchanged root
+    # non-writable default. Never silently normalize: report profile+observed.
+    if sysroot in (Path("/"), Path("/tmp")) or binary == sysroot:
+        raise SystemExit("sysroot must be a private fixture tree, never / or /tmp")
     os.chown(sysroot, 0, 0)
     sysroot.chmod(0o755)
     guest_tmp = sysroot / "tmp"
+    if guest_tmp.resolve() != (sysroot / "tmp").resolve() or str(guest_tmp) == "/tmp":
+        raise SystemExit("guest /tmp must be the private sysroot/tmp, never host /tmp")
     if guest_tmp.is_symlink():
         raise SystemExit("QEMU fixture /tmp must not be a symlink")
-    guest_tmp.mkdir(mode=0o1777, exist_ok=True)
-    os.chown(guest_tmp, 0, 0)
-    guest_tmp.chmod(0o1777)
-    if guest_tmp.stat().st_uid != 0:
-        raise SystemExit("QEMU fixture /tmp must be root owned")
+    want_uid, want_gid, want_mode = TMP_PROFILES[args.tmp_profile]
+    guest_tmp.mkdir(mode=0o755, exist_ok=True)
+    if guest_tmp.is_symlink():
+        raise SystemExit("QEMU fixture /tmp must not be a symlink")
+    os.chown(guest_tmp, want_uid, want_gid)
+    os.chmod(guest_tmp, want_mode)
+    observed = guest_tmp.stat()
+    observed_meta = {"mode": oct(stat.S_IMODE(observed.st_mode)),
+                     "uid": observed.st_uid, "gid": observed.st_gid}
+    if (observed.st_uid, observed.st_gid, stat.S_IMODE(observed.st_mode)) != \
+            (want_uid, want_gid, want_mode):
+        raise SystemExit(f"guest /tmp metadata mismatch: {observed_meta} "
+                         f"want uid={want_uid} gid={want_gid} mode={oct(want_mode)}")
+    print(f"tmp_profile={args.tmp_profile} guest_tmp={observed_meta} (synthetic, not HW proof)")
     observations = []
     with tempfile.TemporaryDirectory(prefix="c2m-d4-arm-fixture-", dir=guest_tmp) as name:
         root = Path(name)
@@ -178,6 +209,8 @@ def main() -> int:
     report = {"verdict": "PASS", "runtime": "exact ARM ELF plus stock loader/glibc under QEMU",
               "binary_sha256": binary_sha256, "stock_runtime_sha256": PINS,
               "fixtures": "synthetic only", "checks": observations,
+              "tmp_profile": args.tmp_profile, "guest_tmp_observed": observed_meta,
+              "static_only_not_hw_proof": True,
               "camera_used": False, "radio_used": False, "private_database_used": False,
               "target_device_accepted": False}
     args.report.parent.mkdir(parents=True, exist_ok=True)
