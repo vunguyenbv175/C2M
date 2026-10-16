@@ -73,6 +73,7 @@ jobs:
           python3 tests/test_d4_web.py
           python3 tests/test_d4_advisory.py
           python3 tests/test_d4_shadow.py
+          python3 tests/test_d4_shadow_trace.py
           python3 tools/fw/test_shadow_package_gate.py
           python3 tools/fw/test_d4_mutation.py
           python3 tests/test_debug_supervisor.py

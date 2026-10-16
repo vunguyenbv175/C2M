@@ -345,6 +345,18 @@ static const char *shadow_code_name(enum c2m_d4_code code)
     }
 }
 
+static const char *shadow_gps_result_name(int result)
+{
+    switch (result) {
+    case C2M_GPS_OK: return "ok";
+    case C2M_GPS_INVALID: return "invalid";
+    case C2M_GPS_IO_ERROR: return "io_error";
+    case C2M_GPS_UNSTABLE: return "unstable";
+    case C2M_GPS_UNSUPPORTED: return "unsupported";
+    default: return "unknown";
+    }
+}
+
 /* Finite RAM-only observer: fixed DB+GPS, 10x1s, explicit monotonic bound,
  * stdout summary only. Never writes/renames any status file, no
  * camera/UART/IPC/network. Simulated publication is explicitly reported
@@ -361,6 +373,8 @@ static int shadow_observe(void)
     struct sigaction action;
     struct timespec delay;
     uint64_t start_ms = 0, now = 0, last_ms = 0, deadline = 0, after_ms = 0;
+    uint64_t previous_poll_ms = 0, poll_dt_ms = 0;
+    const struct c2m_gps_shadow_trace *trace;
     int i, gps_result, ok, rc = 0, completed = 0;
     int final_fresh = 0, final_active = 0;
     const char *db_path = C2M_D4_SHADOW_DB_PATH;
@@ -389,7 +403,7 @@ static int shadow_observe(void)
             db.valid = 0;
     }
     c2m_d4_init(&core, db.signs, db.count, cooldowns);
-    printf("d4_shadow=observer_v1\n");
+    printf("d4_shadow=observer_v2\n");
     printf("samples_fixed=%d interval_s_fixed=%d monotonic_bound_ms=%llu\n",
            C2M_D4_SHADOW_SAMPLES, C2M_D4_SHADOW_INTERVAL_SEC,
            (unsigned long long)C2M_D4_SHADOW_MAX_MS);
@@ -424,12 +438,19 @@ static int shadow_observe(void)
             break;
         }
         last_ms = now;
+        /* Interval between timestamps actually fed to the core, first=0.
+         * Relative only, includes prior work/sleep; never an absolute clock. */
+        poll_dt_ms = completed ? now - previous_poll_ms : 0;
+        previous_poll_ms = now;
         ok = database_unchanged(&db, db_path, fixture);
         gps_result = C2M_GPS_IO_ERROR;
         if (gps_parent_ok(gps_path, fixture))
             gps_result = c2m_gps_read(gps_path, &gps);
         c2m_d4_prepare(&core, gps_result == C2M_GPS_OK ? &gps : NULL, now,
                        ok, 0, &status);
+        /* Read the reason from that exact update; no second feed or copied
+         * freshness decision tree. Single-thread shadow owns this trace. */
+        trace = c2m_gps_shadow_last_trace();
         /* Bound applies after the DB read/core step as well: re-sample the
          * clock without feeding a second timestamp to the core. */
         if (milliseconds(&after_ms)) {
@@ -465,9 +486,13 @@ static int shadow_observe(void)
         final_active = status.active ? 1 : 0;
         printf("sample=%d state=%s gps_fresh=%d active=%d code=%s "
                "distance_m=%u event_id=%" PRIu32 " sequence=%" PRIu32 " "
+               "gps_result=%s poll_dt_ms=%" PRIu64 " utc_step=%s "
+               "freshness_reason=%s "
                "delivery_sim=observer_simulation_not_production_delivery\n",
                completed + 1, state_name, final_fresh, final_active, code_name,
-               status.distance_m, status.event_id, status.sequence);
+               status.distance_m, status.event_id, status.sequence,
+               shadow_gps_result_name(gps_result), poll_dt_ms,
+               trace->utc_step, trace->reason);
         ++completed;
         if (fflush(stdout)) {
             fputs("shadow: stdout failed\n", stderr);

@@ -90,6 +90,21 @@ int c2m_gps_freshness_update(struct c2m_gps_freshness *state,
                            const struct c2m_gps_snapshot *sample,
                            uint64_t monotonic_ms);
 
+#ifdef C2M_D4_SHADOW_OBSERVE
+/* Diagnostic strings only; state layout and freshness decisions are unchanged.
+ * Single-thread finite shadow ONLY: consume immediately after its actual core
+ * update (not a second update/reimplementation). Relative UTC step is classified
+ * against the pre-update freshness anchor; no absolute GPS/time values escape.
+ * Static storage is overwritten by the next update, including failed polls.
+ * No trace/accessor is compiled into production or the standalone GPS probe.
+ */
+struct c2m_gps_shadow_trace {
+    const char *reason;
+    const char *utc_step;
+};
+const struct c2m_gps_shadow_trace *c2m_gps_shadow_last_trace(void);
+#endif
+
 /* Standalone synthetic CLI: cc -std=c99 -Wall -Wextra
  *   -DC2M_GPS_SELFTEST gps_snapshot.c -lm -o gps-selftest
  *   ./gps-selftest --self-test

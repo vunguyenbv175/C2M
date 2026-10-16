@@ -79,7 +79,9 @@ The smallest useful same-poll fields are GPS adapter result, relative monotonic
 poll interval, UTC-step class (`first/repeat/one_step/jump/regress`, not absolute
 UTC), and the exact existing freshness rejection branch. These are a proposed
 local diagnostic improvement, not new evidence explaining this run or license
-to weaken the gate. No additional hardware test is requested by this report.
+to weaken the gate. A later local implementation is documented in
+`D4_SHADOW_DIAGNOSTICS_20261016.md`; it adds no explanation retrospectively to
+these samples. No additional hardware test is requested by this report.
 
 ## Complete split-wiphy observation
 

@@ -29,9 +29,13 @@ class ShadowPackageGate(unittest.TestCase):
                 '--evidence',str(evidence)]
             for mutation in ({'status_writer':True},{'camera_used':True},
                              {'binary_sha256':'0'*64},{'stock_runtime_sha256':{}},
-                             {'verdict':'FAIL'}, {'finite_samples':9}):
+                             {'verdict':'FAIL'}, {'finite_samples':9},
+                             {'shadow_schema':'observer_v1'}, {'shadow_schema':None},
+                             {'same_poll_diagnostics_checked':False},
+                             {'same_poll_diagnostics_checked':None}):
                 report={'verdict':'PASS','camera_used':False,'status_writer':False,
-                        'finite_samples':10,'binary_sha256':digest,'stock_runtime_sha256':PINS}
+                        'finite_samples':10,'binary_sha256':digest,'stock_runtime_sha256':PINS,
+                        'shadow_schema':'observer_v2','same_poll_diagnostics_checked':True}
                 report.update(mutation)
                 (evidence/'arm-d4-shadow-runtime.json').write_text(json.dumps(report))
                 with self.subTest(mutation=mutation), patch('sys.argv',args):

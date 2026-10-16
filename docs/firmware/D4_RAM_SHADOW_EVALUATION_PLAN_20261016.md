@@ -16,7 +16,10 @@ path constants require an explicit host-test macro and are not used in the ARM
 build. Output labels simulated delivery, actual completed sample count and
 completion reason. Signals/errors cannot report full success. The stock-QEMU
 shipping-binary no-DB/sentinel gate and exact report-to-binary packaging gate
-passed in manual CI `38836577606` on source `a7cf680`.
+passed in manual CI `38836577606` on source `a7cf680` (observer v1).
+Later local v2 same-poll diagnostics are tracked separately in
+`D4_SHADOW_DIAGNOSTICS_20261016.md`; v1 build/hardware proof must not be
+attributed to the changed v2 binary.
 
 ## Verified delivery and evidence limits
 

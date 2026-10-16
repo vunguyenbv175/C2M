@@ -58,6 +58,8 @@ def main() -> int:
                 shadow_runtime.get("stock_runtime_sha256") != PINS or
                 shadow_runtime.get("status_writer") is not False or
                 shadow_runtime.get("finite_samples") != 10 or
+                shadow_runtime.get("shadow_schema") != "observer_v2" or
+                shadow_runtime.get("same_poll_diagnostics_checked") is not True or
                 shadow_runtime.get("camera_used") is not False):
             raise SystemExit("Mandatory exact shadow ARM runtime proof/pins missing")
     for path in paths:
@@ -73,7 +75,8 @@ def main() -> int:
         "tools/gps", "tools/fw/prepare_ram_debug_sysroot.py",
         "tools/fw/carve_upgrade.py", "tools/fw/extract_rootfs_cpio.py",
         "tools/fw/test_ram_d4_stock_qemu.py", "tools/fw/test_ram_shadow_stock_qemu.py",
-        "tools/fw/package_ram_debug.py",
+        "tools/fw/package_ram_debug.py", "tests/test_d4_shadow.py",
+        "tests/test_d4_shadow_trace.py", "tests/fixtures/gps_freshness_reference.c",
         ".github/workflows/ram-debug-arm.yml"], cwd=ROOT).decode().split("\0")
     source_pins = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                    for name in tracked if name}

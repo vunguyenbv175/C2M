@@ -273,19 +273,55 @@ static int sample_in_range(const struct c2m_gps_snapshot *sample)
            sample->course_deg < 360.0;
 }
 
+#ifdef C2M_D4_SHADOW_OBSERVE
+static struct c2m_gps_shadow_trace shadow_trace = { "no_state", "unavailable" };
+
+const struct c2m_gps_shadow_trace *c2m_gps_shadow_last_trace(void)
+{
+    return &shadow_trace;
+}
+
+static void shadow_trace_begin(const struct c2m_gps_freshness *state,
+                               const struct c2m_gps_snapshot *sample)
+{
+    shadow_trace.reason = "no_state";
+    shadow_trace.utc_step = "unavailable";
+    if (!state || !sample_in_range(sample))
+        return;
+    if (!state->have_anchor)
+        shadow_trace.utc_step = "first";
+    else if (sample->utc_seconds < state->last_utc_seconds)
+        shadow_trace.utc_step = "regress";
+    else if (sample->utc_seconds == state->last_utc_seconds)
+        shadow_trace.utc_step = "repeat";
+    else if (state->last_utc_seconds == sample->utc_seconds - 1)
+        shadow_trace.utc_step = "one_step";
+    else
+        shadow_trace.utc_step = "jump";
+}
+#define GPS_TRACE(reason_text) do { shadow_trace.reason = (reason_text); } while (0)
+#else
+#define GPS_TRACE(reason_text) do { } while (0)
+#endif
+
 int c2m_gps_freshness_update(struct c2m_gps_freshness *state,
                            const struct c2m_gps_snapshot *sample,
                            uint64_t monotonic_ms)
 {
     uint64_t elapsed_ms, gps_ms, difference_ms, reference_elapsed_ms;
 
+#ifdef C2M_D4_SHADOW_OBSERVE
+    shadow_trace_begin(state, sample);
+#endif
     if (state == NULL)
         return 0;
     if (!sample_in_range(sample)) {
         c2m_gps_freshness_init(state);
+        GPS_TRACE(sample == NULL ? "no_sample" : "invalid_sample");
         return 0;
     }
     if (!state->have_anchor || monotonic_ms < state->last_observation_ms) {
+        GPS_TRACE(!state->have_anchor ? "first_anchor" : "monotonic_regression");
         freshness_anchor(state, sample->utc_seconds, monotonic_ms);
         return 0;
     }
@@ -293,12 +329,16 @@ int c2m_gps_freshness_update(struct c2m_gps_freshness *state,
     elapsed_ms = monotonic_ms - state->last_advance_ms;
     if (elapsed_ms >= C2M_GPS_STALE_MS ||
         sample->utc_seconds < state->last_utc_seconds) {
+        GPS_TRACE(elapsed_ms >= C2M_GPS_STALE_MS ? "timeout" : "utc_regression");
         freshness_anchor(state, sample->utc_seconds, monotonic_ms);
         return 0;
     }
-    if (sample->utc_seconds == state->last_utc_seconds)
+    if (sample->utc_seconds == state->last_utc_seconds) {
+        GPS_TRACE(state->confirmed ? "repeat_confirmed" : "repeat_unconfirmed");
         return state->confirmed;
+    }
     if (elapsed_ms == 0) {
+        GPS_TRACE("zero_elapsed");
         freshness_anchor(state, sample->utc_seconds, monotonic_ms);
         return 0;
     }
@@ -310,6 +350,7 @@ int c2m_gps_freshness_update(struct c2m_gps_freshness *state,
     difference_ms = gps_ms > elapsed_ms ? gps_ms - elapsed_ms :
                                          elapsed_ms - gps_ms;
     if (difference_ms > C2M_GPS_DELTA_TOLERANCE_MS) {
+        GPS_TRACE("step_tolerance");
         freshness_anchor(state, sample->utc_seconds, monotonic_ms);
         return 0;
     }
@@ -324,14 +365,17 @@ int c2m_gps_freshness_update(struct c2m_gps_freshness *state,
                     gps_ms - reference_elapsed_ms :
                     reference_elapsed_ms - gps_ms;
     if (difference_ms > C2M_GPS_DELTA_TOLERANCE_MS) {
+        GPS_TRACE("reference_tolerance");
         freshness_anchor(state, sample->utc_seconds, monotonic_ms);
         return 0;
     }
     state->last_utc_seconds = sample->utc_seconds;
     state->last_advance_ms = monotonic_ms;
     state->confirmed = 1;
+    GPS_TRACE("advancing");
     return 1;
 }
+#undef GPS_TRACE
 
 #ifdef C2M_GPS_SELFTEST
 #include <stdio.h>

@@ -267,6 +267,34 @@ class D4ShadowTests(unittest.TestCase):
         # No CR line endings.
         self.assertNotIn("\r", text)
 
+    @unittest.skipUnless(LINUX, "descriptor/fixture --observe runtime is Linux-only")
+    def test_shadow_fixture_invalid_gps_reports_same_poll_failure(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="c2m-d4-shadow-invalid-") as name:
+            root = Path(name)
+            db_path, gps_path = root / "db.bin", root / "car_info"
+            db_path.write_bytes(db_bytes())
+            bad = bytearray(gps_bytes(7))
+            struct.pack_into("<I", bad, 0x330 + 0x1C, 1000)
+            gps_path.write_bytes(bad)
+            db_path.chmod(0o600)
+            gps_path.chmod(0o600)
+            fixture_bin = root / "shadow-invalid"
+            compile_binary(self.cc, fixture_bin, [
+                "-DC2M_D4_SHADOW_OBSERVE", "-DC2M_D4_SHADOW_TEST_ALLOW",
+                f'-DC2M_D4_SHADOW_TEST_DB="{db_path}"',
+                f'-DC2M_D4_SHADOW_TEST_GPS="{gps_path}"',
+            ])
+            result = self.run_bin(fixture_bin, "--observe", timeout=25)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stderr, "")
+            self._assert_safe_output(result.stdout)
+            rows = self._sample_rows(result.stdout)
+            self.assertEqual(len(rows), 10)
+            self.assertTrue(all("gps_result=invalid" in row and
+                                "freshness_reason=no_sample" in row and
+                                "utc_step=unavailable" in row and "gps_fresh=0" in row
+                                for row in rows), result.stdout)
+
     def test_arm_script_guards(self) -> None:
         raw = ARM_SCRIPT.read_bytes().decode("utf-8")
         self.assertNotIn("\r", raw, "script must be LF-only")
@@ -314,6 +342,31 @@ class D4ShadowTests(unittest.TestCase):
                           "course_deg=", "UTC="):
             self.assertNotIn(forbidden, stdout, f"private/unsafe token leaked: {forbidden}")
         self.assertLess(len(stdout.encode("utf-8")), 8192)
+        self.assertIn("d4_shadow=observer_v2", stdout)
+        rows = self._sample_rows(stdout)
+        reasons = {"no_state", "no_sample", "invalid_sample", "first_anchor",
+                   "monotonic_regression", "timeout", "utc_regression",
+                   "repeat_unconfirmed", "repeat_confirmed", "zero_elapsed",
+                   "step_tolerance", "reference_tolerance", "advancing"}
+        for idx, row in enumerate(rows):
+            fields = dict(part.split("=", 1) for part in row.split())
+            self.assertEqual(set(fields), {
+                "sample", "state", "gps_fresh", "active", "code", "distance_m",
+                "event_id", "sequence", "delivery_sim", "gps_result", "poll_dt_ms",
+                "utc_step", "freshness_reason"})
+            self.assertIn(fields["gps_result"], {"ok", "invalid", "io_error",
+                                                "unstable", "unsupported"})
+            self.assertIn(fields["freshness_reason"], reasons)
+            self.assertIn(fields["utc_step"], {"unavailable", "first", "repeat",
+                                              "one_step", "jump", "regress"})
+            self.assertRegex(fields["poll_dt_ms"], r"^\d+$")
+            self.assertLessEqual(int(fields["poll_dt_ms"]), 30000)
+            if idx == 0:
+                self.assertEqual(fields["poll_dt_ms"], "0")
+            if fields["gps_result"] != "ok":
+                self.assertEqual(fields["freshness_reason"], "no_sample")
+                self.assertEqual(fields["utc_step"], "unavailable")
+                self.assertEqual(fields["gps_fresh"], "0")
 
     @unittest.skipUnless(LINUX, "descriptor/fixture --observe runtime is Linux-only")
     def test_shadow_fixture_advancing_gps_finite_no_status_file(self) -> None:
@@ -371,7 +424,7 @@ class D4ShadowTests(unittest.TestCase):
                     proc.communicate()
             self.assertEqual(proc.returncode, 0, f"{stdout[-3000:]} {stderr[-2000:]}")
             self.assertEqual(stderr, "", stderr)
-            self.assertIn("d4_shadow=observer_v1", stdout)
+            self.assertIn("d4_shadow=observer_v2", stdout)
             self.assertIn("samples_fixed=10", stdout)
             self.assertIn("interval_s_fixed=1", stdout)
             self.assertIn("monotonic_bound_ms=30000", stdout)
@@ -390,7 +443,8 @@ class D4ShadowTests(unittest.TestCase):
                 self.assertRegex(line, r"code=(none|residential_start|residential_end)")
             # Advancing GPS must confirm freshness at least once before the
             # mid-run DB replacement poisons later rows.
-            self.assertRegex(stdout, r"gps_fresh=1")
+            self.assertTrue(any("gps_fresh=1" in row and "gps_result=ok" in row and
+                                "freshness_reason=advancing" in row for row in samples), stdout)
             self.assertTrue(any("state=no_database" in line for line in samples),
                             f"DB replacement must poison later rows:\n{stdout}")
             self.assertFalse(status_probe.exists())
@@ -433,6 +487,11 @@ class D4ShadowTests(unittest.TestCase):
             states = [re.search(r"state=(\w+)", line).group(1) for line in samples]  # type: ignore[union-attr]
             self.assertIn("warming_up", states)
             self.assertIn("stale", states)
+            self.assertIn("freshness_reason=first_anchor", samples[0])
+            self.assertIn("utc_step=first", samples[0])
+            self.assertTrue(all("gps_result=ok" in row for row in samples))
+            self.assertTrue(any("freshness_reason=timeout" in row for row in samples))
+            self.assertTrue(any("freshness_reason=repeat_unconfirmed" in row for row in samples))
             self._assert_safe_output(result.stdout)
 
     @unittest.skipUnless(LINUX, "descriptor/fixture --observe runtime is Linux-only")
@@ -513,6 +572,7 @@ class D4ShadowTests(unittest.TestCase):
             self.assertLess(len(samples), 10, f"expected early stop:\n{stdout}")
             self.assertEqual(summary["completion"], "interrupted_signal")
             self.assertIn("delivery_sim=observer_simulation_not_production_delivery", stdout)
+            self._assert_safe_output(stdout)
             self.assertFalse(list(root.glob(".c2m-d4-*.tmp")))
 
     @unittest.skipUnless(LINUX, "descriptor/fixture --observe runtime is Linux-only")
@@ -546,6 +606,9 @@ class D4ShadowTests(unittest.TestCase):
                                 and "active=0" in line for line in samples),
                             result.stdout)
             self._assert_safe_output(result.stdout)
+            self.assertTrue(all("gps_result=io_error" in row and
+                                "freshness_reason=no_sample" in row and
+                                "utc_step=unavailable" in row for row in samples))
 
 
 if __name__ == "__main__":

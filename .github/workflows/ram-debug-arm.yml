@@ -32,6 +32,7 @@ jobs:
           python3 tools/fw/test_prepare_ram_debug_sysroot.py > work/evidence/host-sysroot.txt 2>&1
           cat work/evidence/host-sysroot.txt
           python3 tests/test_d4_shadow.py > work/evidence/host-d4-shadow.txt 2>&1
+          python3 tests/test_d4_shadow_trace.py >> work/evidence/host-d4-shadow.txt 2>&1
           python3 tools/fw/test_shadow_package_gate.py >> work/evidence/host-d4-shadow.txt 2>&1
           cat work/evidence/host-d4-shadow.txt
       - name: Install ARM tools and QEMU (versions recorded)

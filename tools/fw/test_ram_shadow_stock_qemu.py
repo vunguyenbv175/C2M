@@ -55,6 +55,7 @@ def main():
         assert not r.stderr,r.stderr.decode(errors='replace')
         text=r.stdout.decode('ascii')
         assert len(r.stdout)<8192
+        assert 'd4_shadow=observer_v2' in text
         assert 'db_valid=0 db_count=0' in text
         rows=[x for x in text.splitlines() if x.startswith('sample=')]
         assert len(rows)==10,len(rows)
@@ -63,6 +64,17 @@ def main():
         assert 'delivery_sim=observer_simulation_not_production_delivery' in text
         assert all('state=no_database' in row and 'gps_fresh=0' in row and 'active=0' in row for row in rows)
         assert [int(row.split(' ', 1)[0].split('=')[1]) for row in rows] == list(range(1, 11))
+        for i, row in enumerate(rows):
+            fields = dict(part.split('=', 1) for part in row.split())
+            assert set(fields) == {'sample', 'state', 'gps_fresh', 'active', 'code',
+                'distance_m', 'event_id', 'sequence', 'gps_result', 'poll_dt_ms',
+                'utc_step', 'freshness_reason', 'delivery_sim'}
+            assert fields['gps_result'] == 'io_error'
+            assert fields['freshness_reason'] == 'no_sample'
+            assert fields['utc_step'] == 'unavailable'
+            assert fields['poll_dt_ms'].isdigit() and int(fields['poll_dt_ms']) <= 30000
+            if i == 0:
+                assert fields['poll_dt_ms'] == '0'
         for private in ('latitude=', 'longitude=', 'speed_kmh=', 'course_deg=', 'UTC=', 'record_id='):
             assert private not in text
         after=status.stat()
@@ -75,7 +87,8 @@ def main():
             'camera_used':False,'status_writer':False,'finite_samples':10,
             'runtime':'shipping ARM shadow --observe under pinned stock QEMU',
             'database_case':'missing expected fixed private DB (no private DB in CI)',
-            'status_sentinel_unchanged':True,'target_hardware_accepted':False}
+            'status_sentinel_unchanged':True,'target_hardware_accepted':False,
+            'shadow_schema':'observer_v2','same_poll_diagnostics_checked':True}
     args.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report,sort_keys=True))
 
