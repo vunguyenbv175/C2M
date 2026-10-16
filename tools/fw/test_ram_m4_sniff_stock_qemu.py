@@ -32,6 +32,9 @@ def main():
         assert f.is_symlink() and os.readlink(f) == target
     qemu = shutil.which('qemu-arm-static')
     assert qemu and os.geteuid() == 0
+    # QEMU user-mode uses host interfaces. Never accidentally sniff a host
+    # usb0 on the mandatory no-interface fixture path.
+    assert not Path('/sys/class/net/usb0').exists(), 'Fixture host unexpectedly has usb0'
     guest_tmp = sysroot/'tmp'
     assert not guest_tmp.is_symlink()
     guest_tmp.mkdir(mode=0o1777, exist_ok=True)
@@ -59,7 +62,7 @@ def main():
                        'system', 'popen', 'fopen', 'open', 'openat', 'creat',
                        'syscall', 'execve', 'execv', 'execl', 'dlopen', 'dlsym'}
     assert not (imports & forbidden_calls), sorted(imports & forbidden_calls)
-    for token in (b'm4_sniff=observer_v3', b'iface_fixed=', b'usb0',
+    for token in (b'm4_sniff=observer_v4', b'iface_fixed=', b'usb0',
                   b'payload_hex_fixed=', b'payload_len=', b'payload_hex=',
                   b'observer_simulation_not_production_delivery',
                   b'status_writes=0', b'transmit_bytes=0'):
@@ -77,10 +80,11 @@ def main():
         assert r.returncode == 0, (r.returncode, r.stderr.decode(errors='replace'))
         assert not r.stderr, r.stderr.decode(errors='replace')
         text = r.stdout.decode('ascii')
-        assert len(r.stdout) < 8192
-        assert 'm4_sniff=observer_v3' in text
+        assert len(r.stdout) < 65536
+        assert 'm4_sniff=observer_v4' in text
         assert 'iface_fixed=usb0' in text
-        assert 'payload_hex_fixed=96' in text
+        assert 'payload_hex_fixed=1536' in text
+        assert 'monotonic_bound_ms=12000' in text and 'record_budget=61440' in text
         assert 'status_writes=0' in text and 'transmit_bytes=0' in text
         assert 'delivery_sim=observer_simulation_not_production_delivery' in text
         assert 'summary packets=0 ' in text
@@ -98,13 +102,13 @@ def main():
         status.unlink(missing_ok=True)
     report = {'verdict': 'PASS', 'binary_sha256': binary_digest, 'stock_runtime_sha256': PINS,
               'camera_used': False, 'status_writer': False, 'transmit': False,
-              'finite_packets': 20, 'runtime': 'shipping ARM M4 sniff --observe under pinned stock QEMU',
+              'finite_packets': 4096, 'finite_records': 48, 'window_ms': 12000, 'runtime': 'shipping ARM M4 sniff --observe under pinned stock QEMU',
               'interface_case': 'missing usb0 in CI (no private capture)',
               'status_sentinel_unchanged': True, 'target_hardware_accepted': False,
-              'sniff_schema': 'observer_v3',
+              'sniff_schema': 'observer_v4',
               'undefined_import_no_transmit_gate': True,
-              'record_budget_bytes': 6144,
-              'partial_payload_prefixes_not_reassembled_stream': True}
+              'record_budget_bytes': 61440,
+              'bounded_tcp_payloads_not_reassembled_stream': True}
     args.report.write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     print(json.dumps(report, sort_keys=True))
 

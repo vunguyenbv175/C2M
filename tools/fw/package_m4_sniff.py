@@ -42,11 +42,12 @@ def main() -> int:
             runtime.get("stock_runtime_sha256") != PINS or
             runtime.get("status_writer") is not False or
             runtime.get("transmit") is not False or
-            runtime.get("finite_packets") != 20 or
+            runtime.get("finite_packets") != 4096 or
+            runtime.get("finite_records") != 48 or runtime.get("window_ms") != 12000 or
             runtime.get("undefined_import_no_transmit_gate") is not True or
-            runtime.get("record_budget_bytes") != 6144 or
-            runtime.get("partial_payload_prefixes_not_reassembled_stream") is not True or
-            runtime.get("sniff_schema") != "observer_v3"):
+            runtime.get("record_budget_bytes") != 61440 or
+            runtime.get("bounded_tcp_payloads_not_reassembled_stream") is not True or
+            runtime.get("sniff_schema") != "observer_v4"):
         raise SystemExit("Mandatory M4 sniff ARM runtime proof/pins missing")
     subprocess.run(["python3", "fw/device_minimal/check_elf.py", str(args.sniff),
                     "--allow-dynamic"], cwd=ROOT, check=True, timeout=30)
@@ -57,8 +58,9 @@ def main() -> int:
         "fw/m4_sniff/build_arm.sh", "fw/device_minimal/start.S",
         "fw/device_minimal/check_elf.py", "fw/d3/compat.h",
         "tools/fw/test_ram_m4_sniff_stock_qemu.py", "tools/fw/package_m4_sniff.py",
-        "tests/test_m4_sniff.py",
-        ".github/workflows/ram-debug-arm.yml"], cwd=ROOT).decode().split("\0")
+        "tests/test_m4_sniff.py", "tools/m4/decode_passive_records.py",
+        "tools/m4/test_decode_passive_records.py", "tools/m4/libflow_protocol.py",
+        "tools/m4/m4_policy.json", ".github/workflows/ram-debug-arm.yml"], cwd=ROOT).decode().split("\0")
     source_pins = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                    for name in tracked if name}
     manifest = {
@@ -68,8 +70,10 @@ def main() -> int:
         "sha256": {"c2m-m4-sniff": hashlib.sha256(blob).hexdigest()},
         "bytes": {"c2m-m4-sniff": len(blob)},
         "source_sha256": source_pins, "stock_qemu_m4_sniff": "PASS",
-        "sniff_schema": "observer_v3", "record_budget_bytes": 6144,
-        "capture_scope": "partial_payload_prefixes_not_reassembled_stream",
+        "sniff_schema": "observer_v4", "record_budget_bytes": 61440,
+        "capture_scope": "bounded_tcp_payloads_not_reassembled_stream",
+        "window_ms": 12000, "max_packets": 4096, "max_records": 48,
+        "per_service_records": 16, "per_service_bytes": 20480,
         "undefined_import_no_transmit_gate": True,
         "native_elf_hardware_executed": False, "camera_used": False,
         "radio_used": False, "firmware_package_created": False,

@@ -4,7 +4,8 @@
 Never touches camera, UART, network, vendor IPC, real package paths, or any
 status file. Portable --help/--self-test/CLI checks run on Windows and Linux.
 --observe runtime is Linux-only and must stay finite without usb0.
-observer_v3: shared pure m4_packet_line, IP-total payload, single-VLAN+options.
+observer_v4: shared pure m4_packet_line, IP-total payload, single-VLAN+options,
+1536B capture, 48/16/20480 quotas, exact-peer service selection.
 """
 from __future__ import annotations
 
@@ -30,9 +31,19 @@ REQUIRED_SOURCE = (
     "M4_SNIFF_MAX_PACKETS",
     "M4_SNIFF_SNAPLEN",
     "M4_SNIFF_PAYLOAD_HEX_BYTES",
+    "M4_SNIFF_RECORD_BUDGET",
+    "M4_SNIFF_LINE_BYTES",
+    "M4_SNIFF_MAX_POLLS",
+    "M4_SNIFF_POLL_MS",
     "M4_SNIFF_MAX_MS",
+    "M4_SNIFF_MAX_RECORDS",
+    "M4_SNIFF_SERVICE_RECORDS",
+    "M4_SNIFF_SERVICE_BYTES",
+    "M4_SNIFF_OUTPUT_BYTES",
     "m4_parse_frame",
     "m4_packet_line",
+    "m4_service_index",
+    "m4_should_store",
     "m4_self_test",
     "m4_observe",
     "payload_length",
@@ -46,8 +57,8 @@ REQUIRED_SOURCE = (
     "captured=",
     "truncated=",
     "payload_hex=",
-    "data_packets=",
     "completion=",
+    "elapsed_ms",
     "interrupted_signal",
     "iface_unavailable",
     "capture_unavailable",
@@ -324,9 +335,29 @@ static void h_note_line(const char *name, const char *out, int ret) {
     fflush(stdout);
 }
 
+static void h_make_tcp(uint8_t *f, unsigned cap, unsigned payload_len,
+                       uint8_t s0, uint8_t s1, uint8_t s2, uint8_t s3,
+                       uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
+                       unsigned sport, unsigned dport) {
+    unsigned total = 20u + 20u + payload_len;
+    unsigned k;
+    if (!f || cap < 14u + total) return;
+    memset(f, 0, cap);
+    f[12] = 0x08; f[13] = 0x00;
+    f[14] = 0x45; f[15] = 0x00;
+    h_put16(f, 16, total);
+    f[23] = 6;
+    f[26] = s0; f[27] = s1; f[28] = s2; f[29] = s3;
+    f[30] = d0; f[31] = d1; f[32] = d2; f[33] = d3;
+    f[34] = (uint8_t)((sport >> 8) & 0xFFu); f[35] = (uint8_t)(sport & 0xFFu);
+    f[36] = (uint8_t)((dport >> 8) & 0xFFu); f[37] = (uint8_t)(dport & 0xFFu);
+    f[46] = 0x50; f[47] = 0x18;
+    for (k = 0; k < payload_len; ++k) f[54 + k] = (uint8_t)(k & 0xFFu);
+}
+
 int main(void) {
-    char out[1024];
-    char hex[512];
+    char out[8192];
+    char hex[8192];
     struct m4_parsed p;
     int ret;
     int hexlen;
@@ -335,11 +366,18 @@ int main(void) {
     unsigned vtrunc = 999;
     unsigned i;
 
-    h_report(M4_SNIFF_MAX_PACKETS == 20, "const_max_packets");
-    h_report(M4_SNIFF_SNAPLEN == 512, "const_snaplen");
-    h_report(M4_SNIFF_PAYLOAD_HEX_BYTES == 96, "const_payload_hex");
-    h_report(M4_SNIFF_MAX_POLLS == 15, "const_max_polls");
-    h_report(M4_SNIFF_MAX_MS == UINT64_C(30000), "const_max_ms");
+    h_report(M4_SNIFF_MAX_PACKETS == 4096, "const_max_packets");
+    h_report(M4_SNIFF_SNAPLEN == 2048, "const_snaplen");
+    h_report(M4_SNIFF_PAYLOAD_HEX_BYTES == 1536, "const_payload_hex");
+    h_report(M4_SNIFF_RECORD_BUDGET == 61440, "const_record_budget");
+    h_report(M4_SNIFF_LINE_BYTES == 3584, "const_line_bytes");
+    h_report(M4_SNIFF_MAX_POLLS == 8192, "const_max_polls");
+    h_report(M4_SNIFF_POLL_MS == 100, "const_poll_ms");
+    h_report(M4_SNIFF_MAX_MS == UINT64_C(12000), "const_max_ms");
+    h_report(M4_SNIFF_MAX_RECORDS == 48, "const_max_records");
+    h_report(M4_SNIFF_SERVICE_RECORDS == 16, "const_service_records");
+    h_report(M4_SNIFF_SERVICE_BYTES == 20480, "const_service_bytes");
+    h_report(M4_SNIFF_OUTPUT_BYTES == 65536, "const_output_bytes");
     h_report(m4_self_test() == 0, "selftest");
 
     /* null-out must not crash (checks before memset) */
@@ -352,7 +390,7 @@ int main(void) {
     }
     h_report(1, "null_out_no_crash");
 
-    /* --- plain TCP: ETH+IP(20)+TCP(20)+5 "hello", sport 26012 --- */
+    /* --- plain TCP: ETH+IP(20)+TCP(20)+5 "hello", sport 26012 camera .123->.129 --- */
     {
         uint8_t f[14 + 20 + 20 + 5];
         memset(f, 0, sizeof(f));
@@ -616,10 +654,10 @@ int main(void) {
         h_report(h_get_uint(out, "truncated=", &vtrunc) == 0 && vtrunc == 0, "truncated_headers_trunc");
     }
 
-    /* --- max payload truncation: 200B payload, captured 96 --- */
+    /* --- 200B small payload fully retained under 1536B cap --- */
     {
         static uint8_t f[14 + 20 + 20 + 200];
-        char exp[193];
+        char exp[512];
         size_t k;
         memset(f, 0, sizeof(f));
         f[12] = 0x08; f[13] = 0x00;
@@ -629,55 +667,90 @@ int main(void) {
         f[34] = 0x65; f[35] = 0x9C; f[36] = 0xA8; f[37] = 0xFD;
         f[46] = 0x50; f[47] = 0x18;
         for (i = 0; i < 200; ++i) f[54 + i] = (uint8_t)(i & 0xFFu);
-        for (k = 0; k < 96; ++k) {
+        for (k = 0; k < 200; ++k) {
             static const char hd[] = "0123456789abcdef";
             uint8_t v = (uint8_t)(k & 0xFFu);
             exp[2 * k] = hd[(v >> 4) & 0x0Fu];
             exp[2 * k + 1] = hd[v & 0x0Fu];
         }
-        exp[192] = '\0';
+        exp[400] = '\0';
         memset(&p, 0, sizeof(p));
         memset(out, 0, sizeof(out));
         ret = m4_packet_line(out, sizeof(out), 13, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p);
-        h_note_line("max_payload_trunc", out, ret);
+        h_note_line("max_payload_full_200", out, ret);
         hexlen = h_get_hex(out, hex, sizeof(hex));
-        h_report(ret > 0, "max_payload_trunc_ret");
-        h_report(h_get_uint(out, "payload_len=", &vlen) == 0 && vlen == 200, "max_payload_trunc_len");
-        h_report(h_get_uint(out, "captured=", &vcap) == 0 && vcap == 96, "max_payload_trunc_cap");
-        h_report(hexlen == 192 && h_hex_ci_eq(hex, exp), "max_payload_trunc_hex");
-        h_report(p.payload_length == 200 && p.payload_captured == 96, "max_payload_trunc_struct");
+        h_report(ret > 0, "max_payload_full_200_ret");
+        h_report(h_get_uint(out, "payload_len=", &vlen) == 0 && vlen == 200, "max_payload_full_200_len");
+        h_report(h_get_uint(out, "captured=", &vcap) == 0 && vcap == 200, "max_payload_full_200_cap");
+        h_report(h_get_uint(out, "truncated=", &vtrunc) == 0 && vtrunc == 0, "max_payload_full_200_trunc");
+        h_report(hexlen == 400 && h_hex_ci_eq(hex, exp), "max_payload_full_200_hex");
+        h_report(p.payload_length == 200 && p.payload_captured == 200, "max_payload_full_200_struct");
     }
 
-    /* --- snap truncation: 600B payload, real 654, shown 512 --- */
+    /* --- large 1600B payload capped at 1536B --- */
     {
-        static uint8_t f[512];
-        char exp[193];
+        static uint8_t f[4096];
+        char exp[3100];
+        size_t k;
+        unsigned real = 14 + 20 + 20 + 1600;
+        memset(f, 0, sizeof(f));
+        f[12] = 0x08; f[13] = 0x00;
+        f[14] = 0x45;
+        h_put16(f, 16, 20 + 20 + 1600);
+        f[23] = 6;
+        f[34] = 0x65; f[35] = 0x9C; f[36] = 0xA8; f[37] = 0xFD;
+        f[46] = 0x50; f[47] = 0x18;
+        for (i = 0; i < 1600; ++i) f[54 + i] = (uint8_t)(i & 0xFFu);
+        for (k = 0; k < 1536; ++k) {
+            static const char hd[] = "0123456789abcdef";
+            uint8_t v = (uint8_t)(k & 0xFFu);
+            exp[2 * k] = hd[(v >> 4) & 0x0Fu];
+            exp[2 * k + 1] = hd[v & 0x0Fu];
+        }
+        exp[3072] = '\0';
+        memset(&p, 0, sizeof(p));
+        memset(out, 0, sizeof(out));
+        ret = m4_packet_line(out, sizeof(out), 14, real, f, real, &p);
+        h_note_line("large_1600_trunc", out, ret);
+        hexlen = h_get_hex(out, hex, sizeof(hex));
+        h_report(ret > 0, "large_1600_trunc_ret");
+        h_report(h_get_uint(out, "payload_len=", &vlen) == 0 && vlen == 1600, "large_1600_trunc_len");
+        h_report(h_get_uint(out, "captured=", &vcap) == 0 && vcap == 1536, "large_1600_trunc_cap");
+        h_report(h_get_uint(out, "truncated=", &vtrunc) == 0 && vtrunc == 1, "large_1600_trunc_trunc");
+        h_report(hexlen == 3072 && h_hex_ci_eq(hex, exp), "large_1600_trunc_hex");
+        h_report(p.payload_length == 1600 && p.payload_captured == 1536, "large_1600_trunc_struct");
+    }
+
+    /* --- snap truncation: 2500B payload, real 2554, shown 2048, captured 1536 --- */
+    {
+        static uint8_t f[4096];
+        char exp[3100];
         size_t k;
         memset(f, 0, sizeof(f));
         f[12] = 0x08; f[13] = 0x00;
         f[14] = 0x45;
-        h_put16(f, 16, 640);
+        h_put16(f, 16, 20 + 20 + 2500);
         f[23] = 6;
         f[34] = 0x65; f[35] = 0x9C; f[36] = 0xA8; f[37] = 0xFD;
         f[46] = 0x50; f[47] = 0x18;
-        for (i = 0; i < (unsigned)(512 - 54); ++i) f[54 + i] = (uint8_t)(i & 0xFFu);
-        for (k = 0; k < 96; ++k) {
+        for (i = 0; i < (unsigned)(2048 - 54); ++i) f[54 + i] = (uint8_t)(i & 0xFFu);
+        for (k = 0; k < 1536; ++k) {
             static const char hd[] = "0123456789abcdef";
             uint8_t v = (uint8_t)(k & 0xFFu);
             exp[2 * k] = hd[(v >> 4) & 0x0Fu];
             exp[2 * k + 1] = hd[v & 0x0Fu];
         }
-        exp[192] = '\0';
+        exp[3072] = '\0';
         memset(&p, 0, sizeof(p));
         memset(out, 0, sizeof(out));
-        ret = m4_packet_line(out, sizeof(out), 14, 654u, f, 512u, &p);
-        h_note_line("snap_trunc_large", out, ret);
+        ret = m4_packet_line(out, sizeof(out), 15, 2554u, f, 2048u, &p);
+        h_note_line("snap_2500_trunc", out, ret);
         hexlen = h_get_hex(out, hex, sizeof(hex));
-        h_report(ret > 0, "snap_trunc_large_ret");
-        h_report(h_get_uint(out, "payload_len=", &vlen) == 0 && vlen == 600, "snap_trunc_large_len");
-        h_report(h_get_uint(out, "captured=", &vcap) == 0 && vcap == 96, "snap_trunc_large_cap");
-        h_report(h_get_uint(out, "truncated=", &vtrunc) == 0 && vtrunc == 1, "snap_trunc_large_trunc");
-        h_report(hexlen == 192 && h_hex_ci_eq(hex, exp), "snap_trunc_large_hex");
+        h_report(ret > 0, "snap_2500_trunc_ret");
+        h_report(h_get_uint(out, "payload_len=", &vlen) == 0 && vlen == 2500, "snap_2500_trunc_len");
+        h_report(h_get_uint(out, "captured=", &vcap) == 0 && vcap == 1536, "snap_2500_trunc_cap");
+        h_report(h_get_uint(out, "truncated=", &vtrunc) == 0 && vtrunc == 1, "snap_2500_trunc_trunc");
+        h_report(hexlen == 3072 && h_hex_ci_eq(hex, exp), "snap_2500_trunc_hex");
     }
 
     /* --- return / capacity / null contract for packet_line --- */
@@ -694,13 +767,10 @@ int main(void) {
         f[54] = 0x68; f[55] = 0x65; f[56] = 0x6c; f[57] = 0x6c; f[58] = 0x6f;
         memset(&p, 0, sizeof(p));
         memset(out, 0, sizeof(out));
-        ret = m4_packet_line(out, sizeof(out), 15, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p);
+        ret = m4_packet_line(out, sizeof(out), 16, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p);
         h_report(ret > 0 && (size_t)ret == strlen(out) && out[strlen(out) - 1] == '\n', "packet_line_ret_nl");
         h_report(h_has(out, "payload_len=") && h_has(out, "captured=") && h_has(out, "truncated=") && h_has(out, "leg=") && h_has(out, "payload_hex="), "packet_line_fields");
         {
-            char tmp[64];
-            size_t cap = sizeof(tmp);
-            (void)cap;
             h_report(m4_packet_line(NULL, 100, 1, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p) == -1, "packet_line_null_out");
             h_report(m4_packet_line(small, sizeof(small), 1, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p) == -1, "packet_line_small_cap");
             h_report(m4_packet_line(out, 0, 1, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p) == -1, "packet_line_zero_cap");
@@ -709,9 +779,181 @@ int main(void) {
             char lb[64];
             memset(&p, 0, sizeof(p));
             memset(out, 0, sizeof(out));
-            ret = m4_packet_line(out, sizeof(out), 16, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p);
+            ret = m4_packet_line(out, sizeof(out), 17, (unsigned)sizeof(f), f, (unsigned)sizeof(f), &p);
             h_report(h_get_leg(out, lb, sizeof(lb)) == 0 && strcmp(lb, "adas_26012") == 0, "packet_line_leg_adas");
         }
+        {
+            uint8_t f2[14 + 20 + 20 + 5];
+            char lb[64];
+            h_make_tcp(f2, (unsigned)sizeof(f2), 5, 192,168,32,123, 192,168,32,129, 24012, 50000);
+            f2[54] = 0x68; f2[55] = 0x65; f2[56] = 0x6c; f2[57] = 0x6c; f2[58] = 0x6f;
+            memset(&p, 0, sizeof(p));
+            memset(out, 0, sizeof(out));
+            ret = m4_packet_line(out, sizeof(out), 18, (unsigned)sizeof(f2), f2, (unsigned)sizeof(f2), &p);
+            h_note_line("leg_24012", out, ret);
+            h_report(h_get_leg(out, lb, sizeof(lb)) == 0 && strcmp(lb, "adas_24012") == 0, "packet_line_leg_24012");
+        }
+        {
+            uint8_t f3[14 + 20 + 20 + 5];
+            char lb[64];
+            h_make_tcp(f3, (unsigned)sizeof(f3), 5, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&p, 0, sizeof(p));
+            memset(out, 0, sizeof(out));
+            ret = m4_packet_line(out, sizeof(out), 19, (unsigned)sizeof(f3), f3, (unsigned)sizeof(f3), &p);
+            h_note_line("leg_8080", out, ret);
+            h_report(h_get_leg(out, lb, sizeof(lb)) == 0 && strcmp(lb, "cardv_8080") == 0, "packet_line_leg_cardv");
+        }
+    }
+
+    /* --- m4_service_index: exact peer + direction + ports, ACK never stored --- */
+    {
+        uint8_t sf[256];
+        struct m4_parsed q;
+        h_report(m4_service_index(NULL) == -1, "svc_null");
+        {
+            uint8_t uf[14 + 20 + 8 + 4];
+            memset(uf, 0, sizeof(uf));
+            uf[12] = 0x08; uf[13] = 0x00;
+            uf[14] = 0x45;
+            h_put16(uf, 16, 32);
+            uf[23] = 17;
+            uf[26] = 192; uf[27] = 168; uf[28] = 32; uf[29] = 123;
+            uf[30] = 192; uf[31] = 168; uf[32] = 32; uf[33] = 129;
+            uf[34] = 0x1F; uf[35] = 0x90; uf[36] = 0xC3; uf[37] = 0x50;
+            h_put16(uf, 38, 12);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(uf, (unsigned)sizeof(uf), &q);
+            h_report(m4_service_index(&q) == -1, "svc_nontcp");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 0, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20, &q);
+            h_report(m4_service_index(&q) == -1, "svc_ack_skip");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == 0, "svc0_fwd");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,129, 192,168,32,123, 50000, 8080);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == 0, "svc0_rev");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 24012, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == 1, "svc1_fwd");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,129, 192,168,32,123, 50000, 24012);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == 1, "svc1_rev");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 26012, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == 2, "svc2_fwd");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,129, 192,168,32,123, 50000, 26012);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == 2, "svc2_rev");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,124, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == -1, "svc_wrong_peer");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 10,0,0,1, 10,0,0,2, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == -1, "svc_wrong_peer2");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 9999, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_service_index(&q) == -1, "svc_wrong_port");
+        }
+        {
+            uint8_t ff[42];
+            memset(ff, 0, sizeof(ff));
+            ff[12] = 0x08; ff[13] = 0x00;
+            ff[14] = 0x45;
+            h_put16(ff, 16, 28);
+            ff[20] = 0x20; ff[21] = 0x01;
+            ff[23] = 6;
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(ff, (unsigned)sizeof(ff), &q);
+            h_report(m4_service_index(&q) == -1, "svc_frag_skip");
+        }
+    }
+
+    /* --- m4_should_store: per-service 16-record / 20480-byte quotas, no starvation --- */
+    {
+        uint8_t sf[256];
+        struct m4_parsed q;
+        unsigned counts[3] = {0, 0, 0};
+        unsigned sbytes[3] = {0, 0, 0};
+        h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 8080, 50000);
+        memset(&q, 0, sizeof(q));
+        m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+        h_report(m4_should_store(&q, 100, counts, sbytes) == 0, "store_svc0_ok");
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 0, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20, &q);
+            h_report(m4_should_store(&q, 100, counts, sbytes) == -1, "store_ack_skip");
+        }
+        {
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_should_store(&q, 0, counts, sbytes) == -1, "store_zero_bytes");
+        }
+        {
+            counts[0] = 0; counts[1] = 16; counts[2] = 0;
+            sbytes[0] = 0; sbytes[1] = 0; sbytes[2] = 0;
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 24012, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_should_store(&q, 100, counts, sbytes) == -1, "store_count_full");
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_should_store(&q, 100, counts, sbytes) == 0, "store_no_starve_8080");
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 26012, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_should_store(&q, 100, counts, sbytes) == 2, "store_no_starve_26012");
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 24012, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            counts[0] = 0; counts[1] = 0; counts[2] = 0;
+            h_report(m4_should_store(&q, 100, counts, sbytes) == 1, "store_no_starve_24012");
+        }
+        {
+            counts[0] = 0; counts[1] = 0; counts[2] = 0;
+            sbytes[0] = 20400; sbytes[1] = 0; sbytes[2] = 0;
+            h_make_tcp(sf, (unsigned)sizeof(sf), 5, 192,168,32,123, 192,168,32,129, 8080, 50000);
+            memset(&q, 0, sizeof(q));
+            m4_parse_frame(sf, 14 + 20 + 20 + 5, &q);
+            h_report(m4_should_store(&q, 80, counts, sbytes) == 0, "store_byte_cap_ok");
+            h_report(m4_should_store(&q, 81, counts, sbytes) == -1, "store_byte_cap_full");
+            sbytes[0] = 20480;
+            h_report(m4_should_store(&q, 1, counts, sbytes) == -1, "store_byte_cap_exact_full");
+        }
+        h_report(m4_should_store(NULL, 100, counts, sbytes) == -1, "store_null");
     }
 
     printf("MAX_LINE len=%u\n", h_max_line);
@@ -733,7 +975,7 @@ def compile_harness(cc: str, tmpdir: Path) -> Path:
     result = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=90)
     if result.returncode:
         raise AssertionError(
-            f"harness compile failed (observer_v3 m4_packet_line likely missing):\n"
+            f"harness compile failed (observer_v4 m4_packet_line likely missing):\n"
             f"{result.stdout}{result.stderr}"
         )
     return harness_bin
@@ -771,7 +1013,7 @@ class M4SniffTests(unittest.TestCase):
         self.assertIn("usb0", result.stdout)
         self.assertIn("observer simulation", result.stdout)
         self.assertIn("never transmits", result.stdout)
-        self.assertIn("Payload-only", result.stdout)
+        self.assertIn("Full small TCP payloads", result.stdout)
         self.assertNotIn("--serve", result.stdout)
         self.assertNotIn("--db", result.stdout)
         self.assertNotIn("--gps-file", result.stdout)
@@ -794,9 +1036,10 @@ class M4SniffTests(unittest.TestCase):
         text = MAIN_C.read_text(encoding="utf-8")
         for token in REQUIRED_SOURCE:
             self.assertIn(token, text, f"missing sniffer token: {token}")
-        self.assertIn("m4_sniff=observer_v3", text)
+        self.assertIn("m4_sniff=observer_v4", text)
         self.assertNotIn("m4_sniff=observer_v1", text)
         self.assertNotIn("m4_sniff=observer_v2", text)
+        self.assertNotIn("m4_sniff=observer_v3", text)
         self.assertIn("delivery_sim=observer_simulation_not_production_delivery", text)
         # Observer body must never transmit or write files (comments ignored).
         start = text.find("static int m4_observe(")
@@ -816,15 +1059,27 @@ class M4SniffTests(unittest.TestCase):
         self.assertIn("recvfrom", stripped_body)
         self.assertNotIn("\r", text)
 
-    def test_source_v3_schema(self) -> None:
+    def test_source_v4_schema(self) -> None:
         text = MAIN_C.read_text(encoding="utf-8")
-        # Fixed bounds unchanged: 20pkt / 512 snap / 96 payload / 15 poll / 30s.
-        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_PACKETS\s+20\b")
-        self.assertRegex(text, r"#define\s+M4_SNIFF_SNAPLEN\s+512\b")
-        self.assertRegex(text, r"#define\s+M4_SNIFF_PAYLOAD_HEX_BYTES\s+96\b")
-        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_POLLS\s+15\b")
-        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_MS\b.*30000")
-        self.assertRegex(text, r"#define\s+M4_SNIFF_POLL_MS\s+1000\b")
+        # Fixed bounds v4: 4096 recv / 2048 snap / 1536 payload / 8192 poll / 12s.
+        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_PACKETS\s+4096\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_SNAPLEN\s+2048\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_PAYLOAD_HEX_BYTES\s+1536\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_RECORD_BUDGET\s+61440\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_LINE_BYTES\s+3584\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_POLLS\s+8192\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_POLL_MS\s+100\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_MS\b.*12000")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_MAX_RECORDS\s+48\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_SERVICE_RECORDS\s+16\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_SERVICE_BYTES\s+20480\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_OUTPUT_BYTES\s+65536\b")
+        self.assertRegex(text, r"#define\s+M4_SNIFF_IFACE_FIXED\s+\"usb0\"")
+        # Old v3 bounds must be gone as defines.
+        self.assertNotRegex(text, r"#define\s+M4_SNIFF_MAX_PACKETS\s+20\b")
+        self.assertNotRegex(text, r"#define\s+M4_SNIFF_SNAPLEN\s+512\b")
+        self.assertNotRegex(text, r"#define\s+M4_SNIFF_PAYLOAD_HEX_BYTES\s+96\b")
+        self.assertNotRegex(text, r"#define\s+M4_SNIFF_MAX_POLLS\s+15\b")
         # Struct keeps old fields plus IP-total payload helpers.
         for field in ("eth_type", "ip_proto", "sport", "dport", "tcp_flags",
                       "payload_offset", "is_arp", "is_ip", "is_tcp", "is_udp",
@@ -864,11 +1119,67 @@ class M4SniffTests(unittest.TestCase):
         for token in ("payload_len=", "captured=", "truncated=", "leg=", "payload_hex="):
             self.assertIn(token, pl_window, f"m4_packet_line must format {token}")
         self.assertIn(r"\n", pl_window, "m4_packet_line must terminate with newline")
+        self.assertIn("adas_24012", text, "v4 must add adas_24012 leg")
+        self.assertIn("adas_26012", text, "v4 must keep adas_26012 leg")
+        self.assertIn("cardv_8080", text, "v4 must keep cardv_8080 leg")
         # Single-VLAN + IP-total + TCP/UDP length discipline present.
         lowered = text.lower()
         for token in ("0x8100", "payload_length", "payload_captured", "truncated"):
-            self.assertIn(token, text, f"missing v3 parser token: {token}")
-        self.assertIn("0x3fff", lowered, "missing v3 frag mask 0x3FFF")
+            self.assertIn(token, text, f"missing v4 parser token: {token}")
+        self.assertIn("0x3fff", lowered, "missing v4 frag mask 0x3FFF")
+        # Pure exact-peer service selection.
+        self.assertRegex(
+            text,
+            r"static\s+int\s+m4_service_index\s*\(\s*const\s+struct\s+m4_parsed\s*\*\s*p\s*\)",
+            "m4_service_index signature must match spec",
+        )
+        svc_start = text.find("static int m4_service_index(")
+        self.assertGreaterEqual(svc_start, 0)
+        self.assertLess(svc_start, obs_start, "m4_service_index must be pure (before m4_observe)")
+        svc_window = text[svc_start:svc_start + 2000]
+        for token in ("0xc0a8207b", "0xc0a82081", "8080", "24012", "26012"):
+            self.assertIn(token, svc_window, f"m4_service_index must handle {token}")
+        self.assertIn("payload_length", svc_window)
+        self.assertIn("payload_captured", svc_window)
+        self.assertIn("is_tcp", svc_window)
+        # Pure quota helper.
+        self.assertIn("m4_should_store", text)
+        self.assertRegex(
+            text,
+            r"(?s)static\s+int\s+m4_should_store\s*\(.*counts.*service_bytes",
+            "m4_should_store signature must carry counts/service_bytes",
+        )
+        store_start = text.find("static int m4_should_store(")
+        self.assertGreaterEqual(store_start, 0)
+        self.assertLess(store_start, obs_start, "m4_should_store must be pure (before m4_observe)")
+        store_window = text[store_start:store_start + 2000]
+        self.assertIn("M4_SNIFF_SERVICE_RECORDS", store_window)
+        self.assertIn("M4_SNIFF_SERVICE_BYTES", store_window)
+        self.assertIn("m4_service_index", store_window, "m4_should_store must call m4_service_index")
+        # Observer must use helper before print, with separate limits.
+        obs_end = text.find("#endif", obs_start)
+        obs_body = text[obs_start:obs_end]
+        stripped_obs = strip_c_comments(obs_body)
+        self.assertIn("m4_should_store", stripped_obs, "observer must gate records via m4_should_store")
+        self.assertIn("M4_SNIFF_MAX_PACKETS", stripped_obs)
+        self.assertIn("M4_SNIFF_MAX_RECORDS", stripped_obs)
+        self.assertIn("M4_SNIFF_MAX_POLLS", stripped_obs)
+        self.assertIn("M4_SNIFF_MAX_MS", stripped_obs)
+        self.assertIn("M4_SNIFF_SERVICE_RECORDS", stripped_obs + text, "quotas must reference per-service records")
+        self.assertIn("M4_SNIFF_RECORD_BUDGET", stripped_obs)
+        self.assertIn("elapsed_ms", stripped_obs, "summary must include elapsed_ms")
+        # Protocol-zero nonblock receive-only attach.
+        self.assertRegex(stripped_obs, r"socket\s*\(\s*AF_PACKET\s*,\s*SOCK_RAW\s*\|\s*SOCK_NONBLOCK")
+        self.assertRegex(stripped_obs, r",\s*0\s*\)")
+        self.assertIn("MSG_TRUNC", stripped_obs)
+        self.assertIn("SOCK_NONBLOCK", stripped_obs)
+        # Help wording v4, no pretend-15s full-window claim.
+        self.assertIn("Full small TCP payloads", text)
+        self.assertIn("never transmits", text)
+        self.assertIn("observer simulation", text)
+        self.assertIn("usb0", text)
+        self.assertNotIn("15 seconds", text, "v4 must not pretend 15s full window")
+        self.assertNotIn("30000", text, "v4 window is 12000ms, not 30000")
 
     def test_arm_script_guards(self) -> None:
         raw = ARM_SCRIPT.read_bytes().decode("utf-8")
@@ -890,15 +1201,17 @@ class M4SniffTests(unittest.TestCase):
         result = self.run_bin(self.sniff, "--observe", timeout=25)
         self.assertEqual(result.stderr, "", result.stderr)
         self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr)
-        self.assertLess(len(result.stdout.encode("utf-8")), 8192)
-        self.assertIn("m4_sniff=observer_v3", result.stdout)
+        self.assertLess(len(result.stdout.encode("utf-8")), 65536)
+        self.assertIn("m4_sniff=observer_v4", result.stdout)
         self.assertIn("iface_fixed=usb0", result.stdout)
-        self.assertIn("payload_hex_fixed=96", result.stdout)
+        self.assertIn("payload_hex_fixed=1536", result.stdout)
         self.assertIn("delivery_sim=observer_simulation_not_production_delivery", result.stdout)
         self.assertIn("status_writes=0", result.stdout)
         self.assertIn("transmit_bytes=0", result.stdout)
         self.assertIn("summary packets=", result.stdout)
-        self.assertIn("data_packets=", result.stdout)
+        self.assertIn("records=", result.stdout)
+        self.assertIn("completion=", result.stdout)
+        self.assertIn("elapsed_ms=", result.stdout)
         for forbidden in ("c2m_d4_status", "--serve", "R.420", "latitude", "longitude"):
             self.assertNotIn(forbidden, result.stdout)
 
@@ -923,9 +1236,13 @@ class M4SniffTests(unittest.TestCase):
             "[PASS] tcp_offset_small_hex",
             "[PASS] tcp_offset_beyond_hex",
             "[PASS] truncated_headers_hex",
-            "[PASS] max_payload_trunc_hex",
-            "[PASS] snap_trunc_large_hex",
+            "[PASS] max_payload_full_200_hex",
+            "[PASS] large_1600_trunc_hex",
+            "[PASS] snap_2500_trunc_hex",
             "[PASS] packet_line_ret_nl",
+            "[PASS] packet_line_leg_adas",
+            "[PASS] packet_line_leg_24012",
+            "[PASS] packet_line_leg_cardv",
             "[PASS] null_out_no_crash",
         ):
             self.assertIn(label, result.stdout, f"missing harness case: {label}")
@@ -936,8 +1253,45 @@ class M4SniffTests(unittest.TestCase):
         self.assertRegex(result.stdout, r"payload_hex=(\s|\n)")
         # Labeled packet lines for assertions.
         for name in ("plain_tcp", "vlan_single_options", "padded_ack_no_payload",
-                     "udp_basic", "max_payload_trunc", "snap_trunc_large"):
+                     "udp_basic", "max_payload_full_200", "large_1600_trunc", "snap_2500_trunc"):
             self.assertIn(f"LINE {name} ", result.stdout)
+
+    def test_service_index_and_quotas(self) -> None:
+        harness = compile_harness(self.cc, Path(self.tmp.name))
+        result = subprocess.run([str(harness)], text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0,
+                         f"harness failed:\nSTDOUT:\n{result.stdout[-8000:]}\nSTDERR:\n{result.stderr[-4000:]}")
+        self.assertIn("HARNESS_RESULT PASS", result.stdout, result.stdout[-8000:])
+        for label in (
+            "[PASS] svc_null",
+            "[PASS] svc_nontcp",
+            "[PASS] svc_ack_skip",
+            "[PASS] svc0_fwd",
+            "[PASS] svc0_rev",
+            "[PASS] svc1_fwd",
+            "[PASS] svc1_rev",
+            "[PASS] svc2_fwd",
+            "[PASS] svc2_rev",
+            "[PASS] svc_wrong_peer",
+            "[PASS] svc_wrong_peer2",
+            "[PASS] svc_wrong_port",
+            "[PASS] svc_frag_skip",
+            "[PASS] store_svc0_ok",
+            "[PASS] store_ack_skip",
+            "[PASS] store_zero_bytes",
+            "[PASS] store_count_full",
+            "[PASS] store_no_starve_8080",
+            "[PASS] store_no_starve_26012",
+            "[PASS] store_no_starve_24012",
+            "[PASS] store_byte_cap_ok",
+            "[PASS] store_byte_cap_full",
+            "[PASS] store_byte_cap_exact_full",
+            "[PASS] store_null",
+            "[PASS] const_max_records",
+            "[PASS] const_service_records",
+            "[PASS] const_service_bytes",
+        ):
+            self.assertIn(label, result.stdout, f"missing harness case: {label}")
 
     def test_output_bound_worst(self) -> None:
         harness = compile_harness(self.cc, Path(self.tmp.name))
@@ -948,16 +1302,16 @@ class M4SniffTests(unittest.TestCase):
         assert m is not None
         max_line = int(m.group(1))
         self.assertGreater(max_line, 0)
-        self.assertLess(max_line, 1024, f"single record too large: {max_line}")
-        # Worst case: 20 max records + headers/trailer must stay <8192.
+        self.assertLessEqual(max_line, 3584, f"single record too large: {max_line}")
+        # Worst case: 48 max records capped by 61440 global + headers must stay <65536.
         header_budget = 1024
         if LINUX and not has_usb0():
             obs = subprocess.run([str(self.sniff), "--observe"],
                                  text=True, capture_output=True, timeout=25)
             if obs.returncode == 0:
                 header_budget = len(obs.stdout.encode("utf-8"))
-        worst = header_budget + 20 * max_line
-        self.assertLess(worst, 8192, f"worst 20*({max_line})+{header_budget}={worst} >= 8192")
+        worst = min(48 * max_line, 61440) + header_budget
+        self.assertLess(worst, 65536, f"worst min(48*{max_line},61440)+{header_budget}={worst} >= 65536")
 
 
 if __name__ == "__main__":

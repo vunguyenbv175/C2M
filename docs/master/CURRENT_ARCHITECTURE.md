@@ -101,6 +101,11 @@ UART control was used in those diagnostics.
   status message, speed/sign widget or injection proven. Hardware access stopped;
   see `../firmware/M4_SNIFF_V3_HARDWARE_20261016.md` and
   `../firmware/M4_SNIFF_L1_PLAN_20261016.md`.
+  V4 now prepared offline to address V3 truncation/status starvation: complete
+  small1536B TCP payloads, actual12s window, ACK-excluded per-service quotas,
+  bounded total work/bytes and safe offline contiguous-only decode. New ARM
+  gates/exact pins and fresh owner session still required before hardware;
+  see `../firmware/M4_SNIFF_V4_PLAN_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that
   value nor advertising artwork proves3D speed/sign support; see

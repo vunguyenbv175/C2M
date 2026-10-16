@@ -1,9 +1,10 @@
 /* RAM-only passive M4 RNDIS usb0 observer. No transmit/file/status writer.
  * CLI only --observe/--self-test/--help, no interface/path overrides.
- * Partial TCP payload prefixes, NOT a reconstructed stream or M4 delivery.
- * Fixed 20 received packets / 15 poll calls / 30s monotonic deadline;
- * 512B snaplen, 96B payload prefix, 6144B record budget, <8192B stdout.
- * Actual duration can be much shorter than 15s when packets are ready.
+ * Complete small TCP payloads (up to1536B), NOT a reconstructed full stream
+ * or M4 delivery. Fixed12s monotonic window, independent4096 receive/8192
+ * poll work bounds,48 records,61440 record bytes, stdout<65536B.
+ * ACKs consume work/time, not data quotas. Each proven service has its own
+ * 16-record/20480-byte quota so fast ADAS traffic cannot starve8080 status.
  */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
@@ -16,14 +17,18 @@
 #include <string.h>
 
 #define M4_SNIFF_IFACE_FIXED "usb0"
-#define M4_SNIFF_MAX_PACKETS 20
-#define M4_SNIFF_SNAPLEN 512
-#define M4_SNIFF_PAYLOAD_HEX_BYTES 96
-#define M4_SNIFF_RECORD_BUDGET 6144
-#define M4_SNIFF_LINE_BYTES 640
-#define M4_SNIFF_MAX_POLLS 15
-#define M4_SNIFF_POLL_MS 1000
-#define M4_SNIFF_MAX_MS UINT64_C(30000)
+#define M4_SNIFF_MAX_PACKETS 4096
+#define M4_SNIFF_SNAPLEN 2048
+#define M4_SNIFF_PAYLOAD_HEX_BYTES 1536
+#define M4_SNIFF_RECORD_BUDGET 61440
+#define M4_SNIFF_LINE_BYTES 3584
+#define M4_SNIFF_MAX_POLLS 8192
+#define M4_SNIFF_POLL_MS 100
+#define M4_SNIFF_MAX_MS UINT64_C(12000)
+#define M4_SNIFF_MAX_RECORDS 48
+#define M4_SNIFF_SERVICE_RECORDS 16
+#define M4_SNIFF_SERVICE_BYTES 20480
+#define M4_SNIFF_OUTPUT_BYTES 65536
 
 struct m4_parsed {
     uint16_t eth_type, sport, dport;
@@ -49,7 +54,7 @@ static uint32_t m4_be32(const uint8_t *b)
  * invalid lengths and IP fragments never produce a claimed payload slice.
  * One VLAN tag only; unsupported traffic remains metadata-only.
  * len may be a snaplen prefix; payload_length is the advertised IP/L4 size,
- * payload_captured is the prefix actually retained (at most 96 bytes). */
+ * payload_captured is the slice actually retained (at most1536 bytes). */
 static void m4_parse_frame(const uint8_t *b, unsigned len, struct m4_parsed *o)
 {
     unsigned ip_off = 14, ihl, total, base, transport, header, available;
@@ -129,6 +134,7 @@ static int m4_packet_line(char *out, size_t capacity, unsigned number,
         p->payload_offset = p->payload_length = p->payload_captured = 0;
     }
     if (p->is_tcp && (p->sport == 26012 || p->dport == 26012)) leg = "adas_26012";
+    else if (p->is_tcp && (p->sport == 24012 || p->dport == 24012)) leg = "adas_24012";
     else if (p->is_tcp && (p->sport == 8080 || p->dport == 8080)) leg = "cardv_8080";
     else if (p->is_arp) leg = "arp";
     kept = p->payload_captured;
@@ -152,11 +158,37 @@ static int m4_packet_line(char *out, size_t capacity, unsigned number,
     return (int)used;
 }
 
+/* Pure exact-peer selection, no runtime broadening/filter overrides. */
+static int m4_service_index(const struct m4_parsed *p)
+{
+    unsigned service;
+    if (!p || !p->is_tcp || !p->payload_length || !p->payload_captured) return -1;
+    if (p->src_ip == UINT32_C(0xc0a8207b) && p->dst_ip == UINT32_C(0xc0a82081)) service = p->sport;
+    else if (p->dst_ip == UINT32_C(0xc0a8207b) && p->src_ip == UINT32_C(0xc0a82081)) service = p->dport;
+    else return -1;
+    if (service == 8080) return 0;
+    if (service == 24012) return 1;
+    if (service == 26012) return 2;
+    return -1;
+}
+
+static int m4_should_store(const struct m4_parsed *p, unsigned bytes,
+                           const unsigned counts[3], const unsigned service_bytes[3])
+{
+    int index = m4_service_index(p);
+    if (index < 0 || !counts || !service_bytes || !bytes ||
+        counts[index] >= M4_SNIFF_SERVICE_RECORDS ||
+        service_bytes[index] > M4_SNIFF_SERVICE_BYTES ||
+        bytes > M4_SNIFF_SERVICE_BYTES - service_bytes[index]) return -1;
+    return index;
+}
+
 static int m4_self_test(void)
 {
-    uint8_t frame[180];
+    uint8_t frame[512];
     char line[M4_SNIFF_LINE_BYTES];
     struct m4_parsed p;
+    unsigned counts[3] = {0, 0, 0}, bytes[3] = {0, 0, 0};
     memset(frame, 0, sizeof(frame));
     frame[12] = 8; frame[14] = 0x45;
     frame[17] = 45; frame[23] = 6;
@@ -168,6 +200,17 @@ static int m4_self_test(void)
         !p.is_tcp || p.sport != 26012 || p.payload_offset != 54 ||
         p.payload_length != 5 || p.payload_captured != 5 ||
         !strstr(line, "payload_hex=68656c6c6f\n")) return 1;
+    p.src_ip = UINT32_C(0xc0a8207b); p.dst_ip = UINT32_C(0xc0a82081);
+    if (m4_should_store(&p, 200, counts, bytes) != 2) return 1;
+    counts[2] = M4_SNIFF_SERVICE_RECORDS;
+    if (m4_should_store(&p, 200, counts, bytes) != -1) return 1;
+    p.sport = 8080;
+    if (m4_should_store(&p, 200, counts, bytes) != 0) return 1;
+    /* Shipping ARM self-test exercises a200B payload without prefix loss. */
+    frame[17] = 240; memset(frame + 54, 0x5a, 200);
+    if (m4_packet_line(line, sizeof(line), 2, 254, frame, 254, &p) < 0 ||
+        p.payload_length != 200 || p.payload_captured != 200 ||
+        !strstr(line, "truncated=0")) return 1;
     /* Padded ACK: Ethernet padding is NOT TCP payload. */
     frame[17] = 40;
     if (m4_packet_line(line, sizeof(line), 1, 60, frame, 60, &p) < 0 ||
@@ -188,9 +231,10 @@ static void usage(void)
 {
     puts("usage: c2m-m4-sniff --observe | --self-test | --help\n"
          "RAM-only passive observer; fixed interface usb0 (no overrides).\n"
-         "Fixed bounds: 20 packets, 512B snaplen, 96B payload hex; 15 polls, 30s bound.\n"
-         "Payload-only prefixes, explicit captured/truncated and seq/ack; NOT a full TCP stream.\n"
-         "6144B record budget, <8192B stdout; duration may be shorter than 15 seconds.\n"
+         "Full small TCP payloads up to1536B, 2048B snaplen; captured/truncated and seq/ack.\n"
+         "12s window, 4096 received packets, 8192 polls; ACK-only packets are not stored.\n"
+         "48 records total, 16 and20480B per service; 61440B records, <65536B stdout.\n"
+         "Work/output limits may stop early; NOT a full TCP stream.\n"
          "Receive-only AF_PACKET attach; never transmits and never writes files.\n"
          "Delivery is observer simulation, not production delivery.");
 }
@@ -228,7 +272,8 @@ static int m4_observe(void)
     char line[M4_SNIFF_LINE_BYTES];
     uint64_t start, now, last, deadline;
     unsigned ifindex, packets = 0, polls = 0, records = 0, record_bytes = 0;
-    unsigned adas = 0, cardv = 0, data = 0, payload_bytes = 0;
+    unsigned counts[3] = {0, 0, 0}, service_bytes[3] = {0, 0, 0};
+    unsigned skipped = 0, quota_skipped = 0, payload_bytes = 0, truncated = 0;
     const char *completion = "iface_unavailable";
     int fd = -1, rc = 0;
     memset(&action, 0, sizeof(action));
@@ -238,10 +283,11 @@ static int m4_observe(void)
         milliseconds(&start) || start > UINT64_MAX - M4_SNIFF_MAX_MS) return 1;
     last = start;
     deadline = start + M4_SNIFF_MAX_MS;
-    printf("m4_sniff=observer_v3\niface_fixed=usb0 packets_fixed=20 snaplen_fixed=512 "
-           "payload_hex_fixed=96 polls_fixed=15 monotonic_bound_ms=30000 record_budget=6144\n"
+    printf("m4_sniff=observer_v4\niface_fixed=usb0 packets_fixed=4096 snaplen_fixed=2048 "
+           "payload_hex_fixed=1536 polls_fixed=8192 monotonic_bound_ms=12000 record_budget=61440\n"
+           "service_records_fixed=16 service_bytes_fixed=20480 records_fixed=48\n"
            "delivery_sim=observer_simulation_not_production_delivery\n"
-           "capture_scope=partial_payload_prefixes_not_reassembled_stream\n"
+           "capture_scope=bounded_tcp_payloads_not_reassembled_stream\n"
            "status_writes=0 transmit_bytes=0\n");
     if (fflush(stdout)) return 1;
     ifindex = if_nametoindex(M4_SNIFF_IFACE_FIXED);
@@ -267,17 +313,21 @@ static int m4_observe(void)
         socklen_t peer_len = sizeof(peer);
         ssize_t got;
         unsigned shown;
-        int pr, n;
+        int pr, n, index;
+        unsigned wait_ms;
         if (stopping) { rc = 1; completion = "interrupted_signal"; break; }
-        if (milliseconds(&now) || now < last || now >= deadline) {
-            rc = 1; completion = "error_monotonic_bound"; break;
+        if (milliseconds(&now) || now < last) {
+            rc = 1; completion = "error_clock"; break;
         }
+        if (now >= deadline) { completion = "time_window_complete"; break; }
         last = now;
+        wait_ms = deadline - now < M4_SNIFF_POLL_MS ? (unsigned)(deadline - now) : M4_SNIFF_POLL_MS;
         ++polls;
-        pr = poll(&pfd, 1, M4_SNIFF_POLL_MS);
-        if (milliseconds(&now) || now < last || now >= deadline) {
-            rc = 1; completion = "error_monotonic_bound"; break;
+        pr = poll(&pfd, 1, (int)wait_ms);
+        if (milliseconds(&now) || now < last) {
+            rc = 1; completion = "error_clock"; break;
         }
+        if (now >= deadline) { completion = "time_window_complete"; break; }
         last = now;
         if (stopping) { rc = 1; completion = "interrupted_signal"; break; }
         if (pr < 0) {
@@ -303,6 +353,9 @@ static int m4_observe(void)
         shown = (unsigned)got < sizeof(buf) ? (unsigned)got : (unsigned)sizeof(buf);
         n = m4_packet_line(line, sizeof(line), packets, (unsigned)got, buf, shown, &p);
         if (n < 0) { rc = 1; completion = "error_format"; break; }
+        if (m4_service_index(&p) < 0) { ++skipped; continue; }
+        index = m4_should_store(&p, (unsigned)n, counts, service_bytes);
+        if (index < 0) { ++quota_skipped; continue; }
         if ((unsigned)n > M4_SNIFF_RECORD_BUDGET - record_bytes) {
             completion = "output_budget_partial"; break;
         }
@@ -311,22 +364,25 @@ static int m4_observe(void)
         }
         record_bytes += (unsigned)n;
         ++records;
-        if (p.is_tcp && (p.sport == 26012 || p.dport == 26012)) ++adas;
-        if (p.is_tcp && (p.sport == 8080 || p.dport == 8080)) ++cardv;
-        if (p.payload_length) ++data;
+        ++counts[index];
+        service_bytes[index] += (unsigned)n;
         payload_bytes += p.payload_captured;
-        if (milliseconds(&now) || now < last || now >= deadline) {
-            rc = 1; completion = "error_monotonic_bound"; break;
-        }
+        if (p.payload_captured < p.payload_length) ++truncated;
+        if (records >= M4_SNIFF_MAX_RECORDS) { completion = "record_limit_partial"; break; }
+        if (milliseconds(&now) || now < last) { rc = 1; completion = "error_clock"; break; }
+        if (now >= deadline) { completion = "time_window_complete"; break; }
         last = now;
     }
     if (!rc && packets >= M4_SNIFF_MAX_PACKETS) completion = "packet_limit_partial";
 done:
     if (fd >= 0) close(fd);
-    printf("summary packets=%u records=%u data_packets=%u adas_leg=%u cardv_leg=%u "
-           "payload_bytes_captured=%u record_bytes=%u completion=%s "
+    if (milliseconds(&now) || now < last) { rc = 1; completion = "error_clock"; now = last; }
+    printf("summary packets=%u polls=%u records=%u data_packets=%u adas_leg=%u cardv_leg=%u lane_leg=%u "
+           "skipped=%u quota_skipped=%u truncated_records=%u payload_bytes_captured=%u "
+           "record_bytes=%u elapsed_ms=%" PRIu64 " completion=%s "
            "delivery_sim=observer_simulation_not_production_delivery status_writes=0 transmit_bytes=0\n",
-           packets, records, data, adas, cardv, payload_bytes, record_bytes, completion);
+           packets, polls, records, records, counts[2], counts[0], counts[1], skipped, quota_skipped,
+           truncated, payload_bytes, record_bytes, now - start, completion);
     if (fflush(stdout)) return 1;
     return rc;
 }
