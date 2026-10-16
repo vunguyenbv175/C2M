@@ -13,8 +13,9 @@ Safety / scope:
   captures flush pending incomplete frame bytes. Mid-stream runs have no
   guaranteed WS boundary: offset-0 of each run is a candidate boundary and is
   reported as ``candidate_unverified`` unless it decodes to a complete
-  recognized schema. Candidate boundaries are NOT an authenticated WS
-  handshake: no handshake was observed; passive bytes only.
+  recognized schema. Initial HTTP Upgrade headers are parsed only at offset0
+  with bounded contiguous bytes; matched request/101 accept proves passive
+  framing, NOT authenticated identity or receiver/rendering capability.
 - SAFE metadata only. Never emits payload values (speed/warning/TTC/time /
   frame IDs / GPS / MAC / raw bytes / source strings / credentials). Unknown
   protocol field names from raw JSON/MessagePack are NEVER published;
@@ -63,12 +64,18 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from ws_upgrade import parse_upgrade_prefix, match_upgrade
+except ImportError:
+    from tools.m4.ws_upgrade import parse_upgrade_prefix, match_upgrade
+
 _LIB_AVAILABLE = False
 try:
     from libflow_protocol import (
         KNOWN_TOPICS as _LIB_KNOWN_TOPICS,
         KNOWN_KEYS as _LIB_KNOWN_KEYS,
         SCHEMAS as _LIB_SCHEMAS,
+        SCHEMA_FIELD_KINDS as _LIB_SCHEMA_FIELD_KINDS,
         decode_ws_binary as _lib_decode_ws_binary,
     )
     _LIB_AVAILABLE = True
@@ -78,6 +85,7 @@ except Exception:
             KNOWN_TOPICS as _LIB_KNOWN_TOPICS,
             KNOWN_KEYS as _LIB_KNOWN_KEYS,
             SCHEMAS as _LIB_SCHEMAS,
+            SCHEMA_FIELD_KINDS as _LIB_SCHEMA_FIELD_KINDS,
             decode_ws_binary as _lib_decode_ws_binary,
         )
         _LIB_AVAILABLE = True
@@ -88,12 +96,14 @@ if _LIB_AVAILABLE:
     KNOWN_TOPICS = set(_LIB_KNOWN_TOPICS)
     KNOWN_INNER_KEYS = set(_LIB_KNOWN_KEYS)
     INNER_SCHEMAS = {k: set(v) for k, v in _LIB_SCHEMAS.items()}
+    SCHEMA_FIELD_KINDS = {k: dict(v) for k, v in _LIB_SCHEMA_FIELD_KINDS.items()}
 else:
     # Fail closed: without the real protocol source nothing is known and
     # no fallback decoder is constructed.
     KNOWN_TOPICS: set[str] = set()
     KNOWN_INNER_KEYS: set[str] = set()
     INNER_SCHEMAS: dict[str, set[str]] = {}
+    SCHEMA_FIELD_KINDS: dict[str, dict[str, str]] = {}
 
 # Documented JSON shapes (mirrors replay_guard.SHAPES / m4_policy allow-list).
 DOCUMENTED_JSON_SHAPES: dict[str, set[str]] = {
@@ -102,6 +112,9 @@ DOCUMENTED_JSON_SHAPES: dict[str, set[str]] = {
     "ScreenModeSet": {"type", "uuid", "theme"},
     "ClientConn": {"type", "uuid", "connected"},
 }
+# Receive-only observation schemas do NOT widen ALLOW-L2 or replay shapes.
+# GPSSpeed fields are statically corroborated and10 native V4 examples match.
+OBSERVED_JSON_SHAPES = {"GPSSpeed": {"type", "uuid", "speed"}}
 ALLOW_JSON_UUIDS = set(DOCUMENTED_JSON_SHAPES)
 DENY_JSON_UUIDS = {"AdasStatus", "HeavyCalibStatus", "GPSLevel", "GPSSpeed", "RecordVoice"}
 
@@ -158,8 +171,10 @@ DISCLAIMER_NO_INJECTION = (
 )
 DISCLAIMER_BOUNDARY = (
     "flow start boundaries are candidate WS frame alignments from passive "
-    "bytes only; no WS handshake was observed or authenticated, so "
-    "candidate_unverified means no recognized schema was decoded there."
+    "bytes unless a bounded initial HTTP handshake is explicitly reported. "
+    "matched_passive_upgrade checks RFC6455 request/accept, not device identity "
+    "or receiver/rendering capability; it is not authenticated. "
+    "candidate_unverified means no recognized schema was decoded at that boundary."
 )
 
 _RECORD_RE = re.compile(
@@ -294,8 +309,9 @@ def safe_json_summary(obj: dict) -> dict:
         "uuid": uuid_val if uuid_known else ("REDACTED_UNKNOWN" if "uuid" in obj else "ABSENT"),
         "known_message": bool(uuid_known),
     }
-    if uuid_known and uuid_val in DOCUMENTED_JSON_SHAPES:
-        want = DOCUMENTED_JSON_SHAPES[uuid_val]
+    if uuid_known and uuid_val in (DOCUMENTED_JSON_SHAPES | OBSERVED_JSON_SHAPES):
+        receive_only = uuid_val in OBSERVED_JSON_SHAPES
+        want = OBSERVED_JSON_SHAPES[uuid_val] if receive_only else DOCUMENTED_JSON_SHAPES[uuid_val]
         keys = set(obj.keys())
         # keys here are strings by construction (json dict); filter safely.
         present = sorted([k for k in keys if isinstance(k, str) and k in want])
@@ -306,7 +322,16 @@ def safe_json_summary(obj: dict) -> dict:
         out["extra_field_count"] = extra_count
         out["shape_ok"] = (extra_count == 0 and len(missing) == 0)
         out["field_type_kinds"] = {k: _type_kind(obj[k]) for k in present}
-        out["recognized_schema"] = bool(out["shape_ok"])
+        out["recognized_schema"] = bool(out["shape_ok"] and not receive_only)
+        if receive_only:
+            out["receive_only_schema"] = True
+            out["field_types_ok"] = (type(obj.get("type")) is int
+                                     and type(obj.get("speed")) is int
+                                     and type(obj.get("uuid")) is str)
+            out["stock_type_matches"] = type(obj.get("type")) is int and obj["type"] == 1601
+            out["observed_schema_ok"] = bool(out["shape_ok"] and out["field_types_ok"]
+                                               and out["stock_type_matches"])
+            out["transmit_denied"] = True
     else:
         # Deny-known UUIDs without a documented transmit shape, or unknown
         # UUIDs: publish counts/types only, never raw field names or values.
@@ -410,9 +435,9 @@ def safe_msgpack_summary(payload: bytes) -> dict:
             out["body_item_count"] = len(body)
             out["body_known_fields_present"] = present
             out["body_known_fields_missing"] = missing
-            out["body_extra_field_count"] = len(bkeys - expected)
+            out["body_extra_field_count"] = len(body) - len(present)
             out["body_field_type_kinds"] = {k: _type_kind(body[k]) for k in present}
-            out["schema_ok"] = (len(bkeys - expected) == 0 and len(missing) == 0)
+            out["schema_ok"] = (out["body_extra_field_count"] == 0 and len(missing) == 0)
             out["known_message"] = bool(topic_known and key_known)
         elif isinstance(key_val, str) and key_val in INNER_SCHEMAS and isinstance(body, list):
             expected = INNER_SCHEMAS[key_val]
@@ -423,7 +448,7 @@ def safe_msgpack_summary(payload: bytes) -> dict:
                 if isinstance(item, dict):
                     ik = {k for k in item.keys() if isinstance(k, str)}
                     items_missing_total += len(expected - ik)
-                    items_extra_total += len(ik - expected)
+                    items_extra_total += len(item) - len(ik & expected)
                     checked += 1
             out["body_kind"] = "list"
             out["body_item_count"] = len(body)
@@ -464,6 +489,17 @@ def safe_msgpack_summary(payload: bytes) -> dict:
         out["body_field_names_redacted"] = True
         out["schema_ok"] = False
         out["known_message"] = False
+    if inner_is_dict and inner.get("key") == "pedWarning":
+        # This native dict contains booleans, not a vector/enum/numeric alarm.
+        # ints0/1 are deliberately NOT accepted as bools. Receive proof never
+        # broadens replay policy or changes the PCW normalization driver.
+        body = inner.get("data")
+        kinds = SCHEMA_FIELD_KINDS.get("pedWarning", {})
+        out["body_field_types_ok"] = bool(kinds and isinstance(body, dict) and all(
+            _type_kind(body.get(field)) == kind for field, kind in kinds.items()))
+        out["schema_ok"] = bool(out["schema_ok"] and isinstance(body, dict)
+                                  and out["body_field_types_ok"])
+        out["known_message"] = bool(out["known_message"] and outer.get("topic") == "ped")
     out["decode_ok"] = bool(outer_is_dict and inner_is_dict)
     if not out["decode_ok"]:
         out["decode_error"] = "libflow envelope is not dict outer+inner"
@@ -707,6 +743,19 @@ class FlowState:
         self.suspended: str | None = None
         self.start_boundary: str | None = None
         self.had_data = False
+        # HTTP is recognized ONLY at the initial captured byte of a directed
+        # flow. Never search for a header/frame after omitted TCP bytes.
+        self.upgrade: dict | None = None
+        self.upgrade_checked = False
+        self.upgrade_at_start = True
+        self.handshake_status = "not_observed"
+
+    def _break_upgrade_boundary(self):
+        self.upgrade_at_start = False
+        self.upgrade_checked = True
+        if self.handshake_status == "pending":
+            self.handshake_status = "incomplete_due_to_gap"
+            self.suspended = "http_upgrade_gap"
 
     def _discard_pending(self):
         # Flush incomplete trailing bytes of the current run; keep completed.
@@ -721,6 +770,7 @@ class FlowState:
         data = rec["payload"]
         length = rec["payload_len"]
         if rec["truncated"]:
+            self._break_upgrade_boundary()
             self.truncated_skipped += 1
             # Truncated captures are unusable: flush pending, skip the whole
             # advertised payload span (do not append captured prefix).
@@ -736,6 +786,7 @@ class FlowState:
             self.gaps += 1
             return
         if length > MAX_PAYLOAD_PER_RECORD:
+            self._break_upgrade_boundary()
             self.oversize_skipped += 1
             self._discard_pending()
             self.frame_offset_base += self.run_decoded
@@ -772,6 +823,7 @@ class FlowState:
             return
         if delta < SEQ_MOD // 2:
             # Forward gap: flush pending incomplete, start new candidate run.
+            self._break_upgrade_boundary()
             self.gaps += 1
             self._discard_pending()
             self.frame_offset_base += self.run_decoded
@@ -838,6 +890,21 @@ class FlowState:
     def _try_parse(self):
         if self.suspended is not None:
             return
+        if not self.upgrade_checked and self.upgrade_at_start:
+            upgrade = parse_upgrade_prefix(bytes(self.run_buf), self.server_sender)
+            status = upgrade["status"]
+            if status == "pending":
+                self.handshake_status = "pending"
+                return
+            self.upgrade_checked = True
+            if status == "invalid":
+                self.handshake_status = "invalid_http_upgrade"
+                self.suspended = "invalid_http_upgrade"
+                return
+            if status == "valid":
+                self.upgrade = upgrade  # private key/accept NEVER enter report
+                self.run_decoded = upgrade["consumed"]
+                self.handshake_status = "valid_response_only" if self.server_sender else "valid_request_only"
         if len(self.frames) >= MAX_FRAMES_PER_FLOW:
             if self.suspended is None:
                 self.suspended = "frame_cap_exceeded"
@@ -1018,6 +1085,24 @@ def decode_capture_text(text: str) -> dict:
                 warnings, len(records), malformed,
             )
 
+    # Pair only exact reversed 4-tuples from the same capture. A passive
+    # RFC6455 key/accept match establishes framing, NOT authenticated identity
+    # or application/rendering support. No missing peer is guessed.
+    for key, st in flows.items():
+        if not st.server_sender or st.upgrade is None:
+            continue
+        peer = flows.get((key[1], key[0], key[3], key[2]))
+        if peer is None or peer.upgrade is None:
+            continue
+        if match_upgrade(peer.upgrade, st.upgrade):
+            st.handshake_status = peer.handshake_status = "matched_passive_upgrade"
+        else:
+            st.handshake_status = peer.handshake_status = "accept_mismatch"
+            st.suspended = peer.suspended = "http_upgrade_accept_mismatch"
+            # Invalid upgrade is not evidence of complete WS application data.
+            st.frames.clear()
+            peer.frames.clear()
+
     flow_reports = []
     complete_messages = 0
     recognized_messages = 0
@@ -1027,6 +1112,10 @@ def decode_capture_text(text: str) -> dict:
         # Ensure start boundary set even with no complete frame.
         if st.start_boundary is None:
             st.start_boundary = "candidate_unverified" if st.had_data else "no_data"
+        if st.handshake_status == "matched_passive_upgrade":
+            st.start_boundary = "matched_passive_upgrade"
+        elif st.handshake_status == "accept_mismatch":
+            st.start_boundary = "invalid_http_upgrade"
         if st.start_boundary == "candidate_unverified":
             candidate_unverified_flows += 1
         msgs = [f for f in st.frames
@@ -1052,7 +1141,12 @@ def decode_capture_text(text: str) -> dict:
             "oversize_skipped": st.oversize_skipped,
             "suspended": st.suspended,
             "start_boundary": st.start_boundary,
-            "frames": st.frames[:64],
+            "http_upgrade": {
+                "status": st.handshake_status,
+                "header_bytes": st.upgrade["consumed"] if st.upgrade else 0,
+                "passive_not_authenticated": True,
+            },
+            "frames": st.frames[:MAX_FRAMES_PER_FLOW],
             "complete_messages": len(msgs),
             "recognized_messages": sum(1 for f in msgs if f.get("recognized")),
         })

@@ -110,6 +110,13 @@ UART control was used in those diagnostics.
   new HTTP Upgrade captured. Cause unknown; no retry/injection/extra WS client.
   Recorder/AP/D4 healthy in snapshots; owner reports normal/no M4 flicker.
   Hardware access stopped; see `../firmware/M4_SNIFF_V4_HARDWARE_20261016.md`.
+  Offline follow-up now decodes original stdout directly with bounded HTTP
+  Upgrade matching;2 additional ped messages identified as `pedWarning`
+  (`ped_on`/`pcw_on`, bool/bool), receive schema only, replay still default-DENY.
+  No M4 receiver binary/layout/widget control found; public C2M manual confirms
+  safe-distance seconds, not speed-in3D support. Exact receiver/update/recovery
+  artifact is now the implementation blocker, not more of the same capture;
+  see `../firmware/M4_RECEIVER_LAYOUT_GAP_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that
   value nor advertising artwork proves3D speed/sign support; see

@@ -558,6 +558,21 @@ class DecodeTests(unittest.TestCase):
         t = report_text(rep)
         self.assertNotIn("98771", t)
 
+    def test_receive_only_gps_schema_does_not_allow_transmit(self):
+        for speed, ident, valid in ((98771, 1601, True), (True, 1601, False),
+                                    (1.5, 1601, False), (3, True, False), (3, 1602, False)):
+            obj = {"type": ident, "uuid": "GPSSpeed", "speed": speed}
+            ws = ws_encode(1, json.dumps(obj).encode(), masked=False)
+            rep = decode_capture_text(srv_record(1, ws, 1000))
+            js = rep["flows"][0]["frames"][0]["json"]
+            self.assertEqual(js["uuid_class"], "DENY")
+            self.assertTrue(js["transmit_denied"])
+            self.assertFalse(js["recognized_schema"])
+            self.assertEqual(js["observed_schema_ok"], valid)
+            self.assertEqual(js["known_fields_present"], ["speed", "type", "uuid"])
+            self.assertNotIn("98771", report_text(rep))
+        self.assertNotIn("GPSSpeed", dec.ALLOW_JSON_UUIDS)
+
     def test_msgpack_undecoded_not_complete(self):
         # Valid WS binary frame, garbage MessagePack payload.
         ws = ws_encode(0x2, b"\xff\xff\xff", masked=False)

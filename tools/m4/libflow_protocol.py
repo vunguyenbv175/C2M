@@ -17,13 +17,21 @@ KNOWN_TOPICS={"vehicle","ped","lane","tsr"}
 # TSR key/topic names are static evidence only. Do NOT assign a complete
 # SCHEMAS entry or infer speed units/enums before a runtime frame is captured.
 STATIC_TSR_KEYS={"tsr_trace_res_list","tsr_warning"}
-KNOWN_KEYS={"vehicleWarning","vehicleMeasure","pedestrians","laneWarningRes"} | STATIC_TSR_KEYS
+KNOWN_KEYS={"vehicleWarning","vehicleMeasure","pedestrians","laneWarningRes","pedWarning"} | STATIC_TSR_KEYS
 
 SCHEMAS={
  "vehicleWarning":{"vehicle_id","headway","warning_level","fcw","headway_warning","vb_warning","sag_warning"},
  "vehicleMeasure":{"vehicle_class","vehicle_id","vehicle_width","longitude_dist","lateral_dist","ttc","is_crucial","is_second_crucial"},
  "pedestrians":{"id","world_x","world_y","is_key","is_danger","ttc_m","ttc","have_bike"},
  "laneWarningRes":{"lanelines","ldw_info","turn_radius","turn_frequently"},
+ "pedWarning":{"ped_on","pcw_on"},
+}
+
+# Documented field type kinds for strict bool validation (usable by parent
+# decoder without duplicating policy). Shape-only schema_ok stays in the
+# generic decoder until type proof lands there; lib warnings carry type proof.
+SCHEMA_FIELD_KINDS={
+ "pedWarning":{"ped_on":"bool","pcw_on":"bool"},
 }
 
 @dataclass
@@ -61,7 +69,7 @@ def decode_ws_binary(payload:bytes) -> DecodeResult:
         for k in ("frame_id","time","key","data"):
             if k not in inner:warnings.append(f"inner missing key: {k}")
         key=inner.get("key")
-        if key in SCHEMAS:
+        if isinstance(key,str) and key in SCHEMAS:
             body=inner.get("data")
             expected=SCHEMAS[key]
             if key in {"vehicleMeasure","pedestrians"}:
@@ -73,11 +81,25 @@ def decode_ws_binary(payload:bytes) -> DecodeResult:
                             if missing:warnings.append(f"{key}[{i}] missing: {sorted(missing)}")
                             if extra:warnings.append(f"{key}[{i}] extra: {sorted(extra)}")
                 else:warnings.append(f"{key} data is not an array")
+            elif key == "pedWarning":
+                if not isinstance(body,dict):
+                    warnings.append("pedWarning data is not a dict")
+                else:
+                    missing=expected-set(body); extra=set(body)-expected
+                    if missing:warnings.append(f"{key} missing: {sorted(missing)}")
+                    if extra:warnings.append(f"{key} extra: {sorted(extra)}")
+                    kinds=SCHEMA_FIELD_KINDS.get(key, {})
+                    for field in sorted(expected):
+                        if field in body:
+                            want=kinds.get(field)
+                            val=body[field]
+                            if want == "bool" and not isinstance(val,bool):
+                                warnings.append(f"{key} {field} not bool")
             elif isinstance(body,dict):
                 missing=expected-set(body); extra=set(body)-expected
                 if missing:warnings.append(f"{key} missing: {sorted(missing)}")
                 if extra:warnings.append(f"{key} extra: {sorted(extra)}")
-        elif key in STATIC_TSR_KEYS:
+        elif isinstance(key,str) and key in STATIC_TSR_KEYS:
             warnings.append("TSR key statically known; payload schema/units runtime-unverified")
         elif key is not None:
             warnings.append(f"unknown inner key: {key}")

@@ -38,6 +38,9 @@ jobs:
           cat work/evidence/host-d4-shadow.txt
           python3 tests/test_m4_sniff.py > work/evidence/host-m4-sniff.txt 2>&1
           python3 tools/m4/test_decode_passive_records.py >> work/evidence/host-m4-sniff.txt 2>&1
+          python3 tools/m4/test_ws_upgrade.py >> work/evidence/host-m4-sniff.txt 2>&1
+          python3 tools/m4/test_passive_upgrade.py >> work/evidence/host-m4-sniff.txt 2>&1
+          python3 tools/m4/test_ped_warning.py >> work/evidence/host-m4-sniff.txt 2>&1
           cat work/evidence/host-m4-sniff.txt
       - name: Install ARM tools and QEMU (versions recorded)
         run: |

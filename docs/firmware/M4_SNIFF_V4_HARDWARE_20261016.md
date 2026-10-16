@@ -116,6 +116,18 @@ speed, UTC/frame IDs, locations and arbitrary source/unknown strings are never
 printed in safe reports. No sign/limit result was established; this bounded
 stationary sample cannot establish absence in the full stock stream.
 
+## Offline follow-up (original verdict and files preserved)
+
+The direct decoder now validates bounded initial HTTP Upgrade and request/accept
+matching, so no private prelude-removal step is needed for this sample. It
+recovers all39 server messages from the ORIGINAL stdout; the2 additional ped
+messages are now corroborated `pedWarning` (dict `ped_on`/`pcw_on`, bool/bool).
+Static key/field evidence predates the capture; no values are published. This
+adds a RECEIVE schema only, not a transmit permission or semantic normalization.
+Original22-file manifest/hashes and CI38866208565 pins remain unchanged; the
+26012 preservation gate remains FAILED. See
+`M4_RECEIVER_LAYOUT_GAP_20261016.md` for direct-decode and receiver artifacts.
+
 ## Consequence for the requested3D speed/sign implementation
 
 **Native GPSSpeed reaches the M4 USB link.** The prior “cardv emits speed only

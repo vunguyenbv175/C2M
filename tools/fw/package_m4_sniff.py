@@ -59,7 +59,9 @@ def main() -> int:
         "fw/device_minimal/check_elf.py", "fw/d3/compat.h",
         "tools/fw/test_ram_m4_sniff_stock_qemu.py", "tools/fw/package_m4_sniff.py",
         "tests/test_m4_sniff.py", "tools/m4/decode_passive_records.py",
-        "tools/m4/test_decode_passive_records.py", "tools/m4/libflow_protocol.py",
+        "tools/m4/test_decode_passive_records.py", "tools/m4/ws_upgrade.py",
+        "tools/m4/test_ws_upgrade.py", "tools/m4/test_passive_upgrade.py",
+        "tools/m4/test_ped_warning.py", "tools/m4/libflow_protocol.py",
         "tools/m4/m4_policy.json", ".github/workflows/ram-debug-arm.yml"], cwd=ROOT).decode().split("\0")
     source_pins = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                    for name in tracked if name}

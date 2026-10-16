@@ -2,6 +2,42 @@
 
 These are passive-first helpers derived from the stock C2M binaries.
 
+## Native capture status (2026-10-16)
+
+V3/V4 proved RNDIS `usb0` camera↔M4 with native `8080`, `24012`, `26012`.
+V4 retained42 untruncated payload records;39 complete server messages,
+including10 GPSSpeed. **The unchanged26012 connection gate FAILED** (client
+port changed); owner reported normal/no flicker, no retry or active injection.
+Transport decode does not prove3D receiver/layout capability. See
+`../../docs/firmware/M4_SNIFF_V4_HARDWARE_20261016.md`.
+
+Decode the existing PRIVATE stdout on a workstation only:
+
+```sh
+python3 tools/m4/decode_passive_records.py PRIVATE_CAPTURE --report PRIVATE_REPORT
+```
+
+The decoder now handles bounded initial HTTP Upgrade prefixes directly,
+including segmented headers and RFC6455 request/accept matching on exact
+reversed4-tuples. No byte search or fabricated gap filling; no key/header/speed/
+warning values in safe output. `matched_passive_upgrade` means framing match,
+not authenticated device, supported widget or approval to replay. Midstream
+flows remain candidate boundaries. `GPSSpeed` has a receive-only schema and
+remains DENY; `pedWarning` observation never enables a warning sender.
+
+Offline synthetic regression:
+
+```sh
+python3 tools/m4/test_decode_passive_records.py
+python3 tools/m4/test_ws_upgrade.py
+python3 tools/m4/test_passive_upgrade.py
+python3 tools/m4/test_ped_warning.py
+```
+
+All commands below are historical discovery tools, **not** authorization for a
+new camera session. With M4 attached use no second application client; capture
+requires a separately notified finite-session approval and exact native gates.
+
 ## 0. Prove transport before assuming it
 
 First collect two read-only device baselines:
