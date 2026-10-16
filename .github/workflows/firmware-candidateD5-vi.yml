@@ -90,6 +90,7 @@ jobs:
             exit 1
           fi
           cat work/tsr_experiment_tests.txt
+          python3 tools/fw/test_restore_vi_base.py
           python3 tests/test_tree_ownership.py
           python3 tests/test_d4_stock_paths.py
           python3 tests/test_d3_vi_paths.py
@@ -674,6 +675,7 @@ jobs:
           # profile only, never --tsr-patch.
           test -f fw/d5/health.sh
           test ! -L fw/d5/health.sh
+          export C2M_TEST_SYSROOT="$PWD/work/sysroot"
           "$PWD/work/stock-sh" -n fw/d5/health.sh
           python3 tools/fw/test_d5_health.py > work/d5_health_tests.txt 2>&1 || \
             { cat work/d5_health_tests.txt; exit 1; }

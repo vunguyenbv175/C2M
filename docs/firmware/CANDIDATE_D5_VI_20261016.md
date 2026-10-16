@@ -87,6 +87,23 @@ No drive/card staging/formatting is implied. Freeze the existing known D4-EN
 release and source pins for rollback; a VI-stock reference A is NOT EN rollback.
 Rollback firmware does not automatically reverse persistent TSR profile flags.
 
+## Updater card identified, no formatting
+
+Owner inserted the updater card. Read-only identification found D:, label
+C2M_FLASH_B, removable FAT32, disk1 SMI USB DISK33201061888B (non-system/non-boot),
+partition1. Existing root D4 four-file updater matched prior known inner SHA256
+`4aec53d0b64d5e54aad6b7ddd6c4fe932f21872f102c9fcc746b2bb0f8f797be` and token
+20261015000001. All4 files were frozen/read back locally. A separate local D4
+rollback with token20261016000002 was prepared with version-only ALLOWLIST-OK;
+no device rollback acceptance is claimed. Intended D5 token20261016000001 is
+separate. No card write was performed merely because it was inserted.
+
+Owner explicitly approved replacing ONLY the4 root updater files with D5 after
+all gates/readback and fresh card identity checks. No format/media-directory
+removal, camera access, auto-flash or automatic rollback is authorized. Leave
+Normal/Event/Photo/C2M_DIAG metadata untouched. Local frozen/reference packages
+are not copied together onto the updater root.
+
 ## Hardware acceptance (not performed by package creation)
 
 Only after separate notice/approval, safe stationary power and identified updater

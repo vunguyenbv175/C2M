@@ -88,6 +88,7 @@ jobs:
           python3 tools/fw/test_debug_mutation.py
           python3 tests/test_d5_debug_supervisor.py
           python3 tests/test_vi_package_validation.py
+          python3 tools/fw/test_restore_vi_base.py
           python3 tests/test_tree_ownership.py
           python3 tests/test_d4_stock_paths.py
           python3 tests/test_d3_vi_paths.py
