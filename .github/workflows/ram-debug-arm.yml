@@ -35,6 +35,8 @@ jobs:
           python3 tests/test_d4_shadow_trace.py >> work/evidence/host-d4-shadow.txt 2>&1
           python3 tools/fw/test_shadow_package_gate.py >> work/evidence/host-d4-shadow.txt 2>&1
           cat work/evidence/host-d4-shadow.txt
+          python3 tests/test_m4_sniff.py > work/evidence/host-m4-sniff.txt 2>&1
+          cat work/evidence/host-m4-sniff.txt
       - name: Install ARM tools and QEMU (versions recorded)
         run: |
           set -euo pipefail
@@ -83,6 +85,8 @@ jobs:
           cat work/evidence/arm-gps-probe.txt
           bash fw/d4/build_shadow_arm.sh --out work/arm-d4-shadow --sysroot work/private/sysroot > work/evidence/arm-d4-shadow.txt 2>&1
           cat work/evidence/arm-d4-shadow.txt
+          bash fw/m4_sniff/build_arm.sh --out work/arm-m4-sniff --sysroot work/private/sysroot > work/evidence/arm-m4-sniff.txt 2>&1
+          cat work/evidence/arm-m4-sniff.txt
       - name: Actual ARM D4 producer synthetic runtime under stock QEMU (GATE)
         run: |
           set -euo pipefail
@@ -95,6 +99,12 @@ jobs:
           sudo timeout 30 python3 tools/fw/test_ram_shadow_stock_qemu.py \
             --binary work/arm-d4-shadow/c2m-d4-shadow --sysroot work/private/sysroot \
             --report work/evidence/arm-d4-shadow-runtime.json
+      - name: Exact finite ARM M4 sniff no-transmit runtime (GATE)
+        run: |
+          set -euo pipefail
+          sudo timeout 30 python3 tools/fw/test_ram_m4_sniff_stock_qemu.py \
+            --binary work/arm-m4-sniff/c2m-m4-sniff --sysroot work/private/sysroot \
+            --report work/evidence/arm-m4-sniff-runtime.json
       - name: Assemble RAM-only bundle and source pins
         run: |
           set -euo pipefail
@@ -148,6 +158,9 @@ jobs:
             work/evidence/arm-d4-producer-runtime.json
             work/evidence/arm-d4-shadow.txt
             work/evidence/arm-d4-shadow-runtime.json
+            work/evidence/arm-m4-sniff.txt
+            work/evidence/arm-m4-sniff-runtime.json
+            work/evidence/host-m4-sniff.txt
             work/evidence/manifest.json
             work/evidence/SHA256SUMS.txt
             work/evidence/private-vault-location.txt
@@ -157,10 +170,11 @@ jobs:
           for f in work/evidence/host-gps.txt work/evidence/host-d4.txt \
             work/evidence/host-nlprobe.txt work/evidence/host-gps-probe.txt \
             work/evidence/host-arm-build-guards.txt work/evidence/host-sysroot.txt \
-            work/evidence/host-d4-shadow.txt work/evidence/arm-d4.txt \
+            work/evidence/host-d4-shadow.txt work/evidence/host-m4-sniff.txt work/evidence/arm-d4.txt \
             work/evidence/arm-nlprobe.txt work/evidence/arm-gps-probe.txt \
-            work/evidence/arm-d4-shadow.txt work/evidence/arm-d4-shadow-runtime.stdout.txt \
-            work/evidence/arm-d4-shadow-runtime.stderr.txt; do
+            work/evidence/arm-d4-shadow.txt work/evidence/arm-m4-sniff.txt work/evidence/arm-d4-shadow-runtime.stdout.txt \
+            work/evidence/arm-d4-shadow-runtime.stderr.txt work/evidence/arm-m4-sniff-runtime.stdout.txt \
+            work/evidence/arm-m4-sniff-runtime.stderr.txt; do
             if test -f "$f"; then cat "$f"; fi
           done
       - name: Cleanup private runtime and credentials
