@@ -45,8 +45,9 @@ Do not publish raw GPS samples, recording filenames or private assets.
   and `c2m-signs`. Private proof: `live_asset_hash_comparison.json`.
 - `cardv`, `adas`, lane accelerator/postprocessor, D3 web/controller, D4 producer
   and debug supervisor were running. Front-camera recording metadata advanced
-  to a new segment; the previous segment reached its closed-file size. This
-  supports recording activity but is not a playback/decoded-video acceptance.
+  to a new segment; the previous segment was larger in the later listing. This
+  supports recording activity but proves neither finalization nor successful
+  playback/decoded-video acceptance.
 - The stock public FWVersion string remains the EN base version. The updater
   token is not expected to replace that string; runtime hash comparison is
   stronger evidence of the installed debug assets.
