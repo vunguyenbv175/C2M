@@ -59,7 +59,11 @@ of the working AP.
 **AP+STA remains unproven, not disproven.** The current safe controller must
 keep UNKNOWN and refuse interface creation/association when advertisement is
 empty or unadvertised. Source diagnostic errors now distinguish those cases
-from malformed framing without authorizing any new Wi-Fi action.
+from malformed framing only after validating the complete target response,
+without authorizing any new Wi-Fi action. General Linux/Chrome CI
+`38834222285` passed on source `7832fd5` including empty/missing/wrong-PHY/
+duplicate/truncated cases. This source clarification is not installed on the
+camera and is not a target-driver or AP+STA association test.
 
 Potential next static work is to trace exact wiphy-field initialization and
 VIF type/adapter limits using this hash and kernel4.9 layout. Only a proven

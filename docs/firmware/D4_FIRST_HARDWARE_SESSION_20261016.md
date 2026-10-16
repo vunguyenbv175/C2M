@@ -115,12 +115,16 @@ functions:
    normal calibration/greeting behavior and independent playback review were
    not instrumented; do not infer these from process/file metadata alone.
 2. The bounded `/tmp` binary roundtrip plus reviewed shell execution and cleanup
-   passed. Uploaded native ELF execution, wrong-key/password/forwarding
-   negatives and causal listener expiry/AP-loss behavior remain hardware gates.
-   Do not extend/restart the debug window just to keep access.
-3. Prove and test the GPS subsecond contract locally; only then propose a
-   stationary RAM-only evaluation. Preserve two advancing UTC seconds and
-   stale/future/integrity protections.
-4. Run the isolated read-only nl80211 probe while preserving AP and recording.
+   passed in this first session. Subsequent finite native ARM observers also
+   executed and cleaned successfully; see `RAM_OBSERVERS_HARDWARE_20261016.md`.
+   Wrong-key/password/forwarding negatives and causal listener expiry/AP-loss
+   behavior remain hardware gates. Do not extend/restart the debug window.
+3. The GPS subsecond contract was subsequently proven statically, fixed in
+   source and tested via stock QEMU plus the live finite observer (10/10 decode,
+   freshness acquired). The installed old D4 producer is still unchanged.
+   Preserve two advancing UTC seconds and stale/future/integrity protections.
+4. The later isolated nl80211 probe executed without an AP/recording regression.
+   Single/ordinary dump showed an empty combination attribute, not proof of
+   usable or impossible AP+STA. The split output was truncated.
 5. Do not promote real-route advisories, browser beep, AP+STA, Bluetooth RF or
    M4 3D speed/signs until each is actually observed.
