@@ -126,10 +126,18 @@ UART control was used in those diagnostics.
   **Preservation FAILED:**24012/26012 absent postflight;8080/recorder/AP/PIDs
   healthy in snapshots, owner reports M4 normal. No auth reply/key/shell/UI,
   no retry; see `../firmware/M4_ADB_AUTH_STOP_HARDWARE_20261016.md`.
-  Owner later approved NEW standard one-public-key authorization request;
-  dedicated private key stays on laptop, helper/gates in preparation, no
-  authorization request sent yet. No bypass or speed/sign/warning injection.
-  EN/VI review found no demonstrated new M4 sign route; no VI flash performed.
+  Owner later approved NEW standard one-public-key authorization request.
+  CI38889073536/source141cbc6 passed; one17:56 request sent766B, waited33.271s,
+  no response/no authorization/no visible dialog; USB released/RAM cleaned.
+  All three native connections/recording/AP/PIDs/hashes preserved in snapshots;
+  owner normal. Private key stayed on laptop; no shell/service/sign injection.
+  Owner reconfirmed onlyONE button and NO touch: do not assume Android-style
+  tap-Allow UI or invent hidden/input sequences. No retry/further camera access.
+  GPS2D icon briefly unlit then owner reported GPS returned BEFORE prepared
+  read-only diagnostic ran; cause UNKNOWN, no verified GNSS fault or repair.
+  See `../firmware/M4_STANDARD_AUTH_HARDWARE_20261016.md`.
+  EN/VI review found no demonstrated new M4 sign route; VI extra speed function
+  is a tail-jump alias toWSSetGPSSpeed, not new widget evidence. No VI flash.
   See `../firmware/M4_RECEIVER_LAYOUT_GAP_20261016.md`,
   `../firmware/M4_ACTIVE_TEST_BOUNDARY_20261016.md` and
   `../firmware/M4_ADB_IDENTIFICATION_PLAN_20261016.md`,

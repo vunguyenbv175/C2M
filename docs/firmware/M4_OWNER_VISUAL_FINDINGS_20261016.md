@@ -83,6 +83,14 @@ access. M4 firmware/software version remains UNKNOWN, not inferred from camera
 firmware, advertising or exterior shape. The normal physical toggle is proven
 by owner use; its internal message/renderer implementation is still unverified.
 
+Owner later explicitly confirmed the M4 has **NO touch input**, only that one
+physical button. No Android authorization dialog or method to select Allow is
+established. Instructions to tap an assumed ADB permission dialog were not
+supported by this unit's known input/UI and are withdrawn. Do not substitute
+button sequences or injected input to try to approve an unseen dialog. The
+one standard public-key request produced no response and no owner-visible
+prompt; see `M4_STANDARD_AUTH_HARDWARE_20261016.md`.
+
 Do not try guessed long-press/double-press/hidden-menu sequences, reset, remove
 the screen or alter calibration to obtain identity information. No assumption
 that the button enables speed/sign widgets or maps to `ScreenModeSet/theme`.

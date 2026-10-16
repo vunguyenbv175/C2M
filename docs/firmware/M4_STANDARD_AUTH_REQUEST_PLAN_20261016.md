@@ -46,6 +46,24 @@ not a security hash). Expected fingerprint and public-payload checksum are
 retained privately outside the repo; compare the fingerprint locally if a
 prompt appears. Never accept a different key prompt.
 
+## Completed outcome and input correction
+
+Final source `141cbc60cd09935e7eb488bd4d0ab7de25611792`, ARM run38889073536
+PASS; one request executed at17:56,766B TX,33.271s native elapsed, no response,
+no authorization, interface released and RAM cleanup verified. All three native
+connections and recorder/AP/process/hash checks passed in snapshots; owner
+reported normal and no dialog. No retry. See `M4_STANDARD_AUTH_HARDWARE_20261016.md`.
+
+Owner then explicitly reconfirmed only ONE button and NO touch input. The
+Android-style tap-Allow instruction above was an unverified UI assumption,
+not a supported operation on this M4. Do not repeat it or invent button/input
+sequences. No supported authorization selection method is established.
+
+Owner briefly reported the GPS icon unlit in2D, then said GPS returned before
+any requested GPS read-only diagnosis was executed. That transient has no
+established cause; no ADB/GPS/config/restart follow-up was performed. Native
+GPS continuity or ADB causation cannot be inferred from the icon alone.
+
 ## Gates and preservation
 
 Portable public-key/frame validation + actual source fake-USB success/failure
