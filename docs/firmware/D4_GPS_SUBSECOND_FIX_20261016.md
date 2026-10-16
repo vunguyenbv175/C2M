@@ -111,9 +111,12 @@ Call the member `subsecond_raw`, not `millis` or `hundredths`:
   live timing or live D4 producer acceptance. Private report:
   `build/gps-replay-20261016/replay_report.json`; no coordinates, speed,
   heading or raw bytes are included in that report.
-- Linux safe-reader/producer/browser gates must still pass in CI before
-  calling the patch validated for the target. No updated native ARM binary
-  has been uploaded or run on the camera.
+- General Linux CI `38829034134` on source `aa3f7b9` passed: full Python
+  reader/producer regressions, real Chrome D3/D4/end-to-end suites and existing
+  generic ARM idle build/ELF gates. This does not cross-build the updated D4
+  producer or prove its exact stock-userspace runtime; those target-specific
+  gates remain before RAM evaluation. No updated native ARM binary has been
+  uploaded or run on the camera.
 
 The already-flashed build still has the defect; this source fix does not
 change it. A later reviewed RAM-only evaluation must be bounded and performed

@@ -123,10 +123,10 @@ struct nlmsgerr { int error; uint32_t msglen; };
 #define NL80211_ATTR_MAC 6
 #define NL80211_ATTR_WIPHY_BANDS 22
 #define NL80211_ATTR_WIPHY_FREQ 38
-#define NL80211_ATTR_SUPPORTED_COMMANDS 49
-#define NL80211_ATTR_SSID 51
-#define NL80211_ATTR_INTERFACE_COMBINATIONS 116
-#define NL80211_ATTR_SPLIT_WIPHY_DUMP 167
+#define NL80211_ATTR_SUPPORTED_COMMANDS 50
+#define NL80211_ATTR_SSID 52
+#define NL80211_ATTR_INTERFACE_COMBINATIONS 120
+#define NL80211_ATTR_SPLIT_WIPHY_DUMP 174
 #define NL80211_IFACE_COMB_LIMITS 1
 #define NL80211_IFACE_COMB_MAXNUM 2
 #define NL80211_IFACE_COMB_STA_AP_BI_MATCH 3
@@ -136,6 +136,14 @@ struct nlmsgerr { int error; uint32_t msglen; };
 #define NL80211_IFTYPE_STATION 2
 #define NL80211_IFTYPE_AP 3
 #endif /* __linux__ */
+
+/* Cross-check portable constants against real Linux build headers too.
+ * ABI reference: Linux v4.9 include/uapi/linux/nl80211.h (enum values are
+ * stable across newer kernels). Do not trust self-consistent fixture IDs. */
+typedef char c2m_abi_combos_check[NL80211_ATTR_INTERFACE_COMBINATIONS == 120 ? 1 : -1];
+typedef char c2m_abi_split_check[NL80211_ATTR_SPLIT_WIPHY_DUMP == 174 ? 1 : -1];
+typedef char c2m_abi_commands_check[NL80211_ATTR_SUPPORTED_COMMANDS == 50 ? 1 : -1];
+typedef char c2m_abi_ssid_check[NL80211_ATTR_SSID == 52 ? 1 : -1];
 
 #ifndef NLA_TYPE_MASK
 #define NLA_TYPE_MASK 0x3fffu

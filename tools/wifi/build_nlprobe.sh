@@ -21,9 +21,9 @@ fi
 "$CC" -std=c99 -O2 -Wall -Wextra -Werror \
     tools/wifi/c2m_nlprobe.c -o "$out/c2m-nlprobe"
 "$out/c2m-nlprobe" --help >/dev/null
-"$out/c2m-nlprobe" --self-test | tee "$out/nlprobe-selftest.txt"
+"$out/c2m-nlprobe" --self-test > "$out/nlprobe-selftest.txt"
+cat "$out/nlprobe-selftest.txt"
 grep -q 'self_test=passed' "$out/nlprobe-selftest.txt"
-if command -v python3 >/dev/null 2>&1; then
-    python3 tools/wifi/test_c2m_nlprobe.py
-fi
+command -v python3 >/dev/null 2>&1 || { echo 'python3 required for host guards' >&2; exit 1; }
+python3 tools/wifi/test_c2m_nlprobe.py
 echo "host build+self-test OK: $out/c2m-nlprobe"
