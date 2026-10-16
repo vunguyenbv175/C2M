@@ -42,7 +42,8 @@ def main() -> int:
             runtime.get("stock_runtime_sha256") != PINS or
             runtime.get("status_writer") is not False or
             runtime.get("transmit") is not False or
-            runtime.get("sniff_schema") != "observer_v1"):
+            runtime.get("finite_packets") != 20 or
+            runtime.get("sniff_schema") != "observer_v2"):
         raise SystemExit("Mandatory M4 sniff ARM runtime proof/pins missing")
     subprocess.run(["python3", "fw/device_minimal/check_elf.py", str(args.sniff),
                     "--allow-dynamic"], cwd=ROOT, check=True, timeout=30)

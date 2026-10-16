@@ -98,6 +98,7 @@ grep -q -- '--observe' "$out/sniff-help-arm.txt" || exit 1
 grep -q 'usb0' "$out/sniff-help-arm.txt" || exit 1
 grep -q 'observer simulation' "$out/sniff-help-arm.txt" || exit 1
 grep -q 'never transmits' "$out/sniff-help-arm.txt" || exit 1
+grep -q 'Payload-only' "$out/sniff-help-arm.txt" || exit 1
 if grep -q 'c2m_d4_status' "$out/c2m-m4-sniff"; then echo 'sniffer must not reference status path' >&2; exit 1; fi
 for flag in --serve --db --gps-file --status-file; do
     if grep -q -- "$flag" "$out/c2m-m4-sniff"; then echo 'sniffer must not contain writer/fixture CLI' >&2; exit 1; fi

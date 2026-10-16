@@ -25,6 +25,7 @@ REQUIRED_SOURCE = (
     "M4_SNIFF_IFACE_FIXED",
     "M4_SNIFF_MAX_PACKETS",
     "M4_SNIFF_SNAPLEN",
+    "M4_SNIFF_PAYLOAD_HEX_BYTES",
     "M4_SNIFF_MAX_MS",
     "m4_parse_frame",
     "m4_self_test",
@@ -33,6 +34,10 @@ REQUIRED_SOURCE = (
     "status_writes=0",
     "transmit_bytes=0",
     "iface_fixed",
+    "payload_hex_fixed",
+    "payload_len=",
+    "payload_hex=",
+    "data_packets=",
     "completion=",
     "interrupted_signal",
     "iface_unavailable",
@@ -120,6 +125,7 @@ class M4SniffTests(unittest.TestCase):
         self.assertIn("usb0", result.stdout)
         self.assertIn("observer simulation", result.stdout)
         self.assertIn("never transmits", result.stdout)
+        self.assertIn("Payload-only", result.stdout)
         self.assertNotIn("--serve", result.stdout)
         self.assertNotIn("--db", result.stdout)
         self.assertNotIn("--gps-file", result.stdout)
@@ -142,7 +148,8 @@ class M4SniffTests(unittest.TestCase):
         text = MAIN_C.read_text(encoding="utf-8")
         for token in REQUIRED_SOURCE:
             self.assertIn(token, text, f"missing sniffer token: {token}")
-        self.assertIn("m4_sniff=observer_v1", text)
+        self.assertIn("m4_sniff=observer_v2", text)
+        self.assertNotIn("m4_sniff=observer_v1", text)
         self.assertIn("delivery_sim=observer_simulation_not_production_delivery", text)
         # Observer body must never transmit or write files.
         start = text.find("static int m4_observe(")
@@ -185,12 +192,14 @@ class M4SniffTests(unittest.TestCase):
         self.assertEqual(result.stderr, "", result.stderr)
         self.assertEqual(result.returncode, 0, result.stdout[-2000:] + result.stderr)
         self.assertLess(len(result.stdout.encode("utf-8")), 8192)
-        self.assertIn("m4_sniff=observer_v1", result.stdout)
+        self.assertIn("m4_sniff=observer_v2", result.stdout)
         self.assertIn("iface_fixed=usb0", result.stdout)
+        self.assertIn("payload_hex_fixed=96", result.stdout)
         self.assertIn("delivery_sim=observer_simulation_not_production_delivery", result.stdout)
         self.assertIn("status_writes=0", result.stdout)
         self.assertIn("transmit_bytes=0", result.stdout)
         self.assertIn("summary packets=", result.stdout)
+        self.assertIn("data_packets=", result.stdout)
         # No raw coordinates, DB labels, or status path in metadata output.
         for forbidden in ("c2m_d4_status", "--serve", "R.420", "latitude", "longitude"):
             self.assertNotIn(forbidden, result.stdout)

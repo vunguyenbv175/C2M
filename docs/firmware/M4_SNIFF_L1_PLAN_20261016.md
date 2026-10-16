@@ -21,12 +21,18 @@ New RAM-only source `fw/m4_sniff/m4_usb_observe.c`:
 - Receive-only `AF_PACKET/SOCK_RAW` attach via `bind()`; NO transmit:
   no `send/sendto/sendmsg/connect`, no `ioctl/setsockopt` state change,
   no promiscuous toggle, no file writes, no status-file touch.
-- Finite: 32 packets max, 256B snaplen, 64B hex per packet,
+- Finite: 20 packets max, 512B snaplen, 96B payload-only hex per packet,
   15×1s `poll()`, 30s monotonic bound, signal-stop, external timeout still
-  required. Output stays ASCII and under 8KiB.
+  required. Output stays ASCII and under 8KiB. Headers become metadata
+  (`payload_len`, ports, flags, leg); the hex dump skips Ethernet/IP/TCP
+  headers (IHL/TCP-offset aware, VLAN/frag safe) so a normal segment keeps
+  ~96B of L7 data instead of ~10B. Pure ACKs report `payload_len=0`.
+  Schema is `m4_sniff=observer_v2` (v1 dumped the first 64 frame bytes and
+  is superseded for L1 decode).
 - Graceful when `usb0`/raw socket is absent (CI/QEMU path):
   `completion=iface_unavailable|capture_unavailable`, exit 0, still finite.
-- `--self-test` is pure synthetic Ethernet/IP/TCP/ARP parsing, no network.
+- `--self-test` is pure synthetic Ethernet/IP/TCP/UDP/ARP parsing with
+  options/frag/truncation cases, no network.
 - Every run labels
   `delivery_sim=observer_simulation_not_production_delivery`,
   `status_writes=0`, `transmit_bytes=0`.

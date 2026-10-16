@@ -50,10 +50,12 @@ def main():
         # Source-level transmit calls must not be linked into the observer.
         # Binary symbol check is intentionally strict: any transmit import fails.
         assert transmit not in blob, f'transmit token present: {transmit!r}'
-    for token in (b'm4_sniff=observer_v1', b'iface_fixed=', b'usb0',
+    for token in (b'm4_sniff=observer_v2', b'iface_fixed=', b'usb0',
+                  b'payload_hex_fixed=', b'payload_len=', b'payload_hex=',
                   b'observer_simulation_not_production_delivery',
                   b'status_writes=0', b'transmit_bytes=0'):
         assert token in blob, f'missing observer contract: {token!r}'
+    assert b'm4_sniff=observer_v1' not in blob, 'stale observer schema present'
     args.report.parent.mkdir(parents=True, exist_ok=True)
     try:
         r = subprocess.run([qemu, '-L', str(sysroot), str(binary), '--observe'],
@@ -64,11 +66,13 @@ def main():
         assert not r.stderr, r.stderr.decode(errors='replace')
         text = r.stdout.decode('ascii')
         assert len(r.stdout) < 8192
-        assert 'm4_sniff=observer_v1' in text
+        assert 'm4_sniff=observer_v2' in text
         assert 'iface_fixed=usb0' in text
+        assert 'payload_hex_fixed=96' in text
         assert 'status_writes=0' in text and 'transmit_bytes=0' in text
         assert 'delivery_sim=observer_simulation_not_production_delivery' in text
         assert 'summary packets=0 ' in text
+        assert 'data_packets=0' in text
         assert 'completion=iface_unavailable' in text
         assert 'iface_present=0' in text
         for private in ('latitude=', 'longitude=', 'speed_kmh=', 'R.420', 'c2m_d4_status'):
@@ -82,10 +86,10 @@ def main():
         status.unlink(missing_ok=True)
     report = {'verdict': 'PASS', 'binary_sha256': binary_digest, 'stock_runtime_sha256': PINS,
               'camera_used': False, 'status_writer': False, 'transmit': False,
-              'finite_packets': 32, 'runtime': 'shipping ARM M4 sniff --observe under pinned stock QEMU',
+              'finite_packets': 20, 'runtime': 'shipping ARM M4 sniff --observe under pinned stock QEMU',
               'interface_case': 'missing usb0 in CI (no private capture)',
               'status_sentinel_unchanged': True, 'target_hardware_accepted': False,
-              'sniff_schema': 'observer_v1'}
+              'sniff_schema': 'observer_v2'}
     args.report.write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     print(json.dumps(report, sort_keys=True))
 
