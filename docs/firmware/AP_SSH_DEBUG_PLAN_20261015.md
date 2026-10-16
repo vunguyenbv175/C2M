@@ -9,7 +9,9 @@ private developer build, not an unauthenticated production remote shell.
 Owner reported D4 flashed on2026-10-16; the first owner-controlled AP session
 confirmed dedicated-key SSH login using **Dropbear 2026.94**. See
 `D4_FIRST_HARDWARE_SESSION_20261016.md` for observed identity, runtime pins and
-remaining hardware gates. Stock dormant OpenSSH 5.6p1/shared keys were not used.
+remaining hardware gates. A stationary RAM binary roundtrip/reviewed script
+execution/cleanup subsequently passed. Stock dormant OpenSSH 5.6p1/shared keys
+were not used.
 
 Source/build/package/tests have passed on source `d5bb236`:
 - General CI `38755971989`: SUCCESS.
@@ -20,9 +22,11 @@ Source/build/package/tests have passed on source `d5bb236`:
 
 The source/build evidence alone was not hardware acceptance. The2026-10-16
 session subsequently observed the listener and authenticated SSH after the
-owner reported flash and Wi-Fi connection. Recording/app/audio acceptance and
-RAM roundtrip remain pending; D4 GPS decoding has a live contract discrepancy.
-Ask/notify before subsequent hardware sessions; never assume an old AP lease.
+owner reported flash and Wi-Fi connection. Owner later confirmed stationary
+vehicle and normal recording/app/VI ADAS; a32KiB RAM roundtrip plus bounded
+reviewed shell execution/cleanup passed. D4 GPS decoding has a live contract
+discrepancy, so advisories remain unaccepted. Ask/notify before subsequent
+hardware sessions; never assume an old AP lease.
 
 ## Dedicated owner key
 

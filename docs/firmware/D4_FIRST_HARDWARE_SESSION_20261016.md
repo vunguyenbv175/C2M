@@ -7,11 +7,13 @@ Owner reported that D4 was flashed and the laptop joined C2M Wi-Fi. This is
 Bluetooth, M4, audio or calibration acceptance.
 
 Before any RAM execution or Wi-Fi change, the agent requested confirmation of
-recording, stock-app live view and Vietnamese ADAS audio. That confirmation is
-still pending. Live GPS showed nonzero vehicle speed during the read-only
-session, so the agent explicitly told the owner not to interact while driving.
-No RAM upload/executable test, interface/configuration change, Bluetooth radio
-activation, UART access, warning injection or `:8080` WebSocket client was used.
+recording, stock-app live view and Vietnamese ADAS audio. Live GPS showed
+nonzero vehicle speed during the initial read-only session, so the agent
+explicitly told the owner not to interact while driving and stopped access.
+The owner subsequently confirmed the vehicle was stationary and all original
+functions were normal; only then was the bounded RAM roundtrip below run.
+No interface/configuration change, Bluetooth radio activation, UART access,
+warning injection or `:8080` WebSocket client was used.
 
 Private raw evidence remains in the ignored hardware capture directory:
 `C2M_HW_20261012/06_candidate_D4/live_20261016_070130/`.
@@ -70,6 +72,28 @@ proven statically before changing validation. Do not weaken freshness checks,
 normalize GPS data on the camera, or claim D4 advisories/beep work on this build.
 Local investigation and replay tests can proceed without camera access.
 
+## Stationary RAM roundtrip and listener observation
+
+After explicit owner confirmation of stationary vehicle and healthy stock
+functions:
+
+- Created a random private `0700` directory on `/tmp` (confirmed tmpfs).
+- Uploaded exactly32,768 binary bytes through SSH stdin; checked size/SHA-256.
+- Wrote a reviewed tiny shell script in that private RAM directory, verified
+  its SHA-256, and executed it with stock BusyBox `timeout -t 5` and `nice -n 10`.
+  The script only printed a success marker, byte count and payload hash.
+- Downloaded the binary through SSH stdout, compared exact bytes and SHA-256.
+- A trap removed only the two test files and the directory; a separate SSH
+  command confirmed cleanup. No firmware/config/card file was written.
+- Private proof: `ram_roundtrip_report.json`, verdict PASS. This proves the
+  exec/stdin/stdout debug path with a reviewed script, not a newly uploaded
+  native ELF/ABI acceptance.
+- Near the expected20-minute end of the debug window, a later source-bound
+  TCP check received connection refused on2222 while the verified UUID and
+  AP HTTP still responded. This is consistent with expiry, but the supervisor
+  reason could not be read after shutdown, so the TCP observation alone is not
+  causal expiry proof. No listener restart/extension was attempted.
+
 ## Other capabilities still unproven
 
 - AP remains usable. STA is `unknown`, with
@@ -86,11 +110,13 @@ Local investigation and replay tests can proceed without camera access.
 
 ## Remaining acceptance
 
-1. Owner stationary: confirm recording playback, stock app/live view, normal
-   calibration/greeting behavior and Vietnamese ADAS audio.
-2. Bounded `/tmp` binary upload/hash/execute/download with cleanup; wrong-key,
-   password/forwarding negatives and listener expiry/AP-loss behavior remain
-   hardware checks. Do not extend/restart the debug window just to keep access.
+1. Owner reports recording/app/VI ADAS normal and vehicle stationary. Specific
+   normal calibration/greeting behavior and independent playback review were
+   not instrumented; do not infer these from process/file metadata alone.
+2. The bounded `/tmp` binary roundtrip plus reviewed shell execution and cleanup
+   passed. Uploaded native ELF execution, wrong-key/password/forwarding
+   negatives and causal listener expiry/AP-loss behavior remain hardware gates.
+   Do not extend/restart the debug window just to keep access.
 3. Prove and test the GPS subsecond contract locally; only then propose a
    stationary RAM-only evaluation. Preserve two advancing UTC seconds and
    stale/future/integrity protections.
