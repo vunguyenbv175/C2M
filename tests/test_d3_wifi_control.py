@@ -259,7 +259,10 @@ class WifiControlTests(unittest.TestCase):
                      "combinations_empty_blocked", "combinations_empty_propagated",
                      "combinations_unadvertised_blocked", "combinations_unadvertised_propagated",
                      "combinations_absent_fallback_error", "wiphy_valid_insufficient_is_no",
-                     "combinations_duplicate_malformed"):
+                     "combinations_duplicate_malformed", "combinations_empty_before_wiphy_error",
+                     "combinations_empty_wrong_phy_error", "combinations_empty_missing_phy_error",
+                     "combinations_empty_duplicate_error",
+                     "combinations_empty_trailing_truncated_error"):
             self.assertIn("PASS " + case, result.stdout)
         self.assertIn("self_test=passed", result.stdout)
         self.assertEqual(result.stderr, "")
@@ -428,6 +431,38 @@ int main(int argc, char **argv) {
         CHECK(!strcmp(proof.error, "capability_missing_or_malformed"));
         CHECK(capability_probe_result(&w, 1, &proof) == -1 && w.supported == -1);
         CHECK(!strcmp(w.error, "capability_missing_or_malformed"));
+        /* Combos before WIPHY with valid empty stays empty (order-independent). */
+        fixture_init(&m);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_combinations_empty"));
+        /* Wrong PHY + empty is malformed, never empty. */
+        fixture_init(&m); CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 1) == 0);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_missing_or_malformed"));
+        /* Missing PHY + empty is malformed, never empty/unadvertised. */
+        fixture_init(&m);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_missing_or_malformed"));
+        /* Empty then duplicate empty is malformed, never empty. */
+        fixture_init(&m); CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 0) == 0);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_missing_or_malformed"));
+        /* Valid framing + empty + trailing truncation is malformed. */
+        fixture_init(&m); CHECK(msg_u32(&m, NL80211_ATTR_WIPHY, 0) == 0);
+        CHECK(msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0) == 0);
+        memset(&proof, 0, sizeof(proof)); proof.freq = 5180;
+        CHECK(wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n - 1, &proof) == -1);
+        CHECK(!strcmp(proof.error, "capability_missing_or_malformed"));
 
         memset(&w, 0, sizeof(w)); w.supported = -1; w.error = "ap_nl80211_query_failed";
         startup_probe_record(&w, 1000);

@@ -351,8 +351,10 @@ static int wiphy_reply(int cmd, const void *p, size_t n, void *out) {
     struct proof *r = out;
     struct attrs it = { p, n, 0 };
     struct attr a;
+    const unsigned char *combos_p = NULL;
+    size_t combos_n = 0;
     uint32_t phy = 0;
-    int have_phy = 0, result;
+    int have_phy = 0, combos = 0, result;
     if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > 1) {
         r->error = "capability_nl80211_query_failed"; return -1;
     }
@@ -362,23 +364,13 @@ static int wiphy_reply(int cmd, const void *p, size_t n, void *out) {
                 r->error = "capability_missing_or_malformed"; return -1;
             }
         } else if (a.type == NL80211_ATTR_INTERFACE_COMBINATIONS) {
-            if (r->seen++) {
+            /* Count first; classification is deferred until framing,
+             * uniqueness and target PHY are validated below. */
+            ++combos; ++r->seen;
+            if (combos > 1 || r->seen > 1) {
                 r->error = "capability_missing_or_malformed"; return -1;
             }
-            /* Top attr present with zero payload: driver sent the header
-             * but no combination bytes (live: bytes=0). Unknown, never a
-             * hardware-absence proof and never VIF/association evidence. */
-            if (!a.n) {
-                r->error = "capability_combinations_empty"; return -1;
-            }
-            result = prove_combinations(a.p, a.n, r->freq);
-            if (result == PROOF_MALFORMED) {
-                r->error = "capability_missing_or_malformed"; return -1;
-            }
-            if (result == PROOF_UNVERIFIED) {
-                r->error = "capability_proof_unavailable"; return -1;
-            }
-            r->supported = result;
+            combos_p = a.p; combos_n = a.n;
         }
     }
     if (it.bad || !have_phy || phy != r->phy) {
@@ -386,9 +378,23 @@ static int wiphy_reply(int cmd, const void *p, size_t n, void *out) {
     }
     /* Valid reply with no combinations attr at all: unadvertised.
      * Unknown, never hardware-absence proof. */
-    if (!r->seen) {
+    if (!combos) {
         r->error = "capability_combinations_unadvertised"; return -1;
     }
+    /* Top attr present with zero payload: driver sent the header
+     * but no combination bytes (live: bytes=0). Unknown, never a
+     * hardware-absence proof and never VIF/association evidence. */
+    if (!combos_n) {
+        r->error = "capability_combinations_empty"; return -1;
+    }
+    result = prove_combinations(combos_p, combos_n, r->freq);
+    if (result == PROOF_MALFORMED) {
+        r->error = "capability_missing_or_malformed"; return -1;
+    }
+    if (result == PROOF_UNVERIFIED) {
+        r->error = "capability_proof_unavailable"; return -1;
+    }
+    r->supported = result;
     return 0;
 }
 static const char *ap_probe_error(int result, const struct iface *ap) {
@@ -1010,6 +1016,41 @@ int c2m_wifi_self_test(void) {
     memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
     failures += test_result("combinations_duplicate_malformed", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
     failures += test_str("combinations_duplicate_error", proof.error, "capability_missing_or_malformed");
+    /* Order-independent: combos before WIPHY with valid empty stays empty. */
+    fixture_init(&m);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_empty_before_wiphy_blocked", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_empty_before_wiphy_error", proof.error, "capability_combinations_empty");
+    /* Wrong PHY + empty is malformed, never empty. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 1);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_empty_wrong_phy_malformed", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_empty_wrong_phy_error", proof.error, "capability_missing_or_malformed");
+    /* Missing PHY + empty is malformed, never empty/unadvertised. */
+    fixture_init(&m);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_empty_missing_phy_malformed", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_empty_missing_phy_error", proof.error, "capability_missing_or_malformed");
+    /* Empty then duplicate empty is malformed, never empty. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_empty_duplicate_malformed", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n, &proof), -1);
+    failures += test_str("combinations_empty_duplicate_error", proof.error, "capability_missing_or_malformed");
+    /* Valid framing + empty + trailing truncated TLV is malformed. */
+    fixture_init(&m);
+    (void)msg_u32(&m, NL80211_ATTR_WIPHY, 0);
+    (void)msg_attr(&m, NL80211_ATTR_INTERFACE_COMBINATIONS, NULL, 0);
+    memset(&proof, 0, sizeof(proof)); proof.phy = 0; proof.freq = 5180;
+    failures += test_result("combinations_empty_trailing_truncated_malformed", wiphy_reply(NL80211_CMD_NEW_WIPHY, m.data, m.n - 1, &proof), -1);
+    failures += test_str("combinations_empty_trailing_truncated_error", proof.error, "capability_missing_or_malformed");
     wipe(config, sizeof(config)); wipe(psk, sizeof(psk)); wipe(ssid, sizeof(ssid));
     printf("self_test=%s\n", failures ? "failed" : "passed"); return failures ? 1 : 0;
 }
