@@ -62,8 +62,14 @@ sh tools/wifi/build_nlprobe.sh --out /tmp/nlprobe-host
 python3 tools/wifi/test_c2m_nlprobe.py
 ```
 
-Portable tests only here. Linux compile is covered by the CI job above;
-tests never run `--get-*`.
+Tests never run `--get-*`. Linux CI compiles the actual Linux code path but
+executes only pure fixtures, so it does not establish live netlink behavior.
+Portable ABI constants are cross-checked at compile time against Linux build
+headers; reference: Linux v4.9
+[`include/uapi/linux/nl80211.h`](https://github.com/torvalds/linux/blob/v4.9/include/uapi/linux/nl80211.h).
+Notably `INTERFACE_COMBINATIONS=120`, `SPLIT_WIPHY_DUMP=174`,
+`SUPPORTED_COMMANDS=50`, `SSID=52`; fixture IDs must not merely agree with
+incorrect self-defined constants.
 
 ## Later on-camera RAM use (delayed)
 
