@@ -76,10 +76,10 @@
  *   socket inode. No TCP connect probe is used (no auth-session overhead,
  *   no interference with Dropbear, and a foreign listener on the same
  *   port cannot satisfy the owned-PID fd check). Startup AP readiness is
- *   retried up to 60 s inside the same overall 20-minute cap.
+ *   retried up to 60 s inside the same overall 120-minute cap.
  *
  * Lifetime/limits (documented, not over-promised):
- *   - Supervisor enforces a 20-minute (1200 s) window from serve start
+ *   - Supervisor enforces a 120-minute (7200 s) window from serve start
  *     (startup retries included), then SIGTERMs its OWN dropbear process
  *     group (no pkill/killall) and publishes expired. Dropbear -M600
  *     additionally bounds idle sessions.
@@ -120,7 +120,7 @@
 #define C2M_DEBUG_BIND_PORT 2222
 #define C2M_DEBUG_IFACE "wlan0"
 #define C2M_DEBUG_LOOPBACK_ADDR "127.0.0.1"
-#define C2M_DEBUG_WINDOW_SEC 1200
+#define C2M_DEBUG_WINDOW_SEC 7200
 #define C2M_DEBUG_POLL_MS 1000
 #define C2M_DEBUG_STARTUP_AP_MS 60000
 #define C2M_DEBUG_PROOF_MS 5000
