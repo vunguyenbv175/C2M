@@ -96,7 +96,9 @@ All preparation gates passed in manual CI **`38831681720`** on source
 `38831681303` passed on the same source. All three ARM ELF checks and
 pure self-tests/help ran against the pinned stock libraries. The actual
 updated ARM D4 producer passed all six synthetic runtime checks listed above.
-No updated ARM binary has yet been uploaded or run on the camera.
+A subsequent owner-controlled hardware session executed the two finite native
+observers successfully; see `RAM_OBSERVERS_HARDWARE_20261016.md`. The updated
+D4 producer itself was not uploaded or executed.
 
 Private delivery:
 `deliverables/20261016-ram-debug-r38831681720/ram-bundle`, vault commit
@@ -116,10 +118,10 @@ Manifest SHA-256:
 `1b5c9c51d85b027b03106d555d1ade79b73affd3ae52825eb0ce31701fe145cf`.
 Local proof: `build/ram-debug-r38831681720/local_readback.json`.
 
-A reviewed laptop-local runner is prepared but **not executed**:
-`build/run_ram_observers_reviewed.py`. Its only executable allowlist is the
-finite GPS observer and nl80211 interface/single-wiphy observer. It never
-runs the included `c2m-signs` producer or changes persistent configuration.
-Owner has been notified to perform a normal stationary restart/rejoin only
-when ready, without an updater card/flash. No camera network request was
-made during this preparation; hardware observation remains pending.
+The reviewed laptop-local helper `build/run_ram_observers_reviewed.py` was
+used in the later session to execute the finite GPS and interface/single-wiphy
+observers. A separate reviewed bounded command obtained dump/split-dump
+responses. Every exact private RAM object was removed. The helper never ran
+the included `c2m-signs` producer or changed persistent configuration. No camera
+network request was made during build preparation; the later hardware session
+is separately documented in `RAM_OBSERVERS_HARDWARE_20261016.md`.
