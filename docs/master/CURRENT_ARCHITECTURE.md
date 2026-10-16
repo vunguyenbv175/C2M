@@ -121,12 +121,20 @@ UART control was used in those diagnostics.
   Fresh16:10 owner-approved READ-ONLY sysfs check reconfirmed iface2 ff/42/01
   bulk04/85,512B, no adb binary/daemon; no USB transaction/native upload/UI
   change, recorder advanced, connections/D4 PID unchanged. Owner subsequently
-  approved ONE finite active CNXN identify handshake ONLY after gates/notice;
-  no AUTH/key/shell/UI. New separate `fw/m4_adb` preparation is not hardware
-  acceptance, and does not reopen speed/warning injection.
+  approved ONE finite active CNXN identify handshake. CI38881250082 passed;
+  native16:59 request returned AUTH-required in7ms,31B TX, released/cleanup/exit0.
+  **Preservation FAILED:**24012/26012 absent postflight;8080/recorder/AP/PIDs
+  healthy in snapshots, owner reports M4 normal. No auth reply/key/shell/UI,
+  no retry; see `../firmware/M4_ADB_AUTH_STOP_HARDWARE_20261016.md`.
+  Owner later approved NEW standard one-public-key authorization request;
+  dedicated private key stays on laptop, helper/gates in preparation, no
+  authorization request sent yet. No bypass or speed/sign/warning injection.
+  EN/VI review found no demonstrated new M4 sign route; no VI flash performed.
   See `../firmware/M4_RECEIVER_LAYOUT_GAP_20261016.md`,
   `../firmware/M4_ACTIVE_TEST_BOUNDARY_20261016.md` and
-  `../firmware/M4_ADB_IDENTIFICATION_PLAN_20261016.md`.
+  `../firmware/M4_ADB_IDENTIFICATION_PLAN_20261016.md`,
+  `../firmware/M4_STANDARD_AUTH_REQUEST_PLAN_20261016.md` and
+  `../firmware/M4_EN_VI_RENDER_TEST_ASSESSMENT_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that
   value nor advertising artwork proves3D speed/sign support; see

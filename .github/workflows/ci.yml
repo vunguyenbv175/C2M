@@ -48,6 +48,8 @@ jobs:
           python3 tools/m4/test_passive_upgrade.py
           python3 tools/m4/test_ped_warning.py
           python3 tests/test_m4_adb.py
+          python3 tests/test_m4_adb_authorize.py
+          python3 tools/m4/test_adb_owner_key.py
           python3 tools/m4/test_capture_tsr_readonly.py
           python3 tools/m4/test_tsr_event_lab.py
           python3 tools/m4/test_normalize_adas.py

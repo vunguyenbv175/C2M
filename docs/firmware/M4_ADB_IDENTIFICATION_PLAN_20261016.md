@@ -62,6 +62,20 @@ IMMEDIATELY before native execution; old16:10 health is not evidence of later
 window. No SSH restart/extension, no automatic retry if upload/handshake/health
 fails. Notify before actual hardware handshake; if window expired, stop.
 
+## Completed hardware outcome
+
+Final source `95283f206765133417c00e7b24e67db0d2f5f09e`, ARM run38881250082
+passed. One native request at16:59 returned AUTH-required in7ms;31B TX,
+interface2 released, exit0/RAM cleanup verified, no key/AUTH reply/shell/UI.
+**Connection gate FAILED:**24012/26012 were not established after, while8080,
+recorder/AP/processes remained healthy in snapshots and owner reported M4
+normal. No retry/follow-up camera access. See
+`M4_ADB_AUTH_STOP_HARDWARE_20261016.md` for exact pins/evidence.
+
+Owner later approved a NEW standard public-key authorization request, not an
+extension of that exhausted identification-only scope; see
+`M4_STANDARD_AUTH_REQUEST_PLAN_20261016.md`. No bypass or sign injection.
+
 ## Interpretation and next approval
 
 - CNXN: daemon accepted initial ADB link; not root/shell/readback/render proof.

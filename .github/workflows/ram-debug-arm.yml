@@ -44,6 +44,9 @@ jobs:
           cat work/evidence/host-m4-sniff.txt
           python3 tests/test_m4_adb.py > work/evidence/host-m4-adb.txt 2>&1
           cat work/evidence/host-m4-adb.txt
+          python3 tests/test_m4_adb_authorize.py > work/evidence/host-m4-authorize.txt 2>&1
+          python3 tools/m4/test_adb_owner_key.py >> work/evidence/host-m4-authorize.txt 2>&1
+          cat work/evidence/host-m4-authorize.txt
       - name: Install ARM tools and QEMU (versions recorded)
         run: |
           set -euo pipefail
@@ -96,6 +99,8 @@ jobs:
           cat work/evidence/arm-m4-sniff.txt
           bash fw/m4_adb/build_arm.sh --out work/arm-m4-adb --sysroot work/private/sysroot > work/evidence/arm-m4-adb.txt 2>&1
           cat work/evidence/arm-m4-adb.txt
+          bash fw/m4_adb/build_authorize_arm.sh --out work/arm-m4-authorize --sysroot work/private/sysroot > work/evidence/arm-m4-authorize.txt 2>&1
+          cat work/evidence/arm-m4-authorize.txt
       - name: Actual ARM D4 producer synthetic runtime under stock QEMU (GATE)
         run: |
           set -euo pipefail
@@ -120,6 +125,12 @@ jobs:
           sudo timeout 30 python3 tools/fw/test_ram_m4_adb_stock_qemu.py \
             --binary work/arm-m4-adb/c2m-m4-adb --sysroot work/private/sysroot \
             --report work/evidence/arm-m4-adb-runtime.json
+      - name: Exact finite ARM authorization request absent-USB path (GATE)
+        run: |
+          set -euo pipefail
+          sudo timeout 55 python3 tools/fw/test_ram_m4_authorize_stock_qemu.py \
+            --binary work/arm-m4-authorize/c2m-m4-authorize --sysroot work/private/sysroot \
+            --report work/evidence/arm-m4-authorize-runtime.json
       - name: Assemble RAM-only bundle and source pins
         run: |
           set -euo pipefail
@@ -137,6 +148,10 @@ jobs:
             --binary work/arm-m4-adb/c2m-m4-adb --evidence work/evidence
           cp work/m4-adb-bundle/manifest.json work/evidence/m4-adb-manifest.json
           cp work/m4-adb-bundle/SHA256SUMS.txt work/evidence/m4-adb-SHA256SUMS.txt
+          python3 tools/fw/package_m4_authorize.py --output work/m4-authorize-bundle \
+            --binary work/arm-m4-authorize/c2m-m4-authorize --evidence work/evidence
+          cp work/m4-authorize-bundle/manifest.json work/evidence/m4-authorize-manifest.json
+          cp work/m4-authorize-bundle/SHA256SUMS.txt work/evidence/m4-authorize-SHA256SUMS.txt
       - name: Publish exact RAM-only bundle to PRIVATE vault
         env:
           FIRMWARE_VAULT_PUSH_KEY: ${{ secrets.FIRMWARE_VAULT_PUSH_KEY }}
@@ -154,6 +169,7 @@ jobs:
           cp -r work/ram-bundle "work/private/publish/$D/"
           cp -r work/m4-sniff-bundle "work/private/publish/$D/"
           cp -r work/m4-adb-bundle "work/private/publish/$D/"
+          cp -r work/m4-authorize-bundle "work/private/publish/$D/"
           cp -r work/evidence "work/private/publish/$D/"
           git -C work/private/publish add "$D"
           git -C work/private/publish -c user.name=c2m-ci -c user.email=c2m-ci@local \
@@ -195,6 +211,11 @@ jobs:
             work/evidence/arm-m4-adb-runtime.json
             work/evidence/m4-adb-manifest.json
             work/evidence/m4-adb-SHA256SUMS.txt
+            work/evidence/host-m4-authorize.txt
+            work/evidence/arm-m4-authorize.txt
+            work/evidence/arm-m4-authorize-runtime.json
+            work/evidence/m4-authorize-manifest.json
+            work/evidence/m4-authorize-SHA256SUMS.txt
             work/evidence/private-vault-location.txt
       - name: Show safe gate logs on failure
         if: failure()
@@ -208,7 +229,9 @@ jobs:
             work/evidence/arm-d4-shadow-runtime.stderr.txt work/evidence/arm-m4-sniff-runtime.stdout.txt \
             work/evidence/arm-m4-sniff-runtime.stderr.txt work/evidence/host-m4-adb.txt \
             work/evidence/arm-m4-adb.txt work/evidence/arm-m4-adb-runtime.stdout.txt \
-            work/evidence/arm-m4-adb-runtime.stderr.txt; do
+            work/evidence/arm-m4-adb-runtime.stderr.txt work/evidence/host-m4-authorize.txt \
+            work/evidence/arm-m4-authorize.txt work/evidence/arm-m4-authorize-runtime.stdout.txt \
+            work/evidence/arm-m4-authorize-runtime.stderr.txt; do
             if test -f "$f"; then cat "$f"; fi
           done
       - name: Cleanup private runtime and credentials
