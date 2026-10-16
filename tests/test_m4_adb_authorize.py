@@ -255,7 +255,8 @@ AUTH_SHIM_TEMPLATE = r"""
 static int q_fail = 0, q_total = 0;
 static void q_rep(int ok, const char *n) {
     ++q_total; printf(ok ? "[PASS] %s\n" : "[FAIL] %s\n", n);
-    if (!ok) ++q_fail; fflush(stdout);
+    if (!ok) { ++q_fail; }
+    fflush(stdout);
 }
 static void q_p32(uint8_t *b, uint32_t v) {
     b[0] = (uint8_t)(v & 0xFFu); b[1] = (uint8_t)((v >> 8) & 0xFFu);

@@ -132,10 +132,12 @@ hash-verified ELFs.
 
 - `readelf -W --dyn-syms` VI: `_Z20SendGPSSpeedToScreeni`, VA `0x9A405`,
   size **4 B**. EN: absent.
-- A 4-byte dynsym is a stub / veneer; the real body (if any) is not identified
-  by symbol size alone. Exact caller, gating (GPS-fix / validity / frequency /
-  client-connected), and whether it duplicates or replaces the existing
-  `SendGPSInfoToScreen` -> `WSSetGPSSpeed` path are **UNKNOWN**.
+- Follow-up bounded Capstone/ELF check resolved its single4B Thumb branch at
+  code `0x9A404` to `0xA38C4`, exactly VI `WSSetGPSSpeed(int)` (Thumb VA
+  `0xA38C5`,136B). It is a tail-jump alias/trampoline, NOT an empty function
+  or additional sender logic. EN `WSSetGPSSpeed` VA `0x6FF1D` is also136B;
+  raw body bytes differ, but relocated references are a confounder, not proven
+  semantic change. Exact extra-helper callers and runtime gating remain UNKNOWN.
 - What is proven: (a) message type unchanged (type 1601 template pre-exists in
   EN); (b) EN already delivers 10 native `GPSSpeed` to the M4 link (V4);
   (c) an extra VI sender therefore cannot by itself create an M4 3D widget.
