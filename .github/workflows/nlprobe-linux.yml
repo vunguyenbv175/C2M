@@ -1,0 +1,30 @@
+name: nlprobe-linux
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - tools/wifi/c2m_nlprobe.c
+      - tools/wifi/test_c2m_nlprobe.py
+      - tools/wifi/build_nlprobe.sh
+      - .github/workflows/nlprobe-linux.yml
+
+jobs:
+  linux-compile-selftest:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host compile (strict)
+        run: |
+          cc -std=c99 -O2 -Wall -Wextra -Werror \
+            tools/wifi/c2m_nlprobe.c -o /tmp/c2m-nlprobe
+      - name: Self-test (pure, no Wi-Fi)
+        run: |
+          /tmp/c2m-nlprobe --help
+          /tmp/c2m-nlprobe --self-test > /tmp/nlprobe-selftest.txt
+          cat /tmp/nlprobe-selftest.txt
+          grep -q 'self_test=passed' /tmp/nlprobe-selftest.txt
+          grep -q 'linux_live_validated=no' /tmp/nlprobe-selftest.txt
+          test "$(wc -c < /tmp/nlprobe-selftest.txt)" -lt 8192
+      - name: Python host guards
+        run: python3 tools/wifi/test_c2m_nlprobe.py -v

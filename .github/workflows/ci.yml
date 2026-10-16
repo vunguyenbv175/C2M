@@ -63,6 +63,7 @@ jobs:
           python3 tools/fw/test_d3_mutation.py
           python3 tests/test_d3_web.py
           python3 tests/test_d3_wifi_control.py
+          python3 tools/wifi/test_c2m_nlprobe.py
           python3 tests/test_d3_gps.py
           python3 tests/test_d4_database.py
           python3 tests/test_d4_web.py
