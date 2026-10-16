@@ -6,10 +6,10 @@ Owner requested faster Wi-Fi debugging instead of repeated SD/flash cycles,
 then explicitly approved creating a dedicated C2M SSH key. This is an owner-
 private developer build, not an unauthenticated production remote shell.
 
-Current camera access is HTTP/CGI/status only; no working SSH/Telnet login is
-established. Stock firmware contains dormant OpenSSH 5.6p1, which is too old
-to enable with its default configuration/shared stock keys. The proposed
-new debug bundle uses pinned **Dropbear 2026.94** instead.
+Owner reported D4 flashed on2026-10-16; the first owner-controlled AP session
+confirmed dedicated-key SSH login using **Dropbear 2026.94**. See
+`D4_FIRST_HARDWARE_SESSION_20261016.md` for observed identity, runtime pins and
+remaining hardware gates. Stock dormant OpenSSH 5.6p1/shared keys were not used.
 
 Source/build/package/tests have passed on source `d5bb236`:
 - General CI `38755971989`: SUCCESS.
@@ -18,9 +18,11 @@ Source/build/package/tests have passed on source `d5bb236`:
   exec/binary roundtrip, wrong-key/no-key/password/cross-UID rejection and
   authenticated forwarding rejection, then deep validation/preservation.
 
-Nothing here means the camera already has a new listener, has been flashed,
-or has accepted SSH. Camera Wi-Fi remains disconnected; ask before a
-hardware session.
+The source/build evidence alone was not hardware acceptance. The2026-10-16
+session subsequently observed the listener and authenticated SSH after the
+owner reported flash and Wi-Fi connection. Recording/app/audio acceptance and
+RAM roundtrip remain pending; D4 GPS decoding has a live contract discrepancy.
+Ask/notify before subsequent hardware sessions; never assume an old AP lease.
 
 ## Dedicated owner key
 
