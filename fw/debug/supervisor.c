@@ -345,26 +345,27 @@ int c2m_debug_self_test(void)
                                !valid_bind("192.168.1.1", 2222, 1) &&
                                !valid_bind("0.0.0.0", 2222, 1),
           &failures);
-    check("window_bounds", !(1200 < 1 || 1200 > 86400) && (0 < 1 || 0 > 86400) &&
+    check("window_two_hours", C2M_DEBUG_WINDOW_SEC == 7200, &failures);
+    check("window_bounds", !(C2M_DEBUG_WINDOW_SEC < 1 || C2M_DEBUG_WINDOW_SEC > 86400) && (0 < 1 || 0 > 86400) &&
                                (99999 > 86400),
           &failures);
     /* Production CLI gate: no I/O, order-independent by construction
      * (caller passes one any_override bit for all fixture flags). */
     check("cli_production_defaults",
-          c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, 1200, 1000),
+          c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 1000),
           &failures);
     check("cli_override_needs_loopback",
-          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, 1200, 1000),
+          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 1000),
           &failures);
     check("cli_ap_bypass_rejected_without_loopback",
-          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, 1200, 100),
+          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 100),
           &failures);
     check("cli_override_accepted_with_loopback",
           c2m_debug_cli_valid(1, 1, "127.0.0.1", 2223, 2, 100),
           &failures);
     check("cli_loopback_wrong_bind_rejected",
           !c2m_debug_cli_valid(1, 1, "192.168.1.1", 2222, 2, 100) &&
-              !c2m_debug_cli_valid(1, 0, "192.168.1.1", 2222, 1200, 1000),
+              !c2m_debug_cli_valid(1, 0, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 1000),
           &failures);
     check("cli_bad_bounds_rejected",
           !c2m_debug_cli_valid(1, 1, "127.0.0.1", 0, 2, 100) &&
@@ -437,7 +438,7 @@ static void usage(FILE *f)
           "  Status is starting until OUR child provably holds the bound\n"
           "  listener (/proc/net/tcp inode in the child PID fd set); only\n"
           "  then is active published. Startup AP readiness retries up to\n"
-          "  60 s inside the overall 20-minute window.\n",
+          "  60 s inside the overall 120-minute window.\n",
           f);
 }
 

@@ -182,6 +182,8 @@ class CoreTests(unittest.TestCase):
                       "c2m_debug_cli_valid", "c2m_debug_stock_path_ok"):
             self.assertIn(token, source + header, token)
         self.assertIn('#define C2M_DEBUG_BIND_ADDR "192.168.1.1"', header)
+        self.assertIn("#define C2M_DEBUG_WINDOW_SEC 7200", header)
+        self.assertIn('check("window_two_hours", C2M_DEBUG_WINDOW_SEC == 7200', source)
         self.assertIn('#define C2M_DEBUG_LOOPBACK_ADDR "127.0.0.1"', header)
         # 0.0.0.0 must only appear as a rejected-bind self-test vector,
         # never as a default bind address.
