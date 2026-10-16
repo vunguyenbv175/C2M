@@ -79,6 +79,10 @@ UART control was used in those diagnostics.
   interface-combinations payload. Exact RTL8821CS module has VIF code but no
   proven safe concurrent runtime. Do not force STA at the cost of AP.
 - Bluetooth HCI/transport/RF and M4 3D speed/sign rendering remain unproven.
+  M4 L0 link is now proven: RNDIS `usb0`, camera `.123` ↔ M4 `.129`, native
+  legs to both `adas:26012` and `cardv:8080`. No injection was performed;
+  L1 decode and any replay remain gated. See
+  `../firmware/M4_TRANSPORT_L0_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that
   value nor advertising artwork proves3D speed/sign support; see

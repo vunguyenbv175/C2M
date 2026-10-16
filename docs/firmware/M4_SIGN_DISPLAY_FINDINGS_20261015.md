@@ -138,5 +138,9 @@ For a later owner-approved physical test, record separately: observed real
 sign class/value; native decoded result and freshness; visible M4 icon/value
 and mode; disappearance time; and any unrelated ADAS/recording effect. Do not
 count the live-video picture of a roadside sign as a generated sign widget.
+On2026-10-16 the RNDIS L0 link was proven (camera `.123` ↔ M4 `.129` on
+`usb0`, native ESTABLISHED legs to `adas:26012` and `cardv:8080`); no packet
+was sent and no schema/receiver is proven by that link alone. See
+`M4_TRANSPORT_L0_20261016.md`.
 Do not count a lone speed number as a recognized limit without a verified
 receiver field and visual distinction from vehicle speed.
