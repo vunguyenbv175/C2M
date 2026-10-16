@@ -33,8 +33,10 @@ ioctls, no supplicant, no routes/firewall/config writes.
 Single vs dump vs split-dump print distinct `mode=` lines so behavioural
 differences stay observable. Single replies always emit granular
 `stage=`/`detail=` (missing maxnum/channels/limits, duplicates, truncation,
-wrong phy, bi-match, freq) plus pre-summary counters and bounded combo
-output even on failure.
+wrong phy, bi-match, freq, missing reply) plus pre-summary counters and
+bounded combo output even on failure. Single requires exactly one reply;
+dump requires at least one reply plus `DONE`; both emit a final
+`combos_summary` on success and on failure with the exact failure reason.
 
 ## Privacy and verdict rule
 
@@ -63,7 +65,13 @@ python3 tools/wifi/test_c2m_nlprobe.py
 ```
 
 Tests never run `--get-*`. Linux CI compiles the actual Linux code path but
-executes only pure fixtures, so it does not establish live netlink behavior.
+executes only pure fixtures, so it does not establish live socket behavior.
+The pure live reply validators (`family`/`iface`/`single`/`dump` callbacks)
+plus the shared netlink length check are compiled on every host and exercised
+by `--self-test` with synthetic fixtures (wrong phy/ifindex, duplicates,
+truncation, reply counts); socket peer/seq/`ACK`/`DONE` framing and the 1500 ms
+bounded wait stay Linux-only and unvalidated here. Netlink framing rejects
+`u32` length wrap before any payload use, so the 32-bit ARM case stays safe.
 Portable ABI constants are cross-checked at compile time against Linux build
 headers; reference: Linux v4.9
 [`include/uapi/linux/nl80211.h`](https://github.com/torvalds/linux/blob/v4.9/include/uapi/linux/nl80211.h).

@@ -64,6 +64,12 @@ REQUIRED = (
     "combo_missing_maxnum",
     "combo_missing_channels",
     "combo_missing_limits",
+    "c2m_nlmsg_step",
+    "c2m_family_reply",
+    "c2m_iface_reply",
+    "c2m_wiphy_single_reply",
+    "c2m_wiphy_dump_reply",
+    "missing_reply",
 )
 
 # Real stable ABI numbers (linux/nl80211.h enum order). Fake test-only
@@ -163,6 +169,32 @@ class NlprobeHostTests(unittest.TestCase):
         self.assertIn("NL80211_ATTR_SPLIT_WIPHY_DUMP, NULL, 0", code)
         # Correct nlmsghdr layout (u16 type/flags).
         self.assertIn("uint16_t type", code)
+        # Pure live callbacks must be testable on every host: defined before
+        # the Linux-only socket/framing section, not inside it.
+        live_marker = "#ifdef __linux__\n/* ---- live read-only"
+        self.assertIn(live_marker, raw)
+        live_pos = raw.index(live_marker)
+        for token in ("static int c2m_nlmsg_step",
+                      "static int c2m_family_reply",
+                      "static int c2m_iface_reply",
+                      "static int c2m_wiphy_single_reply",
+                      "static int c2m_wiphy_dump_reply"):
+            self.assertIn(token, raw, f"missing pure helper: {token}")
+            self.assertLess(raw.index(token), live_pos,
+                            f"{token} must be outside Linux-only section")
+        # 32-bit-safe framing: exchange must use the shared step helper.
+        self.assertIn("c2m_nlmsg_step(h.nlmsg_len", code)
+        # Single requires exactly one reply; dump requires at least one.
+        # Malformed/empty responses must exit with exact detail plus summary.
+        self.assertIn("r.replies != 1", code)
+        self.assertIn("!r.replies", code)
+        self.assertIn("missing_reply", code)
+        # Stable ABI asserts for 120/174/50/52 must stay compiled in.
+        for token in ("INTERFACE_COMBINATIONS == 120",
+                      "SPLIT_WIPHY_DUMP == 174",
+                      "SUPPORTED_COMMANDS == 50",
+                      "SSID == 52"):
+            self.assertIn(token, raw, f"missing ABI assert: {token}")
         # Fixed interface: no CLI override for ifname/device.
         self.assertNotIn("--ifname", raw)
         self.assertNotIn("--interface", code)
@@ -183,7 +215,17 @@ class NlprobeHostTests(unittest.TestCase):
                       "privacy_secret_bytes_absent", "dump_single_explicit",
                       "shared_limit_present", "fuzz_bounded_no_crash",
                       "nlmsg_layout_16", "abi_comb_maxnum_is_2",
-                      "noflag_known_schema_present"):
+                      "noflag_known_schema_present",
+                      "nlmsg_step_valid_16", "nlmsg_step_wrap_rejected",
+                      "family_valid_id", "family_duplicate_rejected",
+                      "iface_valid_ok", "iface_wrong_ifindex",
+                      "iface_missing_ifname", "iface_missing_iftype",
+                      "wiphy_single_valid", "wiphy_single_wrong_phy",
+                      "wiphy_single_missing_wiphy",
+                      "wiphy_single_zero_freq_unverified",
+                      "wiphy_single_second_reply_rejected",
+                      "wiphy_dump_valid", "wiphy_dump_bad_cmd",
+                      "wiphy_dump_too_many"):
             self.assertIn("PASS " + case, result.stdout)
         self.assertNotIn("PASS truncation_never_present", result.stdout)
         self.assertIn("concurrency=unknown_not_inferred", result.stdout)

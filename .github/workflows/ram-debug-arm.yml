@@ -1,0 +1,149 @@
+name: ram-debug-arm-stock-qemu
+# MANUAL ONLY. Build owner-private RAM test binaries, NOT an updater.
+# No firmware mutation/flash, private DB, owner key, camera or radio access.
+# Vendor loader/libc bytes stay private; public artifact is explicit safe evidence.
+"on":
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ram-debug:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host synthetic tests (no camera/network device)
+        run: |
+          set -euo pipefail
+          mkdir -p work/evidence
+          python3 tests/test_d3_gps.py > work/evidence/host-gps.txt 2>&1
+          cat work/evidence/host-gps.txt
+          python3 tests/test_d4_advisory.py > work/evidence/host-d4.txt 2>&1
+          cat work/evidence/host-d4.txt
+          python3 tools/wifi/test_c2m_nlprobe.py > work/evidence/host-nlprobe.txt 2>&1
+          cat work/evidence/host-nlprobe.txt
+          python3 tools/gps/test_c2m_gps_probe.py > work/evidence/host-gps-probe.txt 2>&1
+          cat work/evidence/host-gps-probe.txt
+          python3 tools/wifi/test_build_nlprobe_arm.py > work/evidence/host-arm-build-guards.txt 2>&1
+          cat work/evidence/host-arm-build-guards.txt
+          python3 tools/fw/test_prepare_ram_debug_sysroot.py > work/evidence/host-sysroot.txt 2>&1
+          cat work/evidence/host-sysroot.txt
+      - name: Install ARM tools and QEMU (versions recorded)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf qemu-user-static
+          arm-linux-gnueabihf-gcc --version > work/evidence/toolchain.txt
+          qemu-arm-static --version >> work/evidence/toolchain.txt
+          dpkg-query -W gcc-arm-linux-gnueabihf libc6-dev-armhf-cross qemu-user-static >> work/evidence/toolchain.txt
+          cat work/evidence/toolchain.txt
+      - name: Fetch independently pinned EN runtime (PRIVATE)
+        env:
+          FIRMWARE_VAULT_KEY: ${{ secrets.FIRMWARE_VAULT_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$FIRMWARE_VAULT_KEY"
+          umask 077
+          mkdir -p ~/.ssh work/private
+          printf '%s\n' "$FIRMWARE_VAULT_KEY" > ~/.ssh/ram_vault
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/ram_github_known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/ram_vault -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/ram_github_known_hosts -o GlobalKnownHostsFile=/dev/null"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git work/private/vault
+          cp work/private/vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar work/private/stock.tar
+          echo '3a703522df31f8accd58069850be0a01c2ac5ecbf12af1705ccb4904cd465f8c  work/private/stock.tar' | sha256sum -c -
+          rm -rf work/private/vault ~/.ssh/ram_vault
+          python3 tools/fw/carve_upgrade.py work/private/stock.tar -o work/private/carve > work/private/carve.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          roots = list(Path('work/private/carve').glob('rootfs.es.load0.*.bin'))
+          if len(roots) != 1:
+              raise SystemExit('Expected exactly one independently pinned rootfs load')
+          result = subprocess.run(['python3', 'tools/fw/prepare_ram_debug_sysroot.py',
+                                   str(roots[0]), 'work/private/sysroot'], check=True,
+                                  capture_output=True, text=True)
+          Path('work/evidence/stock-runtime-pins.json').write_text(result.stdout)
+          print(result.stdout)
+          PY
+      - name: Cross-build updated D4 and isolated observers (GATE)
+        run: |
+          set -euo pipefail
+          bash fw/d4/build.sh --out work/arm-d4 --sysroot work/private/sysroot > work/evidence/arm-d4.txt 2>&1
+          cat work/evidence/arm-d4.txt
+          bash tools/wifi/build_nlprobe_arm.sh --out work/arm-nlprobe --sysroot work/private/sysroot > work/evidence/arm-nlprobe.txt 2>&1
+          cat work/evidence/arm-nlprobe.txt
+          bash tools/gps/build_gps_probe_arm.sh --out work/arm-gps-probe --sysroot work/private/sysroot > work/evidence/arm-gps-probe.txt 2>&1
+          cat work/evidence/arm-gps-probe.txt
+      - name: Actual ARM D4 producer synthetic runtime under stock QEMU (GATE)
+        run: |
+          set -euo pipefail
+          timeout 45 python3 tools/fw/test_ram_d4_stock_qemu.py \
+            --binary work/arm-d4/c2m-signs --sysroot work/private/sysroot \
+            --report work/evidence/arm-d4-producer-runtime.json
+      - name: Assemble RAM-only bundle and source pins
+        run: |
+          set -euo pipefail
+          python3 tools/fw/package_ram_debug.py --output work/ram-bundle \
+            --d4 work/arm-d4/c2m-signs --nlprobe work/arm-nlprobe/c2m-nlprobe \
+            --gps-probe work/arm-gps-probe/c2m-gps-probe --evidence work/evidence
+          cp work/ram-bundle/manifest.json work/evidence/manifest.json
+          cp work/ram-bundle/SHA256SUMS.txt work/evidence/SHA256SUMS.txt
+      - name: Publish exact RAM-only bundle to PRIVATE vault
+        env:
+          FIRMWARE_VAULT_PUSH_KEY: ${{ secrets.FIRMWARE_VAULT_PUSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$FIRMWARE_VAULT_PUSH_KEY"
+          umask 077
+          printf '%s\n' "$FIRMWARE_VAULT_PUSH_KEY" > ~/.ssh/ram_vault_push
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > ~/.ssh/ram_github_known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/ram_vault_push -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/ram_github_known_hosts -o GlobalKnownHostsFile=/dev/null"
+          git clone --depth 1 git@github.com:vunguyenbv175/c2m-firmware-vault.git work/private/publish
+          D="deliverables/$(date -u +%Y%m%d)-ram-debug-r${GITHUB_RUN_ID}"
+          test ! -e "work/private/publish/$D"
+          mkdir -p "work/private/publish/$D"
+          cp -r work/ram-bundle "work/private/publish/$D/"
+          cp -r work/evidence "work/private/publish/$D/"
+          git -C work/private/publish add "$D"
+          git -C work/private/publish -c user.name=c2m-ci -c user.email=c2m-ci@local \
+            commit -m "RAM-only ARM debug bundle ${GITHUB_RUN_ID}; no updater or target acceptance"
+          git -C work/private/publish push origin main
+          printf 'private_vault_dir=%s\n' "$D" > work/evidence/private-vault-location.txt
+          cat work/evidence/private-vault-location.txt
+          rm -f ~/.ssh/ram_vault_push
+      - name: Upload safe evidence only (NO binaries, vendor bytes or private inputs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ram-debug-arm-evidence
+          if-no-files-found: error
+          path: |
+            work/evidence/host-gps.txt
+            work/evidence/host-d4.txt
+            work/evidence/host-nlprobe.txt
+            work/evidence/host-gps-probe.txt
+            work/evidence/host-arm-build-guards.txt
+            work/evidence/host-sysroot.txt
+            work/evidence/toolchain.txt
+            work/evidence/stock-runtime-pins.json
+            work/evidence/arm-d4.txt
+            work/evidence/arm-nlprobe.txt
+            work/evidence/arm-gps-probe.txt
+            work/evidence/arm-d4-producer-runtime.json
+            work/evidence/manifest.json
+            work/evidence/SHA256SUMS.txt
+            work/evidence/private-vault-location.txt
+      - name: Show safe gate logs on failure
+        if: failure()
+        run: |
+          for f in work/evidence/host-gps.txt work/evidence/host-d4.txt \
+            work/evidence/host-nlprobe.txt work/evidence/host-gps-probe.txt \
+            work/evidence/host-arm-build-guards.txt work/evidence/host-sysroot.txt \
+            work/evidence/arm-d4.txt work/evidence/arm-nlprobe.txt \
+            work/evidence/arm-gps-probe.txt; do
+            if test -f "$f"; then cat "$f"; fi
+          done
+      - name: Cleanup private runtime and credentials
+        if: always()
+        run: |
+          rm -rf work/private
+          rm -f ~/.ssh/ram_vault ~/.ssh/ram_vault_push ~/.ssh/ram_github_known_hosts

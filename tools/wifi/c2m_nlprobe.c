@@ -103,6 +103,7 @@ struct nlmsgerr { int error; uint32_t msglen; };
 #define NLMSG_DONE 3u
 #define GENL_ID_CTRL 0x10u
 #define GENL_MIN_ID 16
+#define CTRL_CMD_NEWFAMILY 1
 #define CTRL_CMD_GETFAMILY 3
 #define CTRL_ATTR_FAMILY_ID 1
 #define CTRL_ATTR_FAMILY_NAME 2
@@ -144,6 +145,23 @@ typedef char c2m_abi_combos_check[NL80211_ATTR_INTERFACE_COMBINATIONS == 120 ? 1
 typedef char c2m_abi_split_check[NL80211_ATTR_SPLIT_WIPHY_DUMP == 174 ? 1 : -1];
 typedef char c2m_abi_commands_check[NL80211_ATTR_SUPPORTED_COMMANDS == 50 ? 1 : -1];
 typedef char c2m_abi_ssid_check[NL80211_ATTR_SSID == 52 ? 1 : -1];
+
+/* Pure netlink framing check (no I/O). Validates u32 nlmsg_len against the
+ * available datagram bytes and computes the aligned step without 32-bit
+ * wrap. Used by the Linux live exchange loop; also exercised by --self-test
+ * so the 32-bit ARM wrap case stays covered on every host. */
+static int c2m_nlmsg_step(uint32_t len, size_t avail, size_t *step_out)
+{
+    size_t step;
+    if (len < 16u || (size_t)len > avail)
+        return -1;
+    step = ((size_t)len + 3u) & ~(size_t)3u;
+    if (step < (size_t)len || step > avail)
+        return -1;
+    if (step_out)
+        *step_out = step;
+    return 0;
+}
 
 #ifndef NLA_TYPE_MASK
 #define NLA_TYPE_MASK 0x3fffu
@@ -671,6 +689,227 @@ static int c2m_describe_wiphy_top(const void *p, size_t n, uint32_t freq,
     return stage;
 }
 
+/* ---- pure reply callbacks (no sockets, no clock, testable on every host).
+ * Moved outside the Linux-only live section so --self-test exercises the
+ * exact live validation logic (bad cmd, reply counts, wrong phy/ifindex,
+ * missing/truncated fields) without hardware. The socket/peer/seq/ACK/DONE
+ * framing loop stays Linux-only; its length check uses c2m_nlmsg_step. */
+struct c2m_iface_obs {
+    uint32_t want_index, index, phy, type, freq;
+    int name_present, replies, error;
+    const char *detail;
+};
+static int c2m_iface_reply(int cmd, const void *p, size_t n, void *out)
+{
+    struct c2m_iface_obs *r = (struct c2m_iface_obs *)out;
+    struct c2m_cursor it;
+    struct c2m_attr a;
+    unsigned seen = 0;
+    uint32_t index = 0, phy = 0, type = 0, freq = 0;
+    int have_name = 0;
+    if (cmd != NL80211_CMD_NEW_INTERFACE || ++r->replies > 128) {
+        r->error = -1;
+        r->detail = "bad_cmd_or_too_many";
+        return -1;
+    }
+    it.p = (const unsigned char *)p;
+    it.n = n;
+    it.bad = 0;
+    while (c2m_next(&it, &a)) {
+        if (a.type == (unsigned)NL80211_ATTR_IFINDEX) {
+            uint32_t v;
+            if ((seen & 1u) || c2m_attr_u32(&a, &v)) {
+                r->detail = "dup_or_bad_ifindex";
+                goto bad;
+            }
+            seen |= 1u;
+            index = v;
+        } else if (a.type == (unsigned)NL80211_ATTR_WIPHY) {
+            uint32_t v;
+            if ((seen & 2u) || c2m_attr_u32(&a, &v)) {
+                r->detail = "dup_or_bad_wiphy";
+                goto bad;
+            }
+            seen |= 2u;
+            phy = v;
+        } else if (a.type == (unsigned)NL80211_ATTR_IFTYPE) {
+            uint32_t v;
+            if ((seen & 4u) || c2m_attr_u32(&a, &v)) {
+                r->detail = "dup_or_bad_iftype";
+                goto bad;
+            }
+            seen |= 4u;
+            type = v;
+        } else if (a.type == (unsigned)NL80211_ATTR_WIPHY_FREQ) {
+            uint32_t v;
+            if ((seen & 8u) || c2m_attr_u32(&a, &v)) {
+                r->detail = "dup_or_bad_freq";
+                goto bad;
+            }
+            seen |= 8u;
+            freq = v;
+        } else if (a.type == (unsigned)NL80211_ATTR_IFNAME) {
+            if ((seen & 16u) || !a.n || a.n > 16 || a.p[a.n - 1]) {
+                r->detail = "bad_ifname";
+                goto bad;
+            }
+            seen |= 16u;
+            have_name = 1; /* value never printed */
+        }
+    }
+    if (it.bad) {
+        r->detail = "truncated";
+        goto bad;
+    }
+    if (!have_name) {
+        r->detail = "missing_ifname";
+        goto bad;
+    }
+    if (!(seen & 4u)) {
+        r->detail = "missing_iftype";
+        goto bad;
+    }
+    if ((seen & 3u) != 3u || !index) {
+        r->detail = "missing_ifindex_or_wiphy";
+        goto bad;
+    }
+    if (index != r->want_index) {
+        r->detail = "wrong_ifindex";
+        r->error = -1;
+        return -1;
+    }
+    r->index = index;
+    r->phy = phy;
+    r->type = type;
+    r->freq = freq;
+    r->name_present = have_name;
+    r->detail = "ok";
+    return 0;
+bad:
+    r->error = -1;
+    return -1;
+}
+struct c2m_wiphy_obs {
+    uint32_t phy, freq;
+    int replies, present;
+    struct c2m_counters counters;
+    const char *stage;
+    const char *detail;
+    struct c2m_out desc;
+};
+/* Single reply: always describe top headers + combo subtree (bounded) even on
+ * malformed/unverified paths, with granular stage and pre-summary counters. */
+static int c2m_wiphy_single_reply(int cmd, const void *p, size_t n, void *out)
+{
+    struct c2m_wiphy_obs *r = (struct c2m_wiphy_obs *)out;
+    struct c2m_cursor it;
+    struct c2m_attr a;
+    uint32_t phy = 0;
+    int have_phy = 0;
+    const char *d = "absent";
+    int stage;
+    if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > C2M_MAX_REPLIES_SINGLE) {
+        r->stage = "malformed";
+        r->detail = "bad_cmd_or_replies";
+        return -1;
+    }
+    /* Pre-scan for phy/combos presence (counters), then full describe. */
+    it.p = (const unsigned char *)p;
+    it.n = n;
+    it.bad = 0;
+    while (c2m_next(&it, &a)) {
+        if (a.type == (unsigned)NL80211_ATTR_WIPHY) {
+            uint32_t v;
+            if (have_phy++ || c2m_attr_u32(&a, &v)) {
+                r->stage = "malformed";
+                r->detail = "duplicate_or_bad_wiphy";
+                goto describe_anyway;
+            }
+            phy = v;
+        }
+    }
+    if (it.bad) {
+        r->stage = "malformed";
+        r->detail = "truncated_top";
+        goto describe_anyway;
+    }
+    if (!have_phy || phy != r->phy) {
+        r->stage = "malformed";
+        r->detail = !have_phy ? "missing_wiphy" : "wrong_phy";
+        goto describe_anyway;
+    }
+    stage = c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &r->counters, &d, &r->present);
+    r->stage = c2m_stage_name(stage);
+    r->detail = d;
+    return stage == C2M_ST_MALFORMED || stage == C2M_ST_UNVERIFIED ? -1 : 0;
+describe_anyway:
+    /* Still emit bounded structural output for diagnosis. */
+    {
+        const char *dd = r->detail;
+        int pp = 0;
+        struct c2m_counters cc;
+        memset(&cc, 0, sizeof(cc));
+        (void)c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &cc, &dd, &pp);
+        r->counters = cc;
+        if (!r->detail)
+            r->detail = dd;
+    }
+    return -1;
+}
+struct c2m_dump_obs {
+    int replies;
+    const char *stage;
+    const char *detail;
+    struct c2m_out desc;
+    struct c2m_counters counters;
+};
+static int c2m_wiphy_dump_reply(int cmd, const void *p, size_t n, void *out)
+{
+    struct c2m_dump_obs *r = (struct c2m_dump_obs *)out;
+    const char *d = "described";
+    int present = 0;
+    struct c2m_counters cc;
+    if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > C2M_MAX_REPLIES_DUMP) {
+        r->stage = "malformed";
+        r->detail = "bad_cmd_or_too_many";
+        return -1;
+    }
+    memset(&cc, 0, sizeof(cc));
+    (void)c2m_describe_wiphy_top(p, n, 2412, &r->desc, &cc, &d, &present);
+    r->counters.top_attrs += cc.top_attrs;
+    r->counters.combos_seen += cc.combos_seen;
+    r->counters.limits_seen += cc.limits_seen;
+    r->counters.attr_total += cc.attr_total;
+    if (r->desc.truncated) {
+        r->stage = "truncated";
+        r->detail = "truncated_output";
+    }
+    return 0;
+}
+static int c2m_family_reply(int cmd, const void *p, size_t n, void *out)
+{
+    struct c2m_cursor it;
+    struct c2m_attr a;
+    uint16_t id;
+    int *family = (int *)out;
+    it.p = (const unsigned char *)p;
+    it.n = n;
+    it.bad = 0;
+    if (cmd != CTRL_CMD_NEWFAMILY)
+        return -1;
+    while (c2m_next(&it, &a)) {
+        if (a.type == CTRL_ATTR_FAMILY_ID) {
+            if (*family || a.n != sizeof(id))
+                return -1;
+            memcpy(&id, a.p, sizeof(id));
+            if (id < GENL_MIN_ID)
+                return -1;
+            *family = id;
+        }
+    }
+    return it.bad ? -1 : 0;
+}
+
 /* ---- fixture builders (pure, shared by --self-test) ---- */
 struct c2m_msg { unsigned char data[4096]; size_t n; int raw; };
 static void c2m_fixture_init(struct c2m_msg *m)
@@ -1107,6 +1346,215 @@ static int c2m_self_test(void)
         failures += c2m_check("fuzz_bounded_no_crash", ok, 1);
     }
 
+    /* 14. Pure framing check shared with the Linux exchange loop. */
+    {
+        size_t st = 0;
+        failures += c2m_check("nlmsg_step_valid_16",
+            c2m_nlmsg_step(16, 16, &st) == 0 && st == 16, 1);
+        failures += c2m_check("nlmsg_step_short_rejected",
+            c2m_nlmsg_step(15, 16, NULL), -1);
+        failures += c2m_check("nlmsg_step_overrun_rejected",
+            c2m_nlmsg_step(20, 16, NULL), -1);
+        failures += c2m_check("nlmsg_step_wrap_rejected",
+            c2m_nlmsg_step(0xffffffffu, 100, NULL), -1);
+        failures += c2m_check("nlmsg_step_zero_rejected",
+            c2m_nlmsg_step(0, 16, NULL), -1);
+    }
+
+    /* 15. Live family callback: exact id, duplicates and small ids fail. */
+    {
+        struct c2m_msg f;
+        int id = 0;
+        uint16_t good = 20, small = 5;
+        c2m_fixture_init(&f);
+        (void)c2m_msg_attr(&f, CTRL_ATTR_FAMILY_ID, &good, sizeof(good));
+        failures += c2m_check("family_valid_id",
+            c2m_family_reply(CTRL_CMD_NEWFAMILY, f.data, f.n, &id) == 0 && id == 20, 1);
+        id = 0;
+        failures += c2m_check("family_bad_cmd",
+            c2m_family_reply(CTRL_CMD_GETFAMILY, f.data, f.n, &id), -1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_attr(&f, CTRL_ATTR_FAMILY_ID, &good, sizeof(good));
+        (void)c2m_msg_attr(&f, CTRL_ATTR_FAMILY_ID, &good, sizeof(good));
+        id = 0;
+        failures += c2m_check("family_duplicate_rejected",
+            c2m_family_reply(CTRL_CMD_NEWFAMILY, f.data, f.n, &id), -1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_attr(&f, CTRL_ATTR_FAMILY_ID, &small, sizeof(small));
+        id = 0;
+        failures += c2m_check("family_small_id_rejected",
+            c2m_family_reply(CTRL_CMD_NEWFAMILY, f.data, f.n, &id), -1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_attr(&f, CTRL_ATTR_FAMILY_ID, &good, sizeof(good));
+        id = 0;
+        failures += c2m_check("family_truncated_rejected",
+            c2m_family_reply(CTRL_CMD_NEWFAMILY, f.data, f.n - 1, &id), -1);
+    }
+
+    /* 16. Live interface callback: fixed wlan0 exactness, no value output. */
+    {
+        struct c2m_msg f;
+        struct c2m_iface_obs io;
+        static const char want[] = { 'w', 'l', 'a', 'n', '0', 0 };
+        static const char nonul[] = { 'w', 'l', 'a', 'n', '0' };
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFTYPE, 3);
+        (void)c2m_msg_attr(&f, (unsigned)NL80211_ATTR_IFNAME, want, sizeof(want));
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_valid_ok",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n, &io) == 0 &&
+            io.index == 7 && io.phy == 3 && io.detail[0] == 'o', 1);
+        memset(&io, 0, sizeof(io));
+        io.want_index = 8;
+        failures += c2m_check("iface_wrong_ifindex",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n, &io) == -1 &&
+            !strcmp(io.detail, "wrong_ifindex"), 1);
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_bad_cmd",
+            c2m_iface_reply(NL80211_CMD_GET_INTERFACE, f.data, f.n, &io) == -1, 1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFTYPE, 3);
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_missing_ifname",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n, &io) == -1 &&
+            !strcmp(io.detail, "missing_ifname"), 1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        (void)c2m_msg_attr(&f, (unsigned)NL80211_ATTR_IFNAME, want, sizeof(want));
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_missing_iftype",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n, &io) == -1 &&
+            !strcmp(io.detail, "missing_iftype"), 1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFTYPE, 3);
+        (void)c2m_msg_attr(&f, (unsigned)NL80211_ATTR_IFNAME, want, sizeof(want));
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_duplicate_rejected",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n, &io) == -1, 1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFTYPE, 3);
+        (void)c2m_msg_attr(&f, (unsigned)NL80211_ATTR_IFNAME, nonul, sizeof(nonul));
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_bad_ifname",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n, &io) == -1 &&
+            !strcmp(io.detail, "bad_ifname"), 1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFINDEX, 7);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_IFTYPE, 3);
+        (void)c2m_msg_attr(&f, (unsigned)NL80211_ATTR_IFNAME, want, sizeof(want));
+        memset(&io, 0, sizeof(io));
+        io.want_index = 7;
+        failures += c2m_check("iface_truncated_rejected",
+            c2m_iface_reply(NL80211_CMD_NEW_INTERFACE, f.data, f.n - 1, &io) == -1, 1);
+    }
+
+    /* 17. Live single-wiphy callback: phy exactness plus combo stage detail. */
+    {
+        struct c2m_msg f, g;
+        struct c2m_wiphy_obs wo;
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        {
+            size_t cb = c2m_begin(&f, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            c2m_combo(&f, 1, 1, 1, 0, 2, 1, 1);
+            c2m_end(&f, cb);
+        }
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 3;
+        wo.freq = 2412;
+        failures += c2m_check("wiphy_single_valid",
+            c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &wo) == 0 &&
+            wo.replies == 1 && wo.present == 1, 1);
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 3;
+        wo.freq = 2412;
+        failures += c2m_check("wiphy_single_bad_cmd",
+            c2m_wiphy_single_reply(NL80211_CMD_GET_WIPHY, f.data, f.n, &wo) == -1, 1);
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 4;
+        wo.freq = 2412;
+        failures += c2m_check("wiphy_single_wrong_phy",
+            c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &wo) == -1 &&
+            !strcmp(wo.detail, "wrong_phy"), 1);
+        c2m_fixture_init(&g);
+        {
+            size_t cb = c2m_begin(&g, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            c2m_combo(&g, 1, 1, 1, 0, 2, 1, 1);
+            c2m_end(&g, cb);
+        }
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 3;
+        wo.freq = 2412;
+        failures += c2m_check("wiphy_single_missing_wiphy",
+            c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, g.data, g.n, &wo) == -1 &&
+            !strcmp(wo.detail, "missing_wiphy"), 1);
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 3;
+        wo.freq = 0;
+        failures += c2m_check("wiphy_single_zero_freq_unverified",
+            c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &wo) == -1 &&
+            !strcmp(wo.stage, "unverified"), 1);
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 3;
+        wo.freq = 2412;
+        (void)c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &wo);
+        failures += c2m_check("wiphy_single_second_reply_rejected",
+            c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &wo) == -1 &&
+            !strcmp(wo.detail, "bad_cmd_or_replies"), 1);
+        memset(&wo, 0, sizeof(wo));
+        wo.phy = 3;
+        wo.freq = 2412;
+        failures += c2m_check("wiphy_single_truncated",
+            c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n - 1, &wo) == -1, 1);
+    }
+
+    /* 18. Live dump callback: bounded multi-reply description stays best-effort. */
+    {
+        struct c2m_msg f;
+        struct c2m_dump_obs d;
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 0);
+        {
+            size_t cb = c2m_begin(&f, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            c2m_combo(&f, 1, 1, 1, 0, 2, 1, 1);
+            c2m_end(&f, cb);
+        }
+        memset(&d, 0, sizeof(d));
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_valid",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d) == 0 &&
+            d.replies == 1, 1);
+        memset(&d, 0, sizeof(d));
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_bad_cmd",
+            c2m_wiphy_dump_reply(NL80211_CMD_GET_WIPHY, f.data, f.n, &d) == -1, 1);
+        memset(&d, 0, sizeof(d));
+        d.replies = C2M_MAX_REPLIES_DUMP;
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_too_many",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d) == -1, 1);
+    }
+
     printf("combos_summary combos_seen=%d limits_seen=%d\n", c.combos_seen, c.limits_seen);
     printf("concurrency=unknown_not_inferred\n");
     printf("meaning=absent_or_malformed_is_unknown_never_no\n");
@@ -1126,19 +1574,24 @@ static int64_t c2m_now_ms(void)
 static int c2m_wait_fd(int fd, int events, int64_t until)
 {
     struct pollfd p;
-    int64_t left;
     int r;
     p.fd = fd;
     p.events = (short)events;
     p.revents = 0;
-    while ((left = until - c2m_now_ms()) > 0) {
+    for (;;) {
+        int64_t now = c2m_now_ms();
+        int64_t left;
+        if (now < 0)
+            return -1;
+        left = until - now;
+        if (left <= 0)
+            return -1;
         r = poll(&p, 1, left > 2147483647 ? 2147483647 : (int)left);
         if (r > 0)
-            return (p.revents & events) ? 0 : -1;
+            return (p.revents & (unsigned)events) ? 0 : -1;
         if (r < 0 && errno != EINTR)
             return -1;
     }
-    return -1;
 }
 struct c2m_nl { int fd, family; uint32_t seq; };
 struct c2m_send { unsigned char data[C2M_NL_SEND]; size_t n; };
@@ -1195,7 +1648,11 @@ static int c2m_exchange(struct c2m_nl *nl, struct c2m_send *m, c2m_reply_fn fn, 
     size_t pos, step;
     ssize_t got;
     int dump, ack = 0, done = 0;
-    int64_t until = c2m_now_ms() + C2M_NL_TIMEOUT_MS;
+    int64_t start = c2m_now_ms();
+    int64_t until;
+    if (start < 0)
+        return -1;
+    until = start + C2M_NL_TIMEOUT_MS;
     memcpy(&h, m->data, sizeof(h));
     sequence = h.nlmsg_seq;
     dump = (h.nlmsg_flags & NLM_F_DUMP) == NLM_F_DUMP;
@@ -1225,8 +1682,8 @@ static int c2m_exchange(struct c2m_nl *nl, struct c2m_send *m, c2m_reply_fn fn, 
             if ((size_t)got - pos < sizeof(h))
                 return -1;
             memcpy(&h, buf + pos, sizeof(h));
-            step = ((size_t)h.nlmsg_len + 3u) & ~(size_t)3u;
-            if (h.nlmsg_len < (uint32_t)NLMSG_HDRLEN || step > (size_t)got - pos)
+            /* 32-bit-safe: reject wrap/overflow before any payload use. */
+            if (c2m_nlmsg_step(h.nlmsg_len, (size_t)got - pos, &step))
                 return -1;
             if (h.nlmsg_seq != sequence)
                 continue;
@@ -1264,29 +1721,6 @@ static int c2m_exchange(struct c2m_nl *nl, struct c2m_send *m, c2m_reply_fn fn, 
             return 0;
     }
 }
-static int c2m_family_reply(int cmd, const void *p, size_t n, void *out)
-{
-    struct c2m_cursor it;
-    struct c2m_attr a;
-    uint16_t id;
-    int *family = (int *)out;
-    it.p = (const unsigned char *)p;
-    it.n = n;
-    it.bad = 0;
-    if (cmd != CTRL_CMD_NEWFAMILY)
-        return -1;
-    while (c2m_next(&it, &a)) {
-        if (a.type == CTRL_ATTR_FAMILY_ID) {
-            if (*family || a.n != sizeof(id))
-                return -1;
-            memcpy(&id, a.p, sizeof(id));
-            if (id < GENL_MIN_ID)
-                return -1;
-            *family = id;
-        }
-    }
-    return it.bad ? -1 : 0;
-}
 static int c2m_nl_open(struct c2m_nl *nl)
 {
     struct sockaddr_nl addr;
@@ -1312,198 +1746,6 @@ fail:
     close(nl->fd);
     nl->fd = -1;
     return -1;
-}
-struct c2m_iface_obs {
-    uint32_t want_index, index, phy, type, freq;
-    int name_present, replies, error;
-    const char *detail;
-};
-static int c2m_iface_reply(int cmd, const void *p, size_t n, void *out)
-{
-    struct c2m_iface_obs *r = (struct c2m_iface_obs *)out;
-    struct c2m_cursor it;
-    struct c2m_attr a;
-    unsigned seen = 0;
-    uint32_t index = 0, phy = 0, type = 0, freq = 0;
-    int have_name = 0;
-    if (cmd != NL80211_CMD_NEW_INTERFACE || ++r->replies > 128) {
-        r->error = -1;
-        r->detail = "bad_cmd_or_too_many";
-        return -1;
-    }
-    it.p = (const unsigned char *)p;
-    it.n = n;
-    it.bad = 0;
-    while (c2m_next(&it, &a)) {
-        if (a.type == (unsigned)NL80211_ATTR_IFINDEX) {
-            uint32_t v;
-            if ((seen & 1u) || c2m_attr_u32(&a, &v)) {
-                r->detail = "dup_or_bad_ifindex";
-                goto bad;
-            }
-            seen |= 1u;
-            index = v;
-        } else if (a.type == (unsigned)NL80211_ATTR_WIPHY) {
-            uint32_t v;
-            if ((seen & 2u) || c2m_attr_u32(&a, &v)) {
-                r->detail = "dup_or_bad_wiphy";
-                goto bad;
-            }
-            seen |= 2u;
-            phy = v;
-        } else if (a.type == (unsigned)NL80211_ATTR_IFTYPE) {
-            uint32_t v;
-            if ((seen & 4u) || c2m_attr_u32(&a, &v)) {
-                r->detail = "dup_or_bad_iftype";
-                goto bad;
-            }
-            seen |= 4u;
-            type = v;
-        } else if (a.type == (unsigned)NL80211_ATTR_WIPHY_FREQ) {
-            uint32_t v;
-            if ((seen & 8u) || c2m_attr_u32(&a, &v)) {
-                r->detail = "dup_or_bad_freq";
-                goto bad;
-            }
-            seen |= 8u;
-            freq = v;
-        } else if (a.type == (unsigned)NL80211_ATTR_IFNAME) {
-            if ((seen & 16u) || !a.n || a.n > 16 || a.p[a.n - 1]) {
-                r->detail = "bad_ifname";
-                goto bad;
-            }
-            seen |= 16u;
-            have_name = 1; /* value never printed */
-        }
-    }
-    if (it.bad) {
-        r->detail = "truncated";
-        goto bad;
-    }
-    if (!have_name) {
-        r->detail = "missing_ifname";
-        goto bad;
-    }
-    if (!(seen & 4u)) {
-        r->detail = "missing_iftype";
-        goto bad;
-    }
-    if ((seen & 3u) != 3u || !index) {
-        r->detail = "missing_ifindex_or_wiphy";
-        goto bad;
-    }
-    if (index != r->want_index) {
-        r->detail = "wrong_ifindex";
-        r->error = -1;
-        return -1;
-    }
-    r->index = index;
-    r->phy = phy;
-    r->type = type;
-    r->freq = freq;
-    r->name_present = have_name;
-    r->detail = "ok";
-    return 0;
-bad:
-    r->error = -1;
-    return -1;
-}
-struct c2m_wiphy_obs {
-    uint32_t phy, freq;
-    int replies, present;
-    struct c2m_counters counters;
-    const char *stage;
-    const char *detail;
-    struct c2m_out desc;
-};
-/* Single reply: always describe top headers + combo subtree (bounded) even on
- * malformed/unverified paths, with granular stage and pre-summary counters. */
-static int c2m_wiphy_single_reply(int cmd, const void *p, size_t n, void *out)
-{
-    struct c2m_wiphy_obs *r = (struct c2m_wiphy_obs *)out;
-    struct c2m_cursor it;
-    struct c2m_attr a;
-    uint32_t phy = 0;
-    int have_phy = 0;
-    const char *d = "absent";
-    int stage;
-    if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > C2M_MAX_REPLIES_SINGLE) {
-        r->stage = "malformed";
-        r->detail = "bad_cmd_or_replies";
-        return -1;
-    }
-    /* Pre-scan for phy/combos presence (counters), then full describe. */
-    it.p = (const unsigned char *)p;
-    it.n = n;
-    it.bad = 0;
-    while (c2m_next(&it, &a)) {
-        if (a.type == (unsigned)NL80211_ATTR_WIPHY) {
-            uint32_t v;
-            if (have_phy++ || c2m_attr_u32(&a, &v)) {
-                r->stage = "malformed";
-                r->detail = "duplicate_or_bad_wiphy";
-                goto describe_anyway;
-            }
-            phy = v;
-        }
-    }
-    if (it.bad) {
-        r->stage = "malformed";
-        r->detail = "truncated_top";
-        goto describe_anyway;
-    }
-    if (!have_phy || phy != r->phy) {
-        r->stage = "malformed";
-        r->detail = !have_phy ? "missing_wiphy" : "wrong_phy";
-        goto describe_anyway;
-    }
-    stage = c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &r->counters, &d, &r->present);
-    r->stage = c2m_stage_name(stage);
-    r->detail = d;
-    return stage == C2M_ST_MALFORMED || stage == C2M_ST_UNVERIFIED ? -1 : 0;
-describe_anyway:
-    /* Still emit bounded structural output for diagnosis. */
-    {
-        const char *dd = r->detail;
-        int pp = 0;
-        struct c2m_counters cc;
-        memset(&cc, 0, sizeof(cc));
-        (void)c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &cc, &dd, &pp);
-        r->counters = cc;
-        if (!r->detail)
-            r->detail = dd;
-    }
-    return -1;
-}
-struct c2m_dump_obs {
-    int replies;
-    const char *stage;
-    const char *detail;
-    struct c2m_out desc;
-    struct c2m_counters counters;
-};
-static int c2m_wiphy_dump_reply(int cmd, const void *p, size_t n, void *out)
-{
-    struct c2m_dump_obs *r = (struct c2m_dump_obs *)out;
-    const char *d = "described";
-    int present = 0;
-    struct c2m_counters cc;
-    if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > C2M_MAX_REPLIES_DUMP) {
-        r->stage = "malformed";
-        r->detail = "bad_cmd_or_too_many";
-        return -1;
-    }
-    memset(&cc, 0, sizeof(cc));
-    (void)c2m_describe_wiphy_top(p, n, 2412, &r->desc, &cc, &d, &present);
-    r->counters.top_attrs += cc.top_attrs;
-    r->counters.combos_seen += cc.combos_seen;
-    r->counters.limits_seen += cc.limits_seen;
-    r->counters.attr_total += cc.attr_total;
-    if (r->desc.truncated) {
-        r->stage = "truncated";
-        r->detail = "truncated_output";
-    }
-    return 0;
 }
 static void c2m_print_out(struct c2m_out *o)
 {
@@ -1551,11 +1793,18 @@ static int c2m_live_wiphy_single(struct c2m_nl *nl, uint32_t phy, uint32_t freq)
     r.detail = "query";
     c2m_send_init(&m, nl->family, NL80211_CMD_GET_WIPHY, 0, ++nl->seq);
     if (c2m_send_u32(&m, NL80211_ATTR_WIPHY, phy) ||
-        c2m_exchange(nl, &m, c2m_wiphy_single_reply, &r)) {
+        c2m_exchange(nl, &m, c2m_wiphy_single_reply, &r) || r.replies != 1) {
+        if (r.replies != 1 && r.detail && !strcmp(r.detail, "query")) {
+            r.stage = "malformed";
+            r.detail = "missing_reply";
+        }
         printf("wiphy mode=single replies=%d top_attrs=%d combos_seen=%d limits_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
             r.replies, r.counters.top_attrs, r.counters.combos_seen, r.counters.limits_seen,
             r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         c2m_print_out(&r.desc);
+        printf("combos_summary combos_seen=%d limits_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+            r.counters.combos_seen, r.counters.limits_seen,
+            r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         return -1;
     }
     printf("wiphy mode=single replies=%d top_attrs=%d combos_seen=%d limits_seen=%d combos_present=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
@@ -1581,11 +1830,18 @@ static int c2m_live_wiphy_dump(struct c2m_nl *nl, int split)
         if (c2m_send_attr(&m, NL80211_ATTR_SPLIT_WIPHY_DUMP, NULL, 0))
             return -1;
     }
-    if (c2m_exchange(nl, &m, c2m_wiphy_dump_reply, &r)) {
+    if (c2m_exchange(nl, &m, c2m_wiphy_dump_reply, &r) || !r.replies) {
+        if (!r.replies && r.detail && !strcmp(r.detail, "described")) {
+            r.stage = "malformed";
+            r.detail = "missing_reply";
+        }
         printf("wiphy mode=%s replies=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
             split ? "split-dump" : "dump", r.replies,
             r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         c2m_print_out(&r.desc);
+        printf("combos_summary replies=%d combos_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+            r.replies, r.counters.combos_seen,
+            r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         return -1;
     }
     printf("wiphy mode=%s replies=%d done=1 top_attrs=%d combos_seen=%d stage=%s concurrency=unknown_not_inferred\n",
