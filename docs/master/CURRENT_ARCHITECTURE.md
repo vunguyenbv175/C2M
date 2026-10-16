@@ -83,9 +83,12 @@ UART control was used in those diagnostics.
   legs to both `adas:26012` and `cardv:8080`. No injection was performed;
   L1 decode and any replay remain gated. See
   `../firmware/M4_TRANSPORT_L0_20261016.md`.
-  A bounded receive-only `usb0` observer is now implemented offline
-  (`fw/m4_sniff`, host gate PASS on Windows, Linux/QEMU/ARM CI pending);
-  no camera contact has been made for L1 yet. See
+  A bounded receive-only `usb0` observer v2 is implemented and gated:
+  payload-only hex (96B L7 per segment, 20 packets, 512B snaplen) instead of
+  frame-start hex; host 4/4 PASS, ARM build/QEMU PASS (`38852345666`,
+  source `23a2d45`, bundle `d3dc30cf…57ac4`, 11624B, `observer_v2`,
+  no-transmit, sentinel unchanged). No camera contact for L1 yet; hardware
+  run needs a newly notified stationary session. See
   `../firmware/M4_SNIFF_L1_PLAN_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that
