@@ -89,9 +89,12 @@ UART control was used in those diagnostics.
   Do not use V2 for hardware or treat its tests as successful capture proof.
   V3 fixes payload bounds, protocol-zero interface attach, nonblocking receive,
   actual output-byte budget and explicit prefix truncation/seq/ack metadata.
-  A newly owner-confirmed read-only preflight found the live USB legs healthy;
-  V3 synthetic/ARM gates and exact pinned runner remain required before run.
-  No sniffer has executed on camera yet; see
+  Final V3 Linux7/7 + ARM/QEMU/import gates passed (`38857027117`, source
+  `b40a276`); ELF11736B `58259c85…640f4e`, exact bundle/source readback and
+  local pinned-runner checks passed. A12:24 read-only preflight found the native
+  USB legs healthy, but the13:14 window check got TCP2222 connection refused
+  after correct bound UUID/local pin. No debug restart/extension or sniffer
+  upload/execution followed; a fresh notified owner session is needed. See
   `../firmware/M4_SNIFF_L1_PLAN_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that

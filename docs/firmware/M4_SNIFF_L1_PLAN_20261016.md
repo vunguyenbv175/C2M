@@ -1,4 +1,4 @@
-# M4 RNDIS usb0 passive sniffer — L1 plan (offline, no camera contact) — 2026-10-16
+# M4 RNDIS usb0 passive sniffer — V3 prepared, hardware capture pending — 2026-10-16
 
 ## Goal
 
@@ -99,7 +99,46 @@ V3 runner is separately named `build/run_m4_sniff_v3_reviewed.py` and fails
 until exact source/run/manifest/binary pins are approved. It requires parsed
 current RNDIS/ARP/route/ESTABLISHED legs and validates raw lifecycle output
 without fabricating self-test markers. Raw capture must stay private.
-Next: synthetic successful parser/output tests → ARM CI/QEMU/import gate →
-exact pinned bundle → finite hardware run if owner readiness/window remain
-valid → offline decode. No replay, M4 widget support or full L1 acceptance is
-implied by any earlier build-only result.
+V3 host checks now exercise the real shared formatter (not just source-token
+checks): ordinary/options/VLAN TCP payload, ACK padding, UDP lengths,
+fragments, invalid/truncated headers, snaplen truncation, output bound and
+null-input handling. Windows: 6 pass, Linux-only absent-interface case skipped.
+Initial Linux CI `38856651684` failed in the include-harness feature-macro
+ordering; corrected in `8767d21` (`38856891002`: Linux7/7 + ARM/QEMU PASS).
+Final `b40a276` also parses the actual readelf symbol-name column (not trailing
+version-index) and requires receive imports, so the forbidden-import gate
+cannot pass by parsing an empty/wrong name set.
+
+## Final V3 preparation and closed window
+
+- Exact source: `b40a276bf4c45c22f96d8d282c86551b4725ddba`.
+- Manual ARM workflow `38857027117`: PASS, including Linux7/7 synthetic
+  checks, ARM ELF/ABI build, pure ARM self-test, stock QEMU absent-interface
+  path/sentinel preservation, and actual undefined-import no-transmit gate.
+- Private vault commit: `0881e68e8aa934ac51e6ce65d00a1ae37e8d0546`;
+  `deliverables/20261016-ram-debug-r38857027117/m4-sniff-bundle`.
+- ELF11736B SHA256:
+  `58259c85dcf811174281ea2f9767d74302409efd5261021a3db95a4b41640f4e`.
+- Manifest2035B SHA256:
+  `fd857ebcf212aba09b03f3c5bb111dd520fd478fe2c0a6c6bd9b28dfcafaa6ff`.
+- Bundle retrieved with byte-preserving `git show` (no Windows newline
+  conversion); all checksums, source hashes, public manifest equality and
+  full ARM ELF gate passed locally. Pinned V3 runner local-only check passed.
+  Binary/vendor bytes remain private; public reports contain no payload.
+
+At13:14 local time the owner asked to continue. Fresh laptop discovery found
+Wi-Fi IPv4 `192.168.1.10`; bound camera UUID and local host pin check passed,
+but TCP2222 returned connection refused. This is **SSH unavailable**, consistent
+with finite-window expiry, not an authenticated read of debug status or proof
+of the exact expiry reason. Private local evidence:
+`C2M_HW_20261012/07_m4/m4_v3_window_check_20261016_131423/window_check.json`.
+No retry, listener restart/extension, upload, native observer execution or M4
+application connection followed. No raw M4 capture exists from this session.
+The earlier12:24 health observations are not a fresh13:14 recording/ADAS check.
+
+Next: separately notified owner-controlled fresh boot/debug session, with
+stationary hardware and normal original functions confirmed, then recheck
+UUID/host pin/source IPv4/current USB legs and finite SSH window before the
+already prepared V3 run. Do not extend the old window to compensate for time
+spent on offline fixes. No replay, M4 widget support, full L1 acceptance or
+hardware-success claim is implied by these build/local checks.

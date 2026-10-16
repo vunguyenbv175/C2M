@@ -9,9 +9,33 @@ M4 status stream. Decode existing captures instead. The CLI observer now
 requires `--confirm-m4-disconnected` and is not a physical M4 delivery test.
 
 **Current feature target:** owner reports speed is already visible in 2D live
-video but there is no speed region in 3D ADAS. Preserve the working 2D/GPS and
-ADAS behavior. Identify the actual renderer/layout before attempting any
-3D speed change; camera OSD capability alone does not prove a 3D overlay.
+video but has never observed vehicle speed or signs in 3D ADAS. The conditional
+top warning bar exists and shows collision-related seconds, not vehicle speed.
+Preserve that working UI, 2D/GPS and ADAS. Identify the actual renderer/layout
+before attempting a 3D speed change; camera OSD alone does not prove a widget.
+
+## Current RAM-only observer (2026-10-16)
+
+L0 was proven as RNDIS `usb0`, camera `192.168.32.123` to M4
+`192.168.32.129`, with native established `26012` and `8080` legs; see
+`../firmware/M4_TRANSPORT_L0_20261016.md`. Recheck that link each session.
+For stock images without tcpdump, use only the separately ABI/QEMU-gated and
+exactly pinned finite `fw/m4_sniff` V3 observer and its reviewed local runner.
+V1/V2 are withdrawn before hardware execution (payload-label bugs); no new
+application socket is needed or allowed for the capture.
+
+V3 captures partial payload prefixes, NOT a reassembled TCP stream. Limits:
+20 received packets, 15 poll calls, 30s internal deadline, 6144B record budget,
+512B snaplen and 96B per-record payload. Fifteen calls with a 1s maximum wait
+are **not** a full 15s sample when traffic is ready. Explicit captured/truncated
+and seq/ack metadata expose missing data. Failure to see a UUID/topic is not
+proof the stock stream lacks it. No raw output belongs in the public repo.
+
+New owner stationary/healthy confirmation, fresh source IPv4, UUID/host pin,
+current link checks, external BusyBox `timeout -t`, exact private RAM cleanup
+and pre/post preservation checks are mandatory. Never extend/restart SSH to
+finish a capture after its approved window has expired. See
+`../firmware/M4_SNIFF_L1_PLAN_20261016.md`.
 
 ## 0. Collect (READ_ONLY)
 
