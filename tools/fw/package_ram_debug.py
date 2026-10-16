@@ -40,8 +40,11 @@ def main() -> int:
     paths = [args.d4, args.nlprobe, args.gps_probe]
     binaries = {name: checked_elf(path) for name, path in zip(EXPECTED, paths)}
     runtime = json.loads((args.evidence / "arm-d4-producer-runtime.json").read_text())
-    if runtime.get("verdict") != "PASS" or runtime.get("camera_used") is not False:
-        raise SystemExit("Mandatory actual ARM producer runtime proof missing")
+    from prepare_ram_debug_sysroot import PINS
+    if (runtime.get("verdict") != "PASS" or runtime.get("camera_used") is not False or
+            runtime.get("binary_sha256") != hashlib.sha256(binaries["c2m-signs"]).hexdigest() or
+            runtime.get("stock_runtime_sha256") != PINS):
+        raise SystemExit("Mandatory actual ARM producer runtime proof/pins missing")
     for path in paths:
         subprocess.run(["python3", "fw/device_minimal/check_elf.py", str(path),
                         "--allow-dynamic"], cwd=ROOT, check=True, timeout=30)
@@ -53,6 +56,7 @@ def main() -> int:
         "fw/device_minimal/check_elf.py", "fw/d4", "fw/warner/db.c",
         "fw/warner/db.h", "fw/warner/warner.c", "fw/warner/warner.h", "tools/wifi",
         "tools/gps", "tools/fw/prepare_ram_debug_sysroot.py",
+        "tools/fw/carve_upgrade.py", "tools/fw/extract_rootfs_cpio.py",
         "tools/fw/test_ram_d4_stock_qemu.py", "tools/fw/package_ram_debug.py",
         ".github/workflows/ram-debug-arm.yml"], cwd=ROOT).decode().split("\0")
     source_pins = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()

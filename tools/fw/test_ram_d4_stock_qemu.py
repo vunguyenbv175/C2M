@@ -7,6 +7,7 @@ The production binary runs in fixture mode, not with camera default paths.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -71,15 +72,40 @@ def main() -> int:
     binary, sysroot = args.binary.resolve(), args.sysroot.resolve()
     if binary.read_bytes()[:4] != b"\x7fELF":
         raise SystemExit("target must be an already ABI-gated ARM ELF")
-    if not (sysroot / "lib/ld-linux-armhf.so.3").is_file():
-        raise SystemExit("stock loader missing")
+    from prepare_ram_debug_sysroot import PINS, LINKS
+    for name, expected in PINS.items():
+        path = sysroot / "lib" / name
+        if path.is_symlink() or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            raise SystemExit("stock runtime pin failed")
+    for name, target in LINKS.items():
+        path = sysroot / "lib" / name
+        if not path.is_symlink() or os.readlink(path) != target:
+            raise SystemExit("stock runtime symlink pin failed")
+    binary_sha256 = hashlib.sha256(binary.read_bytes()).hexdigest()
     qemu = shutil.which("qemu-arm-static")
     if not qemu:
         raise SystemExit("qemu-arm-static required")
+    if os.geteuid() != 0:
+        raise SystemExit("Run this synthetic QEMU fixture gate with sudo; /tmp trust policy requires root")
+    # QEMU -L maps open("/") to the prefix; subsequent descriptor-relative
+    # openat(dirfd, "tmp") cannot fall back to the host /tmp. Put fixtures
+    # under an actual root-owned sticky prefix/tmp, not a symlink, without
+    # weakening the production descriptor/owner checks to suit the host.
+    os.chown(sysroot, 0, 0)
+    sysroot.chmod(0o755)
+    guest_tmp = sysroot / "tmp"
+    if guest_tmp.is_symlink():
+        raise SystemExit("QEMU fixture /tmp must not be a symlink")
+    guest_tmp.mkdir(mode=0o1777, exist_ok=True)
+    os.chown(guest_tmp, 0, 0)
+    guest_tmp.chmod(0o1777)
+    if guest_tmp.stat().st_uid != 0:
+        raise SystemExit("QEMU fixture /tmp must be root owned")
     observations = []
-    with tempfile.TemporaryDirectory(prefix="c2m-d4-arm-fixture-") as name:
+    with tempfile.TemporaryDirectory(prefix="c2m-d4-arm-fixture-", dir=guest_tmp) as name:
         root = Path(name)
         root.chmod(0o700)
+        guest_root = Path("/tmp") / root.name
         database, source, status = root / "synthetic.bin", root / "car_info", root / "status"
         database.write_bytes(db())
         database.chmod(0o600)
@@ -92,8 +118,8 @@ def main() -> int:
 
         update(0, 100)
         command = [qemu, "-strace", "-L", str(sysroot), str(binary), "--serve",
-                   "--db", str(database), "--gps-file", str(source),
-                   "--status-file", str(status)]
+                   "--db", str(guest_root / database.name), "--gps-file", str(guest_root / source.name),
+                   "--status-file", str(guest_root / status.name)]
         trace_path = args.report.with_suffix(".strace.txt")
         trace = trace_path.open("wb")
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=trace)
@@ -148,7 +174,9 @@ def main() -> int:
         stopped = read_status(status)
         assert stopped["state"] == "disabled" and stopped["active"] == "0"
         observations.append("SIGTERM_disabled_status_clean_exit")
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == binary_sha256
     report = {"verdict": "PASS", "runtime": "exact ARM ELF plus stock loader/glibc under QEMU",
+              "binary_sha256": binary_sha256, "stock_runtime_sha256": PINS,
               "fixtures": "synthetic only", "checks": observations,
               "camera_used": False, "radio_used": False, "private_database_used": False,
               "target_device_accepted": False}

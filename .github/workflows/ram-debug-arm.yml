@@ -6,6 +6,9 @@ name: ram-debug-arm-stock-qemu
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ram-debug-arm-private-publish
+  cancel-in-progress: false
 jobs:
   ram-debug:
     runs-on: ubuntu-24.04
@@ -77,7 +80,7 @@ jobs:
       - name: Actual ARM D4 producer synthetic runtime under stock QEMU (GATE)
         run: |
           set -euo pipefail
-          timeout 45 python3 tools/fw/test_ram_d4_stock_qemu.py \
+          sudo timeout 45 python3 tools/fw/test_ram_d4_stock_qemu.py \
             --binary work/arm-d4/c2m-signs --sysroot work/private/sysroot \
             --report work/evidence/arm-d4-producer-runtime.json
       - name: Assemble RAM-only bundle and source pins
@@ -145,5 +148,5 @@ jobs:
       - name: Cleanup private runtime and credentials
         if: always()
         run: |
-          rm -rf work/private
+          sudo rm -rf work/private
           rm -f ~/.ssh/ram_vault ~/.ssh/ram_vault_push ~/.ssh/ram_github_known_hosts
