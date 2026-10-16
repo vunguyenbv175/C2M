@@ -33,8 +33,8 @@ Do not publish raw GPS samples, recording filenames or private assets.
 - Host fingerprint: `SHA256:Sp3VCG13OerdY/FIU3cftqi8h0BqLgVqM/wXHJ1pJEk`.
   `dropbearkey -y` on the camera printed the same public-key fingerprint.
   This is owner-controlled AP + verified UUID **TOFU**, not an independent
-  out-of-band cryptographic verification. No host/private key bytes were read
-  or copied to the laptop. The private client key was not printed or copied.
+  out-of-band cryptographic verification. No server private key bytes were
+  read or copied to the laptop. The private client key was not printed or copied.
 - Public-key authentication succeeded as UID/GID 0. Initial uptime was about
   six minutes; the supervisor status was `active/listening`, with a 1,200-second
   window and explicit `192.168.1.1:2222` binding. `/proc/net/tcp` independently
@@ -64,13 +64,14 @@ one-second-apart reads of only the documented `0x330..0x4ef` GPS region showed:
 - The raw integer at GPS-relative offset `0x1c` took values
   `0, 100, 200, 200, 300`.
 
-The current decoder treats that integer as hundredths and rejects values over
-99 (`fw/d3/gps_snapshot.c`). D4 nevertheless reported `state=stale`,
-`gps_fresh=0`, `active=0` through both SSH and HTTP. The live discrepancy is a
-concrete decoder-contract blocker; its precise vendor unit/range must be
-proven statically before changing validation. Do not weaken freshness checks,
-normalize GPS data on the camera, or claim D4 advisories/beep work on this build.
-Local investigation and replay tests can proceed without camera access.
+The installed decoder treats that integer as hundredths and rejects values
+over99. D4 nevertheless reported `state=stale`, `gps_fresh=0`, `active=0`
+through both SSH and HTTP. Subsequent local static analysis proved a vendor
+unscaled1–3-digit fraction with valid range0..999; source/tests now correct
+both decoder and freshness input validation. See
+`D4_GPS_SUBSECOND_FIX_20261016.md` for exact proof and private-capture host replay.
+No fix was deployed. Do not weaken advancing-second freshness checks, normalize
+GPS data on the camera, or claim D4 advisories/beep work on the installed build.
 
 ## Stationary RAM roundtrip and listener observation
 

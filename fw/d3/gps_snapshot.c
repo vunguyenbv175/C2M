@@ -65,10 +65,16 @@ static int decode_utc(const uint8_t *p, int64_t *seconds)
 
     /* nmeaTIME stores year since 1900 and zero-based month. The RMC
      * parser adds 100 for yy<=89; do NOT interpret this as full-year UTC.
+     * Subseconds at GPS-record-relative +0x1c (absolute file 0x34c) are
+     * unscaled 1-3 digit fraction ("%2d%2d%2d.%d", no x100 scaling):
+     * milliseconds only when 3 digits, range 0..999.
+     * EN cardv _nmea_parse_time (0xe0099) enforces len 6 or 8..10 and stores
+     * the fraction verbatim via nmea_scanf; nmea_GPRMC2info copies it verbatim
+     * to nmeaINFO+0x1c and WriteGpsInfoForCardvUI copies 0x1c0 bytes verbatim.
      */
     if (year < 100u || year > 199u || month > 11u ||
         hour > 23u || minute > 59u || second > 59u ||
-        read_u32_le(p + 0x1c) > 99u)
+        read_u32_le(p + 0x1c) > 999u)
         return 0;
     year += 1900u;
     days_in_month = month_days[month];
@@ -135,7 +141,7 @@ int c2m_gps_decode(const uint8_t *bytes, size_t size,
         signal > INT32_MAX || fix < 2u || fix > INT32_MAX ||
         !decode_utc(bytes, &value.utc_seconds))
         return fail_decode(out, C2M_GPS_INVALID);
-    value.hundredths = read_u32_le(bytes + 0x1c);
+    value.subsecond_raw = read_u32_le(bytes + 0x1c);
     if (!decode_ddmm(read_double_le(bytes + 0x40), 90u,
                      &value.latitude_deg) ||
         !decode_ddmm(read_double_le(bytes + 0x48), 180u,
@@ -250,11 +256,13 @@ static int sample_in_range(const struct c2m_gps_snapshot *sample)
 {
     /* Defend the public state API against an uninitialized/manual sample.
      * Valid UTC window is 2000-01-01 through 2099-12-31 inclusive.
+     * Subsecond raw is 0..999 unscaled 1-3 digit fraction (ms only when
+     * 3 digits); never used to refresh a UTC second.
      */
     return sample != NULL && (sample->mask & C2M_GPS_RMC_MASK) &&
            sample->utc_seconds >= INT64_C(946684800) &&
            sample->utc_seconds <= INT64_C(4102444799) &&
-           sample->hundredths <= 99u &&
+           sample->subsecond_raw <= 999u &&
            isfinite(sample->latitude_deg) &&
            fabs(sample->latitude_deg) <= 90.0 &&
            isfinite(sample->longitude_deg) &&

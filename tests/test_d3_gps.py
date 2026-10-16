@@ -35,7 +35,7 @@ LINUX = sys.platform.startswith("linux")
 class Snapshot(ctypes.Structure):
     _fields_ = [
         ("utc_seconds", ctypes.c_int64),
-        ("hundredths", ctypes.c_uint32),
+        ("subsecond_raw", ctypes.c_uint32),
         ("mask", ctypes.c_uint32),
         ("latitude_deg", ctypes.c_double),
         ("longitude_deg", ctypes.c_double),
@@ -58,13 +58,13 @@ class Freshness(ctypes.Structure):
 
 
 def record(*, mask=8, year=124, month=1, day=29, hour=12, minute=34,
-           second=56, hundredths=78, signal=1, fix=2, latitude=-1230.0,
+           second=56, subsecond_raw=78, signal=1, fix=2, latitude=-1230.0,
            longitude=4530.0, speed=25.0, course=123.5) -> bytes:
     """Explicit little-endian nmeaINFO, not a native ABI struct."""
     blob = bytearray(RECORD_BYTES)
     for offset, value in (
         (0, mask), (4, year), (8, month), (0x0C, day), (0x10, hour),
-        (0x14, minute), (0x18, second), (0x1C, hundredths),
+        (0x14, minute), (0x18, second), (0x1C, subsecond_raw),
         (0x20, signal), (0x24, fix),
     ):
         struct.pack_into("<I", blob, offset, value & 0xFFFFFFFF)
@@ -277,7 +277,7 @@ class GpsTests(unittest.TestCase):
         out = self.decode()
         self.assertEqual(out.utc_seconds, int(dt.datetime(
             2024, 2, 29, 12, 34, 56, tzinfo=dt.timezone.utc).timestamp()))
-        self.assertEqual(out.hundredths, 78)
+        self.assertEqual(out.subsecond_raw, 78)
         self.assertEqual(out.latitude_deg, -12.5)
         self.assertEqual(out.longitude_deg, 45.5)
         self.assertEqual(out.speed_kmh, 25.0)  # No extra knots->km/h factor.
@@ -315,18 +315,24 @@ class GpsTests(unittest.TestCase):
             {"month": 3, "day": 31}, {"month": 1, "day": 30},
             {"year": 123, "month": 1, "day": 29}, {"hour": 24},
             {"hour": -1}, {"minute": 60}, {"second": 60}, {"second": -1},
-            {"hundredths": 100}, {"hundredths": -1},
+            # Unscaled 1-3 digit fraction 0..999 (ms only when 3 digits;
+            # EN _nmea_parse_time "%2d%2d%2d.%d", no scaling).
+            # Live D4 2026-10-16 showed 100/200/300 with advancing seconds.
+            {"subsecond_raw": 1000}, {"subsecond_raw": -1}, {"subsecond_raw": 0xFFFFFFFF},
         )
         for kwargs in bad:
             with self.subTest(kwargs=kwargs):
                 self.decode(record(**kwargs), INVALID)
         valid = (
             {"year": 100, "month": 0, "day": 1, "hour": 0,
-             "minute": 0, "second": 0, "hundredths": 0},
+             "minute": 0, "second": 0, "subsecond_raw": 0},
             {"year": 100, "month": 1, "day": 29},
             {"year": 196, "month": 1, "day": 29},
             {"year": 199, "month": 11, "day": 31, "hour": 23,
-             "minute": 59, "second": 59, "hundredths": 99},
+             "minute": 59, "second": 59, "subsecond_raw": 999},
+            # Live D4 subseconds must decode: 0/100/200/300 with RMC/sig/fix.
+            {"subsecond_raw": 0}, {"subsecond_raw": 100}, {"subsecond_raw": 200}, {"subsecond_raw": 300},
+            {"subsecond_raw": 99},
         )
         for kwargs in valid:
             values = dict(year=124, month=1, day=29, hour=12, minute=34, second=56)
@@ -398,11 +404,11 @@ class GpsTests(unittest.TestCase):
         sample.utc_seconds += 1
         self.assertEqual(self.fresh(state, sample, 14500), 1)
 
-    def test_repeated_coordinates_can_be_fresh_hundredths_cannot(self):
+    def test_repeated_coordinates_can_be_fresh_subsecond_raw_cannot(self):
         state = Freshness()
         sample = self.decode(record(speed=0))
         self.assertEqual(self.fresh(state, sample, 0), 0)
-        sample.hundredths = 99
+        sample.subsecond_raw = 999
         sample.latitude_deg += 0.1
         self.assertEqual(self.fresh(state, sample, 1000), 0)
         sample.utc_seconds += 1
@@ -412,9 +418,69 @@ class GpsTests(unittest.TestCase):
         for ms in range(3000, 13000, 1000):
             sample.utc_seconds += 1
             self.assertEqual(self.fresh(state, sample, ms), 1)
-        sample.hundredths = 0
+        sample.subsecond_raw = 0
         sample.latitude_deg += 1
         self.assertEqual(self.fresh(state, sample, 14500), 0)
+
+    def test_subsecond_raw_invalid_resets_freshness_fail_closed(self):
+        # Raw 1000 is outside vendor 0..999 and must decode INVALID and
+        # reset freshness state, even with an advancing UTC second.
+        self.decode(record(subsecond_raw=1000), INVALID)
+        self.decode(record(subsecond_raw=0xFFFFFFFF), INVALID)
+        state = Freshness()
+        sample = self.decode(record(subsecond_raw=100))
+        self.assertEqual(self.fresh(state, sample, 0), 0)
+        sample.utc_seconds += 1
+        sample.subsecond_raw = 200
+        self.assertEqual(self.fresh(state, sample, 1000), 1)
+        # Inject invalid raw with advancing second: fail closed + reset.
+        sample.utc_seconds += 1
+        sample.subsecond_raw = 1000
+        self.assertEqual(self.fresh(state, sample, 2000), 0)
+        self.assertEqual(state.have_anchor, 0)
+        self.assertEqual(state.confirmed, 0)
+        # Must reacquire with two valid advancing seconds.
+        sample = self.decode(record(subsecond_raw=300))
+        self.assertEqual(self.fresh(state, sample, 3000), 0)
+        sample.utc_seconds += 1
+        sample.subsecond_raw = 999
+        self.assertEqual(self.fresh(state, sample, 4000), 1)
+
+    def test_subsecond_raw_valid_advancing_seconds_confirm(self):
+        # Each valid raw (incl live-shape 100/200/300 and edge 999) must
+        # not block the mandatory two-advancing-second confirmation.
+        for raw in (0, 99, 100, 200, 300, 999):
+            with self.subTest(raw=raw):
+                state = Freshness()
+                sample = self.decode(record(subsecond_raw=raw))
+                self.assertEqual(sample.subsecond_raw, raw)
+                self.assertEqual(self.fresh(state, sample, 0), 0)
+                sample.utc_seconds += 1
+                self.assertEqual(self.fresh(state, sample, 1000), 1)
+
+    def test_live_shape_five_advancing_seconds(self):
+        # Synthetic shape mirroring live subs 0,100,200,200,300 with five
+        # strictly advancing synthetic UTC seconds. Uses only synthetic
+        # record() coordinates/speed/course; no live lat/lon is copied.
+        base = self.decode(record(subsecond_raw=0))
+        base_utc = base.utc_seconds
+        raws = (0, 100, 200, 200, 300)
+        state = Freshness()
+        results = []
+        for i, raw in enumerate(raws):
+            sample = self.decode(record(subsecond_raw=raw))
+            sample.utc_seconds = base_utc + i
+            sample.subsecond_raw = raw
+            results.append(self.fresh(state, sample, i * 1000))
+        self.assertEqual(results, [0, 1, 1, 1, 1])
+        # Subsecond-only churn without UTC advance must never confirm.
+        state = Freshness()
+        sample = self.decode(record(subsecond_raw=0))
+        self.assertEqual(self.fresh(state, sample, 0), 0)
+        for raw in raws[1:]:
+            sample.subsecond_raw = raw
+            self.assertEqual(self.fresh(state, sample, 500), 0)
+        self.assertEqual(state.confirmed, 0)
 
     def test_freshness_delta_tolerance_and_cumulative_drift(self):
         for delta, expected in ((4, 1), (5, 0)):

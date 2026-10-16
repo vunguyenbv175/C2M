@@ -40,6 +40,7 @@ int main(void)
     struct c2m_gps_snapshot gps;
     warner_sign_t sign;
     uint64_t now;
+    uint32_t max_seen = 0;
     memset(&gps, 0, sizeof(gps));
     memset(&sign, 0, sizeof(sign));
     sign.lat = 0.0005;
@@ -53,14 +54,24 @@ int main(void)
     REQUIRE(status.state == C2M_D4_WARMING_UP && !status.active);
     c2m_d4_published(&core, 1);
     /* A lone never-advancing sample eventually reports stale, not perpetual
-     * warming_up; new positions and subseconds cannot refresh GPS time. */
+     * warming_up; new positions and subseconds cannot refresh GPS time.
+     * (now/5)%1000 steps 100 per 500ms poll, covering live-shape 100..900;
+     * 999 is covered explicitly below. */
     for (now = 500; now < 10000; now += 500) {
-        gps.hundredths = (uint32_t)((now / 500) % 100);
+        gps.subsecond_raw = (uint32_t)((now / 5) % 1000);
+        if (gps.subsecond_raw > max_seen) max_seen = gps.subsecond_raw;
+        REQUIRE(gps.subsecond_raw <= 999u);
         c2m_d4_prepare(&core, &gps, now, 1, 0, &status);
         REQUIRE(!status.gps_fresh && !status.active);
         REQUIRE(status.state == (now < 2500 ? C2M_D4_WARMING_UP : C2M_D4_STALE));
         c2m_d4_published(&core, 1);
     }
+    REQUIRE(max_seen >= 900);
+    gps.subsecond_raw = 999;
+    c2m_d4_prepare(&core, &gps, 9500, 1, 0, &status);
+    REQUIRE(!status.gps_fresh && !status.active);
+    REQUIRE(status.state == C2M_D4_STALE);
+    c2m_d4_published(&core, 1);
     ++gps.utc_seconds;
     c2m_d4_prepare(&core, &gps, 10000, 1, 0, &status);
     REQUIRE(status.state == C2M_D4_STALE && !status.active);
@@ -76,14 +87,18 @@ int main(void)
     c2m_d4_prepare(&core, &gps, 13500, 1, 0, &status);
     REQUIRE(status.state == C2M_D4_STALE && !status.gps_fresh && !status.active);
     c2m_d4_published(&core, 1);
+    max_seen = 0;
     for (now = 14000; now <= 30000; now += 500) {
         gps.latitude_deg = (now % 1000) ? 0.00001 : 0;
-        gps.hundredths = (uint32_t)((now / 500) % 100);
+        gps.subsecond_raw = (uint32_t)((now / 5) % 1000);
+        REQUIRE(gps.subsecond_raw <= 999u);
+        if (gps.subsecond_raw > max_seen) max_seen = gps.subsecond_raw;
         c2m_d4_prepare(&core, &gps, now, 1, 0, &status);
         REQUIRE(status.state == C2M_D4_STALE && !status.gps_fresh && !status.active);
         REQUIRE(status.code == C2M_D4_NONE && status.distance_m == 0 && status.event_id == 0);
         c2m_d4_published(&core, 1);
     }
+    REQUIRE(max_seen >= 900);
     /* Failed polls force two-sample reacquisition, and successful delivery's
      * sign cooldown still suppresses the same sign once GPS is fresh again. */
     c2m_d4_prepare(&core, NULL, 31000, 1, 0, &status);

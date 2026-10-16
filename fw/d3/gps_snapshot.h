@@ -31,7 +31,7 @@ enum c2m_gps_result {
 
 struct c2m_gps_snapshot {
     int64_t utc_seconds;       /* Unix UTC seconds; no local timezone/time_t. */
-    uint32_t hundredths;       /* 0..99; not used to refresh a UTC second. */
+    uint32_t subsecond_raw;    /* 0..999 unscaled 1-3 digit fraction; not used to refresh a UTC second. */
     uint32_t mask;
     double latitude_deg;      /* Converted from SIGNED NMEA DDMM, not radians. */
     double longitude_deg;
@@ -41,9 +41,13 @@ struct c2m_gps_snapshot {
 };
 
 /* Pure, allocation-free decoder. Requires exactly C2M_GPS_RECORD_BYTES.
- * RMC, signal>0, fix>=2, UTC 2000..2099, valid calendar/hundredths, finite
+ * RMC, signal>0, fix>=2, UTC 2000..2099, valid calendar/subseconds, finite
  * signed DDMM coordinates, speed [0,300], and course [0,360) are mandatory.
- * Returns OK or INVALID. All failures clear *out when out is non-NULL.
+ * Subseconds at GPS-record-relative 0x1c (nmeaINFO+0x1c; absolute file
+ * 0x34c = 0x330+0x1c) are 0..999 unscaled 1-3 digit fraction (milliseconds
+ * only when 3 digits; see _nmea_parse_time 0xe0099 with "%2d%2d%2d.%d",
+ * no scaling). Returns OK or INVALID. All failures clear *out
+ * when out is non-NULL.
  * A decoded sample alone is NOT proof of freshness or a heading candidate.
  */
 int c2m_gps_decode(const uint8_t *bytes, size_t size,
@@ -75,7 +79,7 @@ void c2m_gps_freshness_init(struct c2m_gps_freshness *state);
  * from the caller's monotonic clock, NOT wall time or file mtime. Returns 1
  * only after two strictly increasing GPS UTC-second observations agree
  * with elapsed monotonic time within 3 seconds. Repeated seconds do not
- * refresh the clock, regardless of coordinates/hundredths; at age >=2.5s
+ * refresh the clock, regardless of coordinates/subseconds; at age >=2.5s
  * they are invalid. Stale gaps, clock regressions, UTC jumps/regressions,
  * and failed polls require a new two-sample confirmation. This function
  * is pure and has no timer/thread; callers must poll before using a sample.
