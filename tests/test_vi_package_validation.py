@@ -164,7 +164,7 @@ def main() -> int:
         fails.append(f"protected_for_profile raised unexpectedly: {exc}")
 
     # 4. No arbitrary hash-override flags; --base-profile exists on both tools.
-    for tool in ("tools/fw/validate_firmware.py", "tools/fw/build_candidates.py"):
+    for tool in ("tools/fw/validate_firmware.py", "tools/fw/build_candidates.py", "tools/fw/repack_firmware.py"):
         r = subprocess.run([sys.executable, tool, "--help"],
                            cwd=ROOT, capture_output=True, text=True, timeout=60)
         out = r.stdout + r.stderr
@@ -230,6 +230,13 @@ def main() -> int:
                 if r.returncode != 0:
                     fails.append(f"private VI contract derivation failed: {r.stderr[-500:]}")
                 else:
+                    repack = subprocess.run(
+                        [sys.executable, "tools/fw/repack_firmware.py", "--tar", str(vi_tar),
+                         "--base-profile", "vi", "--contract", str(vc_json),
+                         "--out", str(tmp / "vi_repack.tar"), "--report", str(tmp / "vi_repack.json")],
+                        cwd=ROOT, capture_output=True, timeout=60)
+                    if repack.returncode or not (tmp / "vi_repack.tar").exists() or sha256_bytes((tmp / "vi_repack.tar").read_bytes()) != VI_TAR:
+                        fails.append("VI exact pinned repack not byte identical")
                     rc, doc = run_validator(vi_tar, vc_json, tmp, "vi_real_vi",
                                             ["--deep", "--base-profile", "vi"], timeout=300)
                     if not (rc == 0 and doc.get("verdict") == "VALID"):

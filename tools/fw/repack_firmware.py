@@ -39,6 +39,8 @@ def sha256_bytes(d: bytes) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tar", type=Path, required=True)
+    ap.add_argument("--base-profile", choices=("en", "vi"), default="en",
+                    help="independent exact base TAR pin; default EN remains unchanged")
     ap.add_argument("--contract", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--report", type=Path, required=True)
@@ -53,8 +55,10 @@ def main() -> int:
 
     contract = json.loads(args.contract.read_text(encoding="utf-8"))
     orig_tar_bytes = args.tar.read_bytes()
-    if sha256_bytes(orig_tar_bytes) != EXPECTED_TAR_SHA:
-        print(f"REPACK-FAIL: source TAR SHA mismatch (not the golden EN baseline).")
+    from validate_firmware import VI_TAR_SHA256
+    expected_sha = VI_TAR_SHA256 if args.base_profile == "vi" else EXPECTED_TAR_SHA
+    if sha256_bytes(orig_tar_bytes) != expected_sha:
+        print(f"REPACK-FAIL: source TAR SHA mismatch (not the pinned {args.base_profile} baseline).")
         return 1
     if sha256_bytes(orig_tar_bytes) != contract["source_tar_sha256"]:
         print("REPACK-FAIL: source TAR does not match contract source_tar_sha256.")

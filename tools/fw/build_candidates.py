@@ -156,7 +156,7 @@ def main() -> int:
 
     # ---- Candidate A (always) ----
     run([py, "tools/fw/repack_firmware.py", "--tar", str(base_tar),
-         "--contract", str(args.contract),
+         "--base-profile", args.base_profile, "--contract", str(args.contract),
          "--out", str(wd / "EN_REPACK_GOLDEN.tar"),
          "--report", str(wd / "repack_A.json")], "repack-A")
     run([py, "tools/fw/validate_firmware.py", "--tar", str(wd / "EN_REPACK_GOLDEN.tar"),
