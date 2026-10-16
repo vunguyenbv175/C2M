@@ -50,8 +50,10 @@ def main():
     # Dynamic symbol names contain no '('; the old byte grep was not a gate.
     symbols = subprocess.check_output(['arm-linux-gnueabihf-readelf', '--wide',
                                       '--dyn-syms', str(binary)], text=True)
-    imports = {row.split()[-1].split('@')[0] for row in symbols.splitlines()
+    # Column 7 is Name; a trailing '(version-index)' is NOT the symbol name.
+    imports = {row.split()[7].split('@')[0] for row in symbols.splitlines()
                if ' UND ' in row and len(row.split()) >= 8}
+    assert {'socket', 'bind', 'recvfrom', 'poll'} <= imports, 'Unparsed/missing capture imports'
     forbidden_calls = {'send', 'sendto', 'sendmsg', 'sendmmsg', 'connect', 'write',
                        'writev', 'pwrite', 'pwrite64', 'ioctl', 'setsockopt',
                        'system', 'popen', 'fopen', 'open', 'openat', 'creat',
