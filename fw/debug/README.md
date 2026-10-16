@@ -3,6 +3,16 @@
 Scope: full debug bundle build-only: `dropbear`, `dropbearkey`,
 `c2m-debug` (supervisor), `debug_boot.sh` + reports/objects in `--out DIR`.
 No exact deploy; parent deploys to `/customer/c2m` separately.
+
+Default D4 SSH supervisor lifetime is **120 minutes (7200 seconds) from serve start**.
+D5-VI uses the separate `build_dropbear.sh --lifetime` edition: `window_sec=0`,
+`lifetime=boot`, no listener deadline. AP-loss/signal/child-exit still stops the
+owned listener, without automatic restart. The600s idle-session bound remains.
+This is a compile-time policy (`C2M_DEBUG_WINDOW_SEC`), not a production CLI
+extension. AP-only bind, owner Ed25519 key, AP-loss shutdown and automatic
+expiry remain enforced. The existing camera runs its old 20-minute binary until
+a separately gated updated binary/package is deployed; repo changes alone do
+not extend a live session.
 Run this script after the D4 build; parent assembles all assets.
 
 Root-only: supervisor serves root only; Dropbear is compiled

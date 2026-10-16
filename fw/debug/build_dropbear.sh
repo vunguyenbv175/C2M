@@ -22,7 +22,7 @@
 # Run from repo root: sh fw/debug/build_dropbear.sh --out DIR --sysroot ROOT [--lifetime]
 #   --lifetime selects the D5 boot-lifetime supervisor edition
 #   (-DC2M_DEBUG_LIFETIME=1, default window 0, no supervisor deadline).
-#   Default (no flag) is the D4 20-minute window edition. The helper keeps
+#   Default (no flag) is the D4 120-minute window edition. The helper keeps
 #   the same install name c2m-debug in both editions; the edition is
 #   recorded in reports/c2m-debug-edition.txt plus a preprocessor proof.
 set -eu
@@ -389,7 +389,7 @@ headers = '''#define _POSIX_C_SOURCE 200809L
 destination.write_text(headers+s,encoding='utf-8')
 PY
 # D5 lifetime edition: same c2m-debug helper name, explicit macro.
-# Default (lifetime=0) keeps the D4 20-minute window; --lifetime sets
+# Default (lifetime=0) keeps the D4 120-minute window; --lifetime sets
 # C2M_DEBUG_LIFETIME=1 (default window 0, no supervisor deadline).
 supervisor_defs=""
 if [ "$lifetime" = 1 ]; then
@@ -420,8 +420,8 @@ if [ "$lifetime" = 1 ]; then
     printf 'edition=lifetime-boot\nwindow_sec=0\nlifetime_macro=1\n' > "$out/reports/c2m-debug-edition.txt"
 else
     grep -q "^#define C2M_DEBUG_LIFETIME 0$" "$out/reports/c2m-debug-macros.txt" || { echo 'D4 edition macro proof FAIL' >&2; exit 1; }
-    grep -q "^#define C2M_DEBUG_WINDOW_SEC 1200$" "$out/reports/c2m-debug-macros.txt" || { echo 'D4 default window proof FAIL' >&2; exit 1; }
-    printf 'edition=window-1200\nwindow_sec=1200\nlifetime_macro=0\n' > "$out/reports/c2m-debug-edition.txt"
+    grep -q "^#define C2M_DEBUG_WINDOW_SEC 7200$" "$out/reports/c2m-debug-macros.txt" || { echo 'D4 default window proof FAIL' >&2; exit 1; }
+    printf 'edition=window-7200\nwindow_sec=7200\nlifetime_macro=0\n' > "$out/reports/c2m-debug-edition.txt"
 fi
 cat "$out/reports/c2m-debug-edition.txt"
 arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \

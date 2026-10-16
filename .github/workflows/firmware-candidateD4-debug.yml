@@ -681,7 +681,7 @@ jobs:
           for the owner's own camera: bind 192.168.1.1:2222 on wlan0 only,
           key-only root login with the pinned owner Ed25519 public key
           (SHA256 08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d),
-          no passwords, no forwarding, 20-minute listener window, then the
+          no passwords, no forwarding, 120-minute listener window, then the
           supervisor stops its own listener. The persistent hostkey generates
           on first boot only under the private config dir; later boots reuse
           it. The service starts detached after D3/D4 boot and never edits

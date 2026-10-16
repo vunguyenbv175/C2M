@@ -352,26 +352,30 @@ int c2m_debug_self_test(void)
                                !valid_bind("192.168.1.1", 2222, 1) &&
                                !valid_bind("0.0.0.0", 2222, 1),
           &failures);
-    check("window_bounds", !(1200 < 1 || 1200 > 86400) && (0 < 1 || 0 > 86400) &&
+#if !C2M_DEBUG_LIFETIME
+    check("window_two_hours", C2M_DEBUG_WINDOW_SEC == 7200, &failures);
+#endif
+    check("window_bounds", (C2M_DEBUG_LIFETIME ? C2M_DEBUG_WINDOW_SEC == 0 :
+                               (C2M_DEBUG_WINDOW_SEC >= 1 && C2M_DEBUG_WINDOW_SEC <= 86400)) &&
                                (99999 > 86400),
           &failures);
     /* Production CLI gate: no I/O, order-independent by construction
      * (caller passes one any_override bit for all fixture flags). */
     check("cli_production_defaults",
-          c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, 1200, 1000),
+          c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 1000),
           &failures);
     check("cli_override_needs_loopback",
-          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, 1200, 1000),
+          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 1000),
           &failures);
     check("cli_ap_bypass_rejected_without_loopback",
-          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, 1200, 100),
+          !c2m_debug_cli_valid(0, 1, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 100),
           &failures);
     check("cli_override_accepted_with_loopback",
           c2m_debug_cli_valid(1, 1, "127.0.0.1", 2223, 2, 100),
           &failures);
     check("cli_loopback_wrong_bind_rejected",
           !c2m_debug_cli_valid(1, 1, "192.168.1.1", 2222, 2, 100) &&
-              !c2m_debug_cli_valid(1, 0, "192.168.1.1", 2222, 1200, 1000),
+              !c2m_debug_cli_valid(1, 0, "192.168.1.1", 2222, C2M_DEBUG_WINDOW_SEC, 1000),
           &failures);
     check("cli_bad_bounds_rejected",
 #if C2M_DEBUG_LIFETIME
@@ -404,7 +408,7 @@ int c2m_debug_self_test(void)
           !c2m_debug_cli_valid(0, 0, "192.168.1.1", 2222, 0, 1000) &&
               !c2m_debug_cli_valid(1, 1, "127.0.0.1", 2222, 0, 100),
           &failures);
-    check("d4_default_window_1200", C2M_DEBUG_WINDOW_SEC == 1200,
+    check("d4_default_window_7200", C2M_DEBUG_WINDOW_SEC == 7200,
           &failures);
 #endif
     /* Stock table vectors from actual EN cpio facts (/tmp,/var,/customer
@@ -477,7 +481,7 @@ static void usage(FILE *f)
           "  default window 0, status window_sec=0 lifetime=boot; AP loss\n"
           "  still stops the owned listener, SIGTERM stops, no restart).\n",
 #else
-          "  60 s inside the overall 20-minute window.\n",
+          "  60 s inside the overall 120-minute window.\n",
 #endif
           f);
 }

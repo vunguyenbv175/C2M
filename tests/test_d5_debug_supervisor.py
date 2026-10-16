@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """D5 lifetime-boot debug-supervisor tests. Never touch camera/WLAN/flash/SD.
 
-Covers the D5 Vietnamese-firmware variant: first 20-minute SSH cap removed,
-D4 default 1200 preserved, explicit build variant C2M_DEBUG_LIFETIME via
+Covers the D5 Vietnamese-firmware variant: first 120-minute SSH cap removed,
+D4 default 7200 preserved, explicit build variant C2M_DEBUG_LIFETIME via
 build_dropbear.sh --lifetime. D5 --serve production lifetime window 0 keeps
 AP gate / key-only / root / owned-PID listener proof / persistent hostkey /
 no-password / no-forward unchanged; 600 s idle session timeout (-M600) is a
@@ -15,7 +15,7 @@ Builds fw/debug/supervisor.c twice (D4 default + D5 lifetime) with strict C99.
 Portable --help/--self-test run everywhere. Mock-exec integration runs only
 on Linux with private temp run/config/status paths, mock dropbear fixtures,
 --loopback-test and --ap-state-file. No real SSH, radio, firewall, route,
-or passwd change. No 1200 s waits: fixtures use window 0 (boot-lifetime)
+or passwd change. No 7200 s waits: fixtures use window 0 (boot-lifetime)
 and short sleeps beyond the former 2 s expiry to prove no deadline.
 """
 from __future__ import annotations
@@ -142,11 +142,11 @@ class EditionSourceTests(unittest.TestCase):
         self.assertIn("#define C2M_DEBUG_LIFETIME 0", header)
         self.assertIn("#if C2M_DEBUG_LIFETIME", header)
         self.assertIn("#define C2M_DEBUG_WINDOW_SEC 0", header)
-        self.assertIn("#define C2M_DEBUG_WINDOW_SEC 1200", header)
-        # D4 default 1200 must remain the else-branch value.
+        self.assertIn("#define C2M_DEBUG_WINDOW_SEC 7200", header)
+        # D4 default 7200 must remain the else-branch value.
         idx0 = header.index("#define C2M_DEBUG_WINDOW_SEC 0")
-        idx1200 = header.index("#define C2M_DEBUG_WINDOW_SEC 1200")
-        self.assertLess(idx0, idx1200)
+        idx7200 = header.index("#define C2M_DEBUG_WINDOW_SEC 7200")
+        self.assertLess(idx0, idx7200)
         self.assertIn("lifetime=boot", header)
         self.assertIn("--lifetime", header)
 
@@ -158,7 +158,7 @@ class EditionSourceTests(unittest.TestCase):
         self.assertIn("c2m-debug-edition.txt", script)
         self.assertIn("c2m-debug-macros", script)
         self.assertIn("edition=lifetime-boot", script)
-        self.assertIn("edition=window-1200", script)
+        self.assertIn("edition=window-7200", script)
         # Helper keeps the same install name in both editions.
         self.assertIn('"$out/c2m-debug"', script)
         self.assertNotIn("c2m-debug-lifetime", script.split("Host tools allowed")[0]
@@ -203,7 +203,7 @@ class EditionSourceTests(unittest.TestCase):
                                 text=True, timeout=30)
             self.assertEqual(r4.returncode, 0, r4.stdout + r4.stderr)
             self.assertIn("c2m-debug self-test: OK", r4.stdout)
-            self.assertIn("d4_default_window_1200", r4.stdout)
+            self.assertIn("d4_default_window_7200", r4.stdout)
             self.assertIn("cli_zero_rejected_d4_default", r4.stdout)
             r5 = subprocess.run([str(d5), "--self-test"], capture_output=True,
                                 text=True, timeout=30)
@@ -235,7 +235,7 @@ class EditionSourceTests(unittest.TestCase):
             if not LINUX:
                 self.skipTest("--serve gate needs Linux; self-test covers it")
             self.assertFalse(status.exists())
-            # D4 production default window 1200 is the only valid default;
+            # D4 production default window 7200 is the only valid default;
             # lifetime binary must NOT reject window 0 at the gate. Use a
             # missing-owner fixture so it fails fast with 1 (not 2).
             run_dir = base / "run"

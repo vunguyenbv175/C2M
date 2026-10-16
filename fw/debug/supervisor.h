@@ -81,12 +81,12 @@
  *   socket inode. No TCP connect probe is used (no auth-session overhead,
  *   no interference with Dropbear, and a foreign listener on the same
  *   port cannot satisfy the owned-PID fd check). Startup AP readiness is
- *   retried up to 60 s inside the same overall 20-minute cap (D4), or
+ *   retried up to 60 s inside the same overall 120-minute cap (D4), or
  *   with no supervisor deadline in the lifetime-boot edition (D5) where
  *   the 60 s AP bound still applies.
  *
  * Lifetime/limits (documented, not over-promised):
- *   - Default (D4) supervisor enforces a 20-minute (1200 s) window from
+ *   - Default (D4) supervisor enforces a 120-minute (7200 s) window from
  *     serve start (startup retries included), then SIGTERMs its OWN
  *     dropbear process group (no pkill/killall) and publishes expired.
  *     Dropbear -M600 additionally bounds idle sessions.
@@ -147,7 +147,7 @@
 #if C2M_DEBUG_LIFETIME
 #define C2M_DEBUG_WINDOW_SEC 0
 #else
-#define C2M_DEBUG_WINDOW_SEC 1200
+#define C2M_DEBUG_WINDOW_SEC 7200
 #endif
 #define C2M_DEBUG_POLL_MS 1000
 #define C2M_DEBUG_STARTUP_AP_MS 60000

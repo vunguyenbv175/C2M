@@ -108,9 +108,7 @@ jobs:
             --output firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar
           echo "f28cad049bf27437f4245ff489a784c679a20c1d867c4a63b6bcfb081b8d3cfa  firmware/original/V2023.09.20.1_C2M_U_FR_WIFI_VI.tar" \
             | sha256sum -c -
-          # VI base only: refuse any EN tar in the vault copy step.
-          test ! -f /tmp/fw-vault/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar || \
-            { echo "D5-VI-GATE: EN tar must not be fetched for a VI base"; exit 1; }
+          # Shared private vault retains EN for rollback; never copy it into this VI build.
           test ! -f firmware/original/V2023.08.03.1_C2M_U_FR_WIFI_EN.tar
           python3 - <<'EOF'
           import tarfile
@@ -293,13 +291,16 @@ jobs:
           mkdir -p work/sysroot/tmp
           cp build/arm-dyn-b/c2m-idle work/sysroot/tmp/c2m-idle
           sha256sum work/sysroot/tmp/c2m-idle > work/qemu_bin.sha256
-          rm -f /tmp/c2m_idle.marker
+          rm -f /tmp/c2m_idle.marker work/sysroot/tmp/c2m_idle.marker
           timeout -s KILL 10 qemu-arm-static -L work/sysroot work/sysroot/tmp/c2m-idle \
             > work/qemu_out.txt 2>&1 || [ $? -eq 137 ]
           cat work/qemu_out.txt
           grep -q "c2m-idle 0.2.0-sdlog1" work/qemu_out.txt
-          cat /tmp/c2m_idle.marker
-          grep -qx "c2m-idle 0.2.0-sdlog1" /tmp/c2m_idle.marker
+          marker=work/sysroot/tmp/c2m_idle.marker
+          if [ ! -f "$marker" ]; then marker=/tmp/c2m_idle.marker; fi
+          test -f "$marker" && test ! -L "$marker"
+          cat "$marker"
+          grep -qx "c2m-idle 0.2.0-sdlog1" "$marker"
           echo "QEMU-RUNTIME: PASS (VI stock glibc-2.30 userspace; stdout + marker verified)"
           # Pinned VI stock NSS check: same 361400-byte module as EN pin.
           # Any mismatch STOPS the run (report, do not proceed).
