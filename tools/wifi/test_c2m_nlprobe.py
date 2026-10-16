@@ -70,6 +70,12 @@ REQUIRED = (
     "c2m_wiphy_single_reply",
     "c2m_wiphy_dump_reply",
     "missing_reply",
+    "combos_attrs",
+    "combos_bytes",
+    "top_other",
+    "freq_unverified",
+    "truncated_output",
+    "parse_complete",
 )
 
 # Real stable ABI numbers (linux/nl80211.h enum order). Fake test-only
@@ -184,6 +190,10 @@ class NlprobeHostTests(unittest.TestCase):
                             f"{token} must be outside Linux-only section")
         # 32-bit-safe framing: exchange must use the shared step helper.
         self.assertIn("c2m_nlmsg_step(h.nlmsg_len", code)
+        # No nominal dump frequency: dump must use the real interface freq.
+        self.assertNotIn("c2m_describe_wiphy_top(p, n, 2412, &r->desc", code)
+        self.assertIn("want_phy", code)
+        self.assertIn("freq_unverified", code)
         # Single requires exactly one reply; dump requires at least one.
         # Malformed/empty responses must exit with exact detail plus summary.
         self.assertIn("r.replies != 1", code)
@@ -225,7 +235,17 @@ class NlprobeHostTests(unittest.TestCase):
                       "wiphy_single_zero_freq_unverified",
                       "wiphy_single_second_reply_rejected",
                       "wiphy_dump_valid", "wiphy_dump_bad_cmd",
-                      "wiphy_dump_too_many"):
+                      "wiphy_dump_too_many", "wiphy_dump_other_phy_filtered",
+                      "wiphy_dump_freq_unverified_no_fake",
+                      "wiphy_dump_dup_phy_not_other",
+                      "wiphy_dump_trunc_prescan_target",
+                      "wiphy_dump_missing_phy_target",
+                      "wiphy_dump_malformed_clears_described",
+                      "dump_late_combo_kept",
+                      "many_combos_truncated_not_absent",
+                      "combos_missing_attrs_zero",
+                      "combos_present_empty_counted",
+                      "truncated_combo_malformed"):
             self.assertIn("PASS " + case, result.stdout)
         self.assertNotIn("PASS truncation_never_present", result.stdout)
         self.assertIn("concurrency=unknown_not_inferred", result.stdout)

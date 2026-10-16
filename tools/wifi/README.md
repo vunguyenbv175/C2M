@@ -37,6 +37,13 @@ wrong phy, bi-match, freq, missing reply) plus pre-summary counters and
 bounded combo output even on failure. Single requires exactly one reply;
 dump requires at least one reply plus `DONE`; both emit a final
 `combos_summary` on success and on failure with the exact failure reason.
+Dump and split-dump first query fixed `wlan0` for the real phy/freq and filter
+to that phy (other phys count as `other=` replies only, never into target
+combo counters or output); uninteresting top headers are counted as
+`top_other` but suppressed in dump so late combinations are not starved.
+Zero interface freq stays `freq_unverified` with no faked nominal value.
+Target malformed/unverified fragments clear `described`; per-fragment missing
+combos never classifies absence, aggregate `combos_attrs` decides.
 
 ## Privacy and verdict rule
 
@@ -54,8 +61,14 @@ Absent, truncated, or malformed combinations always print
 
 recv 65536, send 4096, timeout 1500 ms, attrs 128/level, depth 4,
 replies 1 single / 64 dump, combos 64, limits 32, output 200 lines /
-8192 bytes. Wiphy output is top headers plus combo subtree only; a final
-`combos_summary` is always emitted.
+8192 bytes. Single prints top headers plus combo subtree; dump counts but
+suppresses repetitive top headers and counts non-target phys as replies only
+to prioritize the target-phy combination subtree. Parsing never aborts on
+output truncation so `top_attrs`/`top_other`/`combos_attrs`/`combos_bytes`/
+`combos_seen` (target-only) stay accurate; summaries carry explicit `done=`/
+`parse_complete=`/`text_truncated=` and a truncated parse never reports
+absent (present-empty `bytes=0` vs truly missing is decided by counters, not
+by printed lines). A final `combos_summary` is always emitted.
 
 ## Host build/test (no firmware, no camera)
 

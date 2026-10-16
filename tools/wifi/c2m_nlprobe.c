@@ -33,9 +33,16 @@
  *   recv 65536, send 4096, timeout 1500 ms, attrs 128/level, depth 4,
  *   replies 1 (single) / 64 (dump), combos 64, limits 32,
  *   output 200 lines / 8192 bytes. Overflow prints `truncated_at_*`.
- * Wiphy output describes top headers (bounded) plus the combo subtree only;
- * other nested blobs are summarized, never recursed, so late combos are not
- * starved by output budget. A final combo summary is always emitted.
+ * Single prints top headers plus the combo subtree; dump (quiet) counts
+ * uninteresting top headers but suppresses them to reserve budget for the
+ * target-phy combination subtree, counting other phys as replies only.
+ * Parsing never aborts on output truncation, so counters (top_attrs,
+ * top_other, combos_attrs/bytes/seen, target-only) stay accurate; truncation
+ * reports malformed/truncated_output with done/parse_complete/text_truncated
+ * flags, never absent. Per-fragment missing combos in split dumps never
+ * classifies absence; aggregate attr presence decides. Dump uses the real
+ * wlan0 interface phy/freq (freq 0 stays unverified); no nominal frequency
+ * is faked. A final combo summary is always emitted.
  *
  * --self-test is pure: no socket, no files, no env, no clock. Deterministic
  * fixtures only. Live modes compile and run on Linux only.
@@ -253,6 +260,9 @@ static void c2m_emit(struct c2m_out *o, const char *line)
 
 struct c2m_counters {
     int top_attrs;
+    int top_other;
+    int combos_attrs;
+    int combos_bytes;
     int combos_seen;
     int combos_present;
     int combos_unverified;
@@ -605,14 +615,20 @@ static int c2m_analyze_combos(const void *p, size_t n, uint32_t freq,
 
 /* Wiphy top level: bounded headers + combo subtree only. Other nested blobs
  * are summarized, never recursed, never u32-printed. Summary always emitted
- * by the caller via printf (not via the bounded buffer). */
+ * by the caller via printf (not via the bounded buffer).
+ * quiet=1 (dump) suppresses repetitive uninteresting top headers to reserve
+ * the 200-line/8192-byte budget for the combination subtree; counters are
+ * identical in both modes. Parsing never aborts on output truncation: emits
+ * become no-ops but counters keep accumulating, and a truncated output still
+ * reports malformed/truncated_output (never absent) with accurate counts. */
 static int c2m_describe_wiphy_top(const void *p, size_t n, uint32_t freq,
-    struct c2m_out *o, struct c2m_counters *c, const char **detail, int *present)
+    struct c2m_out *o, struct c2m_counters *c, const char **detail, int *present,
+    int quiet)
 {
     struct c2m_cursor it;
     struct c2m_attr a;
     uint32_t phy = 0;
-    int have_phy = 0, combos_attrs = 0, stage = C2M_ST_ABSENT;
+    int have_phy = 0, combos_local = 0, stage = C2M_ST_ABSENT;
     const char *d = "absent";
     char line[192];
     int rc;
@@ -639,10 +655,15 @@ static int c2m_describe_wiphy_top(const void *p, size_t n, uint32_t freq,
             if (rc > 0)
                 c2m_emit(o, line);
         } else if (a.type == (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS) {
-            if (combos_attrs++) {
+            if (combos_local++) {
                 *detail = "multi_combos_attr";
                 return C2M_ST_MALFORMED;
             }
+            c->combos_attrs++;
+            if ((size_t)a.n > 2147483647u)
+                c->combos_bytes += 2147483647;
+            else
+                c->combos_bytes += (int)a.n;
             rc = snprintf(line, sizeof(line),
                 "top interface_combinations bytes=%u begin", (unsigned)a.n);
             if (rc > 0)
@@ -662,16 +683,19 @@ static int c2m_describe_wiphy_top(const void *p, size_t n, uint32_t freq,
             }
         } else {
             /* All other top attrs: header only, redacted, never recursed,
-             * never u32-printed (collision-safe). */
-            rc = snprintf(line, sizeof(line),
-                "top type=%u len=%u value=redacted", a.type, (unsigned)(a.n + 4));
-            if (rc > 0)
-                c2m_emit(o, line);
+             * never u32-printed (collision-safe). In dump (quiet) only count
+             * them so late combinations are not starved by output budget. */
+            c->top_other++;
+            if (!quiet) {
+                rc = snprintf(line, sizeof(line),
+                    "top type=%u len=%u value=redacted", a.type, (unsigned)(a.n + 4));
+                if (rc > 0)
+                    c2m_emit(o, line);
+            }
         }
-        if (o->truncated) {
-            *detail = "truncated_output";
-            return C2M_ST_MALFORMED;
-        }
+        /* No early return on o->truncated: keep parsing for accurate
+         * counters; emits are no-ops once truncated. Final stage below
+         * reports truncation instead of absent. */
     }
     if (it.bad) {
         *detail = "truncated_top";
@@ -681,7 +705,11 @@ static int c2m_describe_wiphy_top(const void *p, size_t n, uint32_t freq,
         *detail = "missing_wiphy";
         return C2M_ST_MALFORMED;
     }
-    if (!combos_attrs) {
+    if (o->truncated) {
+        *detail = "truncated_output";
+        return C2M_ST_MALFORMED;
+    }
+    if (!combos_local) {
         *detail = "combos_empty_absent";
         return C2M_ST_ABSENT;
     }
@@ -838,7 +866,7 @@ static int c2m_wiphy_single_reply(int cmd, const void *p, size_t n, void *out)
         r->detail = !have_phy ? "missing_wiphy" : "wrong_phy";
         goto describe_anyway;
     }
-    stage = c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &r->counters, &d, &r->present);
+    stage = c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &r->counters, &d, &r->present, 0);
     r->stage = c2m_stage_name(stage);
     r->detail = d;
     return stage == C2M_ST_MALFORMED || stage == C2M_ST_UNVERIFIED ? -1 : 0;
@@ -849,7 +877,7 @@ describe_anyway:
         int pp = 0;
         struct c2m_counters cc;
         memset(&cc, 0, sizeof(cc));
-        (void)c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &cc, &dd, &pp);
+        (void)c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &cc, &dd, &pp, 0);
         r->counters = cc;
         if (!r->detail)
             r->detail = dd;
@@ -857,7 +885,9 @@ describe_anyway:
     return -1;
 }
 struct c2m_dump_obs {
-    int replies;
+    uint32_t want_phy, freq;
+    int replies, target_replies, other_replies;
+    int parse_complete;
     const char *stage;
     const char *detail;
     struct c2m_out desc;
@@ -869,18 +899,73 @@ static int c2m_wiphy_dump_reply(int cmd, const void *p, size_t n, void *out)
     const char *d = "described";
     int present = 0;
     struct c2m_counters cc;
+    struct c2m_cursor it;
+    struct c2m_attr a;
+    uint32_t phy = 0;
+    int have_phy = 0, phy_bad = 0, st;
     if (cmd != NL80211_CMD_NEW_WIPHY || ++r->replies > C2M_MAX_REPLIES_DUMP) {
         r->stage = "malformed";
         r->detail = "bad_cmd_or_too_many";
+        r->parse_complete = 0;
         return -1;
     }
+    /* Strict pre-scan: exactly one valid u32 WIPHY and clean TLV framing
+     * are required before other-phy filtering. Duplicate, bad length,
+     * truncation, or missing WIPHY all stay on the target path so the full
+     * describe reports malformed instead of being hidden as other. */
+    it.p = (const unsigned char *)p;
+    it.n = n;
+    it.bad = 0;
+    while (c2m_next(&it, &a)) {
+        if (a.type == (unsigned)NL80211_ATTR_WIPHY) {
+            uint32_t v;
+            if (have_phy++ || c2m_attr_u32(&a, &v)) {
+                phy_bad = 1;
+                break;
+            }
+            phy = v;
+        }
+    }
+    if (it.bad)
+        phy_bad = 1;
+    if (!phy_bad && have_phy == 1 && phy != r->want_phy) {
+        r->other_replies++;
+        return 0;
+    }
     memset(&cc, 0, sizeof(cc));
-    (void)c2m_describe_wiphy_top(p, n, 2412, &r->desc, &cc, &d, &present);
+    st = c2m_describe_wiphy_top(p, n, r->freq, &r->desc, &cc, &d, &present, 1);
+    r->target_replies++;
     r->counters.top_attrs += cc.top_attrs;
+    r->counters.top_other += cc.top_other;
+    r->counters.combos_attrs += cc.combos_attrs;
+    r->counters.combos_bytes += cc.combos_bytes;
     r->counters.combos_seen += cc.combos_seen;
+    r->counters.combos_present += cc.combos_present;
+    r->counters.combos_unverified += cc.combos_unverified;
     r->counters.limits_seen += cc.limits_seen;
     r->counters.attr_total += cc.attr_total;
-    if (r->desc.truncated) {
+    /* Track target parse results across fragments. Missing combos on one
+     * split fragment is expected, so ABSENT per fragment never overrides;
+     * aggregate combos_attrs decides presence. MALFORMED (parse bound, TLV
+     * truncation, duplicate, etc.) clears parse_complete unless it is only
+     * output truncation (parsing finished, text budget hit). */
+    if (st == C2M_ST_MALFORMED) {
+        if (!strcmp(d, "truncated_output")) {
+            if (strcmp(r->stage, "malformed"))
+                r->stage = "truncated";
+            r->detail = "truncated_output";
+        } else {
+            r->stage = "malformed";
+            r->detail = d;
+            r->parse_complete = 0;
+        }
+    } else if (st == C2M_ST_UNVERIFIED) {
+        if (strcmp(r->stage, "malformed")) {
+            r->stage = "unverified";
+            r->detail = d;
+        }
+    }
+    if (r->desc.truncated && strcmp(r->stage, "malformed")) {
         r->stage = "truncated";
         r->detail = "truncated_output";
     }
@@ -1248,7 +1333,7 @@ static int c2m_self_test(void)
     memset(&o, 0, sizeof(o));
     memset(&c, 0, sizeof(c));
     detail = "";
-    r = c2m_describe_wiphy_top(w.data, w.n, 2412, &o, &c, &detail, &present);
+    r = c2m_describe_wiphy_top(w.data, w.n, 2412, &o, &c, &detail, &present, 0);
     failures += c2m_check("privacy_wiphy_top_ok", r == C2M_ST_ABSENT || r == 1 || r == C2M_ST_MALFORMED, 1);
     if (strstr(o.buf, "305419896") || strstr(o.buf, "secret")) {
         printf("FAIL privacy_collision_no_u32_leak\n");
@@ -1296,7 +1381,7 @@ static int c2m_self_test(void)
     memset(&o, 0, sizeof(o));
     memset(&c, 0, sizeof(c));
     detail = "";
-    r = c2m_describe_wiphy_top(m.data, m.n, 2412, &o, &c, &detail, &present);
+    r = c2m_describe_wiphy_top(m.data, m.n, 2412, &o, &c, &detail, &present, 0);
     failures += c2m_check("dump_reply1_present", r, 1);
     failures += c2m_check("dump_top_attrs_seen", c.top_attrs >= 2, 1);
     printf("dump_single_distinct: mode=single replies=1\n");
@@ -1310,7 +1395,7 @@ static int c2m_self_test(void)
     detail = "";
     /* Split flag alone (no wiphy/combos) is malformed-missing-wiphy, but the
      * flag itself must be described as flag, not redacted payload. */
-    r = c2m_describe_wiphy_top(m.data, m.n, 2412, &o, &c, &detail, &present);
+    r = c2m_describe_wiphy_top(m.data, m.n, 2412, &o, &c, &detail, &present, 0);
     failures += c2m_check("split_flag_described", strstr(o.buf, "type=") != NULL, 1);
     (void)r;
 
@@ -1525,9 +1610,9 @@ static int c2m_self_test(void)
             c2m_wiphy_single_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n - 1, &wo) == -1, 1);
     }
 
-    /* 18. Live dump callback: bounded multi-reply description stays best-effort. */
+    /* 18. Live dump callback: real phy/freq, strict target filter. */
     {
-        struct c2m_msg f;
+        struct c2m_msg f, dup, trunc;
         struct c2m_dump_obs d;
         c2m_fixture_init(&f);
         (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 0);
@@ -1537,22 +1622,220 @@ static int c2m_self_test(void)
             c2m_end(&f, cb);
         }
         memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
         d.stage = "described";
         d.detail = "described";
         failures += c2m_check("wiphy_dump_valid",
             c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d) == 0 &&
-            d.replies == 1, 1);
+            d.replies == 1 && d.target_replies == 1 && d.other_replies == 0 &&
+            d.parse_complete == 1, 1);
         memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
         d.stage = "described";
         d.detail = "described";
         failures += c2m_check("wiphy_dump_bad_cmd",
             c2m_wiphy_dump_reply(NL80211_CMD_GET_WIPHY, f.data, f.n, &d) == -1, 1);
         memset(&d, 0, sizeof(d));
         d.replies = C2M_MAX_REPLIES_DUMP;
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
         d.stage = "described";
         d.detail = "described";
         failures += c2m_check("wiphy_dump_too_many",
             c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d) == -1, 1);
+        /* Non-target phy counts only: no combo counters leak into target. */
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 1;
+        d.freq = 2412;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_other_phy_filtered",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d) == 0 &&
+            d.replies == 1 && d.target_replies == 0 && d.other_replies == 1 &&
+            d.desc.len == 0 && d.counters.combos_seen == 0 &&
+            d.counters.combos_attrs == 0, 1);
+        /* Zero interface freq stays unverified: no fake nominal value. */
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 0;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_freq_unverified_no_fake",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d) == 0 &&
+            d.replies == 1 && d.freq == 0 &&
+            !strcmp(d.stage, "unverified"), 1);
+        /* Duplicate WIPHY pre-scan must not filter as other: target error. */
+        c2m_fixture_init(&dup);
+        (void)c2m_msg_u32(&dup, (unsigned)NL80211_ATTR_WIPHY, 99);
+        (void)c2m_msg_u32(&dup, (unsigned)NL80211_ATTR_WIPHY, 99);
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_dup_phy_not_other",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, dup.data, dup.n, &d) == 0 &&
+            d.target_replies == 1 && d.other_replies == 0 &&
+            !strcmp(d.stage, "malformed") && d.parse_complete == 0, 1);
+        /* Truncated TLV pre-scan (it.bad) must not filter as other. */
+        c2m_fixture_init(&trunc);
+        (void)c2m_msg_u32(&trunc, (unsigned)NL80211_ATTR_WIPHY, 99);
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_trunc_prescan_target",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, trunc.data, trunc.n - 1, &d) == 0 &&
+            d.target_replies == 1 && d.other_replies == 0 &&
+            !strcmp(d.stage, "malformed"), 1);
+        /* Missing WIPHY stays target-malformed, never other. */
+        c2m_fixture_init(&trunc);
+        (void)c2m_msg_attr(&trunc, 500u, NULL, 0);
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        failures += c2m_check("wiphy_dump_missing_phy_target",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, trunc.data, trunc.n, &d) == 0 &&
+            d.target_replies == 1 && d.other_replies == 0 &&
+            !strcmp(d.stage, "malformed"), 1);
+        /* Malformed target fragment clears described: never success-masked. */
+        c2m_fixture_init(&trunc);
+        (void)c2m_msg_u32(&trunc, (unsigned)NL80211_ATTR_WIPHY, 0);
+        (void)c2m_msg_u32(&trunc, (unsigned)NL80211_ATTR_WIPHY, 0);
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 0;
+        d.freq = 2412;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        (void)c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d);
+        failures += c2m_check("wiphy_dump_malformed_clears_described",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, trunc.data, trunc.n, &d) == 0 &&
+            strcmp(d.stage, "described") != 0 && d.parse_complete == 0, 1);
+    }
+
+    /* 19. Late combination after >200 same-phy headers (dump priority).
+     * 50 target replies x (WIPHY + 3 dummy headers) = 200 verbose lines;
+     * quiet suppression keeps the late target combo visible. */
+    {
+        struct c2m_msg f, late;
+        struct c2m_dump_obs d;
+        int t;
+        memset(&d, 0, sizeof(d));
+        d.want_phy = 3;
+        d.freq = 2412;
+        d.parse_complete = 1;
+        d.stage = "described";
+        d.detail = "described";
+        for (t = 0; t < 50; t++) {
+            c2m_fixture_init(&f);
+            (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+            (void)c2m_msg_attr(&f, 500u, NULL, 0);
+            (void)c2m_msg_attr(&f, 501u, NULL, 0);
+            (void)c2m_msg_attr(&f, 502u, NULL, 0);
+            if (c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, f.data, f.n, &d)) {
+                failures += c2m_check("dump_many_target_ok", 0, 1);
+                break;
+            }
+        }
+        c2m_fixture_init(&late);
+        (void)c2m_msg_u32(&late, (unsigned)NL80211_ATTR_WIPHY, 3);
+        {
+            size_t cb = c2m_begin(&late, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            c2m_combo(&late, 1, 1, 1, 0, 2, 1, 1);
+            c2m_end(&late, cb);
+        }
+        failures += c2m_check("dump_late_combo_kept",
+            c2m_wiphy_dump_reply(NL80211_CMD_NEW_WIPHY, late.data, late.n, &d) == 0 &&
+            d.target_replies == 51 && d.other_replies == 0 &&
+            d.counters.combos_seen == 1 && d.counters.combos_attrs == 1 &&
+            d.desc.truncated == 0 && d.parse_complete == 1 &&
+            strstr(d.desc.buf, "combo index=1") != NULL, 1);
+    }
+
+    /* 19b. Verbose output truncation never loses parsing: many combos fill
+     * the 200-line budget but counters stay accurate and stage is truncated,
+     * never absent. */
+    {
+        struct c2m_msg f;
+        int t;
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        {
+            size_t cb = c2m_begin(&f, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            for (t = 0; t < 30; t++)
+                c2m_combo(&f, 1, 1, 1, 0, 2, 1, 1);
+            c2m_end(&f, cb);
+        }
+        memset(&o, 0, sizeof(o));
+        memset(&c, 0, sizeof(c));
+        detail = "";
+        r = c2m_describe_wiphy_top(f.data, f.n, 2412, &o, &c, &detail, &present, 0);
+        failures += c2m_check("many_combos_truncated_not_absent",
+            r == C2M_ST_MALFORMED && o.truncated == 1 &&
+            c.combos_seen == 30 && c.combos_attrs == 1, 1);
+        failures += c2m_check_str("many_combos_truncated_detail",
+            detail, "truncated_output");
+    }
+
+    /* 20. Empty combos attr present vs truly missing (counters decide). */
+    {
+        struct c2m_msg f;
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        memset(&o, 0, sizeof(o));
+        memset(&c, 0, sizeof(c));
+        detail = "";
+        r = c2m_describe_wiphy_top(f.data, f.n, 2412, &o, &c, &detail, &present, 0);
+        failures += c2m_check("combos_missing_attrs_zero",
+            r == C2M_ST_ABSENT && c.combos_attrs == 0 && c.combos_bytes == 0 &&
+            c.combos_seen == 0, 1);
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        {
+            size_t cb = c2m_begin(&f, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            c2m_end(&f, cb);
+        }
+        memset(&o, 0, sizeof(o));
+        memset(&c, 0, sizeof(c));
+        detail = "";
+        r = c2m_describe_wiphy_top(f.data, f.n, 2412, &o, &c, &detail, &present, 0);
+        failures += c2m_check("combos_present_empty_counted",
+            r == C2M_ST_ABSENT && c.combos_attrs == 1 && c.combos_bytes == 0 &&
+            c.combos_seen == 0, 1);
+        failures += c2m_check_str("combos_present_empty_detail",
+            detail, "combos_empty_absent");
+    }
+
+    /* 21. Truncated combo payload is malformed, never present/absent. */
+    {
+        struct c2m_msg f;
+        c2m_fixture_init(&f);
+        (void)c2m_msg_u32(&f, (unsigned)NL80211_ATTR_WIPHY, 3);
+        {
+            size_t cb = c2m_begin(&f, (unsigned)NL80211_ATTR_INTERFACE_COMBINATIONS);
+            c2m_combo(&f, 1, 1, 1, 0, 2, 1, 1);
+            c2m_end(&f, cb);
+        }
+        memset(&o, 0, sizeof(o));
+        memset(&c, 0, sizeof(c));
+        detail = "";
+        r = c2m_describe_wiphy_top(f.data, f.n - 1, 2412, &o, &c, &detail, &present, 0);
+        failures += c2m_check("truncated_combo_malformed",
+            r == C2M_ST_MALFORMED && r != C2M_ST_ABSENT && r != 1, 1);
     }
 
     printf("combos_summary combos_seen=%d limits_seen=%d\n", c.combos_seen, c.limits_seen);
@@ -1798,29 +2081,38 @@ static int c2m_live_wiphy_single(struct c2m_nl *nl, uint32_t phy, uint32_t freq)
             r.stage = "malformed";
             r.detail = "missing_reply";
         }
-        printf("wiphy mode=single replies=%d top_attrs=%d combos_seen=%d limits_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
-            r.replies, r.counters.top_attrs, r.counters.combos_seen, r.counters.limits_seen,
+        printf("wiphy mode=single replies=%d top_attrs=%d top_other=%d combos_attrs=%d combos_bytes=%d combos_seen=%d limits_seen=%d truncated=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+            r.replies, r.counters.top_attrs, r.counters.top_other, r.counters.combos_attrs,
+            r.counters.combos_bytes, r.counters.combos_seen, r.counters.limits_seen,
+            r.desc.truncated ? 1 : 0,
             r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         c2m_print_out(&r.desc);
-        printf("combos_summary combos_seen=%d limits_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
-            r.counters.combos_seen, r.counters.limits_seen,
+        printf("combos_summary combos_seen=%d combos_attrs=%d combos_bytes=%d limits_seen=%d truncated=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+            r.counters.combos_seen, r.counters.combos_attrs, r.counters.combos_bytes,
+            r.counters.limits_seen, r.desc.truncated ? 1 : 0,
             r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         return -1;
     }
-    printf("wiphy mode=single replies=%d top_attrs=%d combos_seen=%d limits_seen=%d combos_present=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
-        r.replies, r.counters.top_attrs, r.counters.combos_seen, r.counters.limits_seen,
-        r.present, r.stage ? r.stage : "absent", r.detail ? r.detail : "absent");
+    printf("wiphy mode=single replies=%d top_attrs=%d top_other=%d combos_attrs=%d combos_bytes=%d combos_seen=%d limits_seen=%d combos_present=%d truncated=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+        r.replies, r.counters.top_attrs, r.counters.top_other, r.counters.combos_attrs,
+        r.counters.combos_bytes, r.counters.combos_seen, r.counters.limits_seen,
+        r.present, r.desc.truncated ? 1 : 0,
+        r.stage ? r.stage : "absent", r.detail ? r.detail : "absent");
     c2m_print_out(&r.desc);
-    printf("combos_summary combos_seen=%d limits_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
-        r.counters.combos_seen, r.counters.limits_seen,
+    printf("combos_summary combos_seen=%d combos_attrs=%d combos_bytes=%d limits_seen=%d truncated=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+        r.counters.combos_seen, r.counters.combos_attrs, r.counters.combos_bytes,
+        r.counters.limits_seen, r.desc.truncated ? 1 : 0,
         r.stage ? r.stage : "absent", r.detail ? r.detail : "absent");
     return 0;
 }
-static int c2m_live_wiphy_dump(struct c2m_nl *nl, int split)
+static int c2m_live_wiphy_dump(struct c2m_nl *nl, int split, uint32_t phy, uint32_t freq)
 {
     struct c2m_dump_obs r;
     struct c2m_send m;
     memset(&r, 0, sizeof(r));
+    r.want_phy = phy;
+    r.freq = freq;
+    r.parse_complete = 1;
     r.stage = "described";
     r.detail = "described";
     c2m_send_init(&m, nl->family, NL80211_CMD_GET_WIPHY, NLM_F_DUMP, ++nl->seq);
@@ -1834,22 +2126,34 @@ static int c2m_live_wiphy_dump(struct c2m_nl *nl, int split)
         if (!r.replies && r.detail && !strcmp(r.detail, "described")) {
             r.stage = "malformed";
             r.detail = "missing_reply";
+            r.parse_complete = 0;
         }
-        printf("wiphy mode=%s replies=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
-            split ? "split-dump" : "dump", r.replies,
-            r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
+        printf("wiphy mode=%s replies=%d target=%d other=%d done=%d parse_complete=%d text_truncated=%d top_attrs=%d top_other=%d combos_attrs=%d combos_bytes=%d combos_seen=%d stage=%s detail=%s freq_unverified=%d concurrency=unknown_not_inferred\n",
+            split ? "split-dump" : "dump", r.replies, r.target_replies, r.other_replies,
+            0, r.parse_complete ? 1 : 0, r.desc.truncated ? 1 : 0,
+            r.counters.top_attrs, r.counters.top_other, r.counters.combos_attrs,
+            r.counters.combos_bytes, r.counters.combos_seen,
+            r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed",
+            r.freq ? 0 : 1);
         c2m_print_out(&r.desc);
-        printf("combos_summary replies=%d combos_seen=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
-            r.replies, r.counters.combos_seen,
+        printf("combos_summary replies=%d target=%d other=%d combos_seen=%d combos_attrs=%d combos_bytes=%d parse_complete=%d text_truncated=%d done=%d stage=%s detail=%s concurrency=unknown_not_inferred\n",
+            r.replies, r.target_replies, r.other_replies, r.counters.combos_seen,
+            r.counters.combos_attrs, r.counters.combos_bytes,
+            r.parse_complete ? 1 : 0, r.desc.truncated ? 1 : 0, 0,
             r.stage ? r.stage : "query_failed", r.detail ? r.detail : "query_failed");
         return -1;
     }
-    printf("wiphy mode=%s replies=%d done=1 top_attrs=%d combos_seen=%d stage=%s concurrency=unknown_not_inferred\n",
-        split ? "split-dump" : "dump", r.replies, r.counters.top_attrs,
-        r.counters.combos_seen, r.stage ? r.stage : "described");
+    printf("wiphy mode=%s replies=%d target=%d other=%d done=1 parse_complete=%d text_truncated=%d top_attrs=%d top_other=%d combos_attrs=%d combos_bytes=%d combos_seen=%d stage=%s freq_unverified=%d concurrency=unknown_not_inferred\n",
+        split ? "split-dump" : "dump", r.replies, r.target_replies, r.other_replies,
+        r.parse_complete ? 1 : 0, r.desc.truncated ? 1 : 0,
+        r.counters.top_attrs, r.counters.top_other, r.counters.combos_attrs,
+        r.counters.combos_bytes, r.counters.combos_seen,
+        r.stage ? r.stage : "described", r.freq ? 0 : 1);
     c2m_print_out(&r.desc);
-    printf("combos_summary replies=%d combos_seen=%d concurrency=unknown_not_inferred\n",
-        r.replies, r.counters.combos_seen);
+    printf("combos_summary replies=%d target=%d other=%d combos_seen=%d combos_attrs=%d combos_bytes=%d parse_complete=%d text_truncated=%d done=1 concurrency=unknown_not_inferred\n",
+        r.replies, r.target_replies, r.other_replies, r.counters.combos_seen,
+        r.counters.combos_attrs, r.counters.combos_bytes,
+        r.parse_complete ? 1 : 0, r.desc.truncated ? 1 : 0);
     return 0;
 }
 #endif /* __linux__ */
@@ -1899,7 +2203,7 @@ int main(int argc, char **argv)
             printf("nl80211 stage=family_failed detail=query_failed concurrency=unknown_not_inferred\n");
             return 1;
         }
-        if (mode_iface || mode_single) {
+        if (mode_iface || mode_single || mode_dump || mode_split) {
             if (c2m_live_interface(&nl, &phy, &freq)) {
                 close(nl.fd);
                 return 1;
@@ -1910,9 +2214,9 @@ int main(int argc, char **argv)
         else if (mode_iface && !mode_single)
             rc = 0;
         else if (mode_dump)
-            rc = c2m_live_wiphy_dump(&nl, 0) ? 1 : 0;
+            rc = c2m_live_wiphy_dump(&nl, 0, phy, freq) ? 1 : 0;
         else if (mode_split)
-            rc = c2m_live_wiphy_dump(&nl, 1) ? 1 : 0;
+            rc = c2m_live_wiphy_dump(&nl, 1, phy, freq) ? 1 : 0;
         printf("meaning=absent_or_malformed_is_unknown_never_no\n");
         close(nl.fd);
         return rc;

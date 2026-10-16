@@ -109,7 +109,8 @@ Next tasks:
    this diagnostic clarification is not installed on the camera and does not
    make an AP+STA combination valid.
 2. Finish exact-driver static concurrency analysis; AP+STA remains unproven.
-3. Plan any updated producer test separately. Prefer finite shadow output in a
+3. Any updated producer test needs a separate implementation/build/runtime
+   gate. Prefer finite shadow output in a
    private RAM path/stdout; never two producers writing the shared D4 status,
    no stopping recorder/ADAS and no weakening production path checks. A plan
    only is recorded in `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`; no shadow
