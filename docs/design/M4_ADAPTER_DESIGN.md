@@ -27,7 +27,22 @@ L4 custom UI (chỉ nếu L3 xong và còn giá trị)
 
 L3 là định nghĩa thành công sản phẩm. Không làm L4 sớm.
 
-## 2. Kiến trúc dual-path (HIGH-CONFIDENCE static, chưa runtime-proven)
+## 2026-10-16 runtime and active-test correction
+
+V4 proved native camera→M4 USB RNDIS paths8080/24012/26012 and39 complete
+server messages. That proves transmission, NOT how3D renders them. No active
+value/render test has occurred, so “unsupported” and “new firmware required”
+are NOT established. The strict26012 connection gate FAILED (native reconnect,
+cause unknown); no retry or semantic injection followed.
+
+Next assess one stock harmless visible change+restore through a verified native
+setter, not a second8080 client or raw TCP injection. This tests the path only,
+not speed/sign widget support. Saved USB interface `.2` has ADB signature
+`ff/42/01`; no authorized ADB session/readback exists yet. Exact native setter,
+rollback/side effects and a fresh owner-notified stationary session must be
+verified; see `../firmware/M4_ACTIVE_TEST_BOUNDARY_20261016.md`.
+
+## 2. Historical dual-path hypothesis (now superseded by runtime capture)
 
 ```text
 adas --libflow/MP vehicle|ped|lane :26012--> [M4 hoặc proxy hoặc app-debug] --\

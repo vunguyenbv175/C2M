@@ -114,9 +114,19 @@ UART control was used in those diagnostics.
   Upgrade matching;2 additional ped messages identified as `pedWarning`
   (`ped_on`/`pcw_on`, bool/bool), receive schema only, replay still default-DENY.
   No M4 receiver binary/layout/widget control found; public C2M manual confirms
-  safe-distance seconds, not speed-in3D support. Exact receiver/update/recovery
-  artifact is now the implementation blocker, not more of the same capture;
-  see `../firmware/M4_RECEIVER_LAYOUT_GAP_20261016.md`.
+  safe-distance seconds, not speed-in3D support. Active value/render trial has
+  NOT occurred: support is UNKNOWN, not disproved, and needing new firmware is
+  not established. Native harmless setter+restore is being traced; saved USB
+  `.2` descriptor `ff/42/01` matches ADB but no authorized readback is proven.
+  Fresh16:10 owner-approved READ-ONLY sysfs check reconfirmed iface2 ff/42/01
+  bulk04/85,512B, no adb binary/daemon; no USB transaction/native upload/UI
+  change, recorder advanced, connections/D4 PID unchanged. Owner subsequently
+  approved ONE finite active CNXN identify handshake ONLY after gates/notice;
+  no AUTH/key/shell/UI. New separate `fw/m4_adb` preparation is not hardware
+  acceptance, and does not reopen speed/warning injection.
+  See `../firmware/M4_RECEIVER_LAYOUT_GAP_20261016.md`,
+  `../firmware/M4_ACTIVE_TEST_BOUNDARY_20261016.md` and
+  `../firmware/M4_ADB_IDENTIFICATION_PLAN_20261016.md`.
   Owner photos/clarification confirm a conditional M4 top warning bar (mainly
   collision-related seconds), not a permanently absent toolbar. Neither that
   value nor advertising artwork proves3D speed/sign support; see

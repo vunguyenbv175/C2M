@@ -105,13 +105,17 @@ proof of an M4 update. No third-party APK/firmware or camera OTA is prescribed.
 
 ## Next actionable boundary
 
-To implement a genuine3D speed/sign widget, obtain the **exact M4 receiver
-software/update package and supported recovery/update procedure**, or an
-explicit vendor-supported widget API for that variant. Prefer seller/vendor
-support via existing purchase records; do not guess a firmware from camera
-version or a look-alike product. Keep the working unit unchanged meanwhile.
+Exact M4 receiver software/update/recovery artifacts or a vendor-supported API
+would help implement a genuine3D widget. They are NOT proved to be required
+before any harmless active test, and lack of these files is not proof that M4
+cannot render speed/signs. Prefer seller/vendor support via existing purchase
+records; do not guess firmware from camera version or a look-alike product.
 
-There is no evidence-backed camera-only patch to deliver this3D feature yet.
-This is a specific missing implementation artifact, not a need for another
-capture of the same stream. D4 browser advisories remain a separately approved
-feature, not a claimed substitute for M4 rendering.
+There is no evidence-backed camera-only patch to deliver this3D feature yet;
+there has also been NO active value/render trial, so receiver support stays
+UNKNOWN, not unsupported. A separately gated stock brightness/theme trial is
+being assessed as a visible path check (not a speed/sign test). Saved USB
+interface `.2` has the ADB-signature descriptor `ff/42/01`; no authorized ADB
+session/readback is established. See `M4_ACTIVE_TEST_BOUNDARY_20261016.md` for
+that newly recognized route, explicit restoration and remaining gates.
+D4 browser advisories remain separate, not a substitute for M4 rendering.
