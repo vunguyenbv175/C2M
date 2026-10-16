@@ -79,6 +79,10 @@ UART control was used in those diagnostics.
   interface-combinations payload. Exact RTL8821CS module has VIF code but no
   proven safe concurrent runtime. Do not force STA at the cost of AP.
 - Bluetooth HCI/transport/RF and M4 3D speed/sign rendering remain unproven.
+  Owner photos/clarification confirm a conditional M4 top warning bar (mainly
+  collision-related seconds), not a permanently absent toolbar. Neither that
+  value nor advertising artwork proves3D speed/sign support; see
+  `../firmware/M4_OWNER_VISUAL_FINDINGS_20261016.md`.
 - Agent defaults remain read-only/bounded private RAM tests; no broad root
   commands, shared status writers, calibration/recorder changes or second
   cardv `:8080` observer.

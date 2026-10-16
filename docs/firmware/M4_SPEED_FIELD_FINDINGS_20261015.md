@@ -4,9 +4,16 @@ Owner requested actual vehicle-speed display on the M4, not substitution by
 the D4 browser page, and authorized stationary observation with M4 powered on.
 
 **Owner clarification:** M4 has two modes: **2D live video already shows vehicle
-speed; 3D ADAS has no speed region.** The actual feature request is to retain/show
-vehicle speed in the 3D ADAS layout. Earlier generic wording “M4 has no speed
-region” was incomplete and must not be read as a failure of the 2D mode.
+speed; vehicle speed has never been observed in3D ADAS.** The actual feature
+request is to retain/show vehicle speed in the3D layout. Earlier wording
+“3D has no speed region” describes observed behavior, not proof that the
+renderer lacks or cannot support a widget. It is not a failure of the2D mode.
+
+On2026-10-16 the owner supplied2D/3D photos plus advertising illustrations and
+clarified that **a top warning bar does exist, appearing during warnings; the
+main value seen is collision-related seconds/countdown**. A photo with the bar
+hidden does not prove a missing bar or broken layout. Do not identify the
+advertising `0.5` as vehicle speed. See `M4_OWNER_VISUAL_FINDINGS_20261016.md`.
 
 This narrows the missing behavior to the 3D presentation path, but does not by
 itself prove which process draws the 2D digits. They may be camera-burned video

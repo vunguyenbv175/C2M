@@ -2,7 +2,13 @@
 
 ## Owner's actual request and observation
 
-- M4 **2D live video shows vehicle speed**; **3D ADAS has no speed region**.
+- M4 **2D live video shows vehicle speed**; owner has never observed vehicle
+  speed in3D. That does not prove the renderer lacks widget capability.
+- Later owner photos and clarification confirm a **conditional top warning
+  bar**: it appears during warnings, mainly showing collision-related seconds.
+  Do not interpret a screenshot without the bar as a permanently missing UI.
+  Advertising numbered badges/`0.5` are not live sign/speed evidence; see
+  `M4_OWNER_VISUAL_FINDINGS_20261016.md`.
 - Owner additionally requested checking how traffic signs appear on M4.
 - Owner reports **never having seen a traffic-sign icon/value on this M4**.
   This is not the same as the vehicle-speed number and is not evidence of a
