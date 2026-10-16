@@ -65,6 +65,7 @@ def main() -> int:
     parser.add_argument("--sysroot", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     args = parser.parse_args()
+    args.report.parent.mkdir(parents=True, exist_ok=True)
     if os.name != "posix":
         raise SystemExit("Linux/QEMU required; do not silently skip this gate")
     binary, sysroot = args.binary.resolve(), args.sysroot.resolve()
@@ -90,10 +91,12 @@ def main() -> int:
             os.replace(temporary, source)
 
         update(0, 100)
-        command = [qemu, "-L", str(sysroot), str(binary), "--serve",
+        command = [qemu, "-strace", "-L", str(sysroot), str(binary), "--serve",
                    "--db", str(database), "--gps-file", str(source),
                    "--status-file", str(status)]
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        trace_path = args.report.with_suffix(".strace.txt")
+        trace = trace_path.open("wb")
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=trace)
         try:
             wait_status(status, lambda s: s["state"] == "warming_up")
             observations.append("raw100_valid_warming_up")
@@ -130,13 +133,18 @@ def main() -> int:
         finally:
             process.terminate()
             try:
-                stdout, stderr = process.communicate(timeout=5)
+                stdout, _ = process.communicate(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.communicate(timeout=3)
                 raise AssertionError("bounded SIGTERM did not stop producer")
-        assert process.returncode == 0, (process.returncode, stderr.decode(errors="replace"))
-        assert not stdout and not stderr, "unexpected producer output"
+            finally:
+                trace.close()
+                # Trace contains only synthetic fixture paths/data; no private
+                # database, keys, firmware content or live camera coordinates.
+                print(trace_path.read_text(errors="replace")[-24000:])
+        assert process.returncode == 0, process.returncode
+        assert not stdout, "unexpected producer output"
         stopped = read_status(status)
         assert stopped["state"] == "disabled" and stopped["active"] == "0"
         observations.append("SIGTERM_disabled_status_clean_exit")
