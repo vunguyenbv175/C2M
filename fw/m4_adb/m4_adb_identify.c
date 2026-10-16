@@ -1,6 +1,12 @@
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE
+#endif
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 /* M4 ADB active identifier: fixed USB 1-1, one finite handshake.
  * Active CNXN identification is NOT a passive sniffer and NOT an M4
  * rendering test. One CNXN handshake only; no key/shell/files/app/UI.
