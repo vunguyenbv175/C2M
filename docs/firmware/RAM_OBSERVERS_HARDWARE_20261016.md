@@ -124,7 +124,9 @@ Next tasks:
    private RAM path/stdout; never two producers writing the shared D4 status,
    no stopping recorder/ADAS and no weakening production path checks. A plan
    and local-only compile-time implementation are recorded in
-   `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`; no shadow producer was executed
-   in this hardware session.
+   `D4_RAM_SHADOW_EVALUATION_PLAN_20261016.md`. Its later source passed Linux
+   and stock-ARM/QEMU gates (`38836575675`/`38836577606`) and local4/4 retrieval,
+   but no shadow producer was executed in this hardware session or afterwards.
+   Owner disconnected camera Wi-Fi; notify before any new hardware session.
 4. Real-route D4 advisories/beep, Bluetooth RF and M4 3D speed/sign rendering
    remain unaccepted. Notify owner before another hardware session.

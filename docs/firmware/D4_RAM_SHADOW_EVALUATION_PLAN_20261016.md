@@ -1,20 +1,58 @@
-# Proposed D4 RAM shadow evaluation — 2026-10-16
+# D4 RAM shadow — prepared and stock-QEMU verified — 2026-10-16
 
-**Local source implementation added; not yet target-built or hardware-executed.**
+**ARM build, host fixtures and stock-QEMU runtime passed; not hardware-executed.**
 
 `fw/d4/main.c` has a compile-time `C2M_D4_SHADOW_OBSERVE` variant using the same
 checked loader/core with fixed target paths,10 one-second samples and a30-second
 monotonic bound. The ordinary production build path keeps its existing CLI and
 status-writer behavior; the shadow build excludes the status writer entirely.
 Build script: `fw/d4/build_shadow_arm.sh`. Host tests:
-`tests/test_d4_shadow.py` (Windows4 passed/5 Linux fixture tests skipped).
+`tests/test_d4_shadow.py` (Windows4 passed/5 Linux fixture tests skipped;
+all9 tests subsequently passed in Linux CI, including the five runtime fixtures).
 
 The shipping shadow CLI has no fixture path override and no `--serve`. Test-only
 path constants require an explicit host-test macro and are not used in the ARM
 build. Output labels simulated delivery, actual completed sample count and
-completion reason. Signals/errors cannot report full success. A stock-QEMU
+completion reason. Signals/errors cannot report full success. The stock-QEMU
 shipping-binary no-DB/sentinel gate and exact report-to-binary packaging gate
-are prepared; they must pass before any later hardware execution.
+passed in manual CI `38836577606` on source `a7cf680`.
+
+## Verified delivery and evidence limits
+
+- General Linux/Chrome CI `38836575675`: PASS on the same source
+  `a7cf6800a0982e9b91876e3814b242c138b33a9b`.
+- ARM32 hard-float/stock loader/GLIBC<=2.30 ELF gates, pure self-test/help and
+  exact shipping shadow `--observe` runtime under the pinned stock libraries:
+  PASS. Ten samples completed naturally; a synthetic existing D4 status
+  sentinel retained its bytes/inode/mtime; no shared status writer existed.
+- Shipping-binary QEMU case deliberately had no private DB/GPS. It proves the
+  finite no-DB/no-write path, not positive private DB handling on hardware.
+  Host Linux fixtures separately prove advancing GPS/raw100-200, frozen GPS,
+  DB replacement invalidation, symlink rejection and interrupted sample count.
+- Private delivery:
+  `deliverables/20261016-ram-debug-r38836577606/ram-bundle`, vault commit
+  `1e9afc802301a14f2a78c7a89b018293f380a9b5`.
+- Retrieved to `build/ram-debug-r38836577606/ram-bundle/`; local **4/4** binary
+  hashes, source pins, stock ARM ELF headers/loader and report-to-shadow hash
+  binding verified. The manifest/SHA256SUMS match separately downloaded CI
+  evidence. Public artifact audit:18 explicitly allowlisted text/report files,
+  no binaries, vendor library bytes, private DB or key material.
+- Shadow size26984 bytes, SHA-256
+  `273ca45f544a241d2051c9689e55e3c2a7c552ba40e6ef5bfaaa8cf38fcbecb7`.
+- Bundle manifest SHA-256
+  `f5d404e97078cace07ace6abb50d78808b7befd19c95623f7b40be33ddb9ad05`.
+- Local proof: `build/ram-debug-r38836577606/local_readback.json`.
+
+Owner has intentionally disconnected camera Wi-Fi. **Do not reconnect, query,
+reboot or run the shadow until notifying the owner and obtaining a new
+stationary hardware session.** No new camera access occurred for this build
+or retrieval, and the installed D4 producer remains unchanged. A laptop-local
+reviewed runner is prepared at `build/run_d4_shadow_reviewed.py`: its default
+mode checks only the independently pinned bundle, and hardware execution needs
+an explicit new-session/stationary confirmation plus actual source IPv4. It
+only uploads/runs the shadow, never `c2m-signs`; hashes, pure target self-test,
+external timeout/nice, cleanup and original producer hash are rechecked.
+The runner's local-check-only invocation passed; its hardware path has not run.
 
 The corrected GPS observer decoded10/10 actual samples and acquired freshness
 on hardware. The complete corrected producer passed stock-QEMU synthetic
@@ -29,7 +67,7 @@ and complicate rollback. Neither is necessary to validate the next stage.
 
 ## Preferred next diagnostic: finite shadow, private output
 
-Implement a separate diagnostic executable, not another daemon:
+The implemented separate diagnostic executable is not another daemon:
 
 - Fixed package DB `/customer/c2m/signs-d4.bin` and existing regular GPS file
   `/tmp/car_info`; no UART, device node, vendor IPC, network, audio or M4 output.
