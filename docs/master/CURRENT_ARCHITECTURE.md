@@ -68,7 +68,10 @@ UART control was used in those diagnostics.
   unaccepted. A finite shadow later loaded the valid12708-record DB and completed
   on hardware, but had two transient stale polls with unresolved cause. This
   is not stable corrected runtime or deployment; see
-  `../firmware/D4_SHADOW_HARDWARE_20261016.md`.
+  `../firmware/D4_SHADOW_HARDWARE_20261016.md`. Same-poll diagnostic shadow v2
+  later passed Linux/Chrome and exact stock ARM/QEMU (`38842722272` attempt2 /
+  `38842731209`), with local4/4 bundle readback; v2 is not hardware-executed.
+  See `../firmware/D4_SHADOW_DIAGNOSTICS_20261016.md`.
 - AP+STA remains UNKNOWN: single/ordinary wiphy query advertises an empty
   interface-combinations payload. Exact RTL8821CS module has VIF code but no
   proven safe concurrent runtime. Do not force STA at the cost of AP.
