@@ -1,0 +1,2 @@
+# Unified diffs require one context marker on empty context lines.
+*.patch text eol=lf whitespace=-blank-at-eol

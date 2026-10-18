@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline metadata-comparison tests; no firmware fixture or device needed."""
 import copy
+import struct
 import unittest
 from elftools.common.exceptions import ELFError
 from module_abi_report import compare, report
@@ -43,6 +44,32 @@ class ModuleABIReportTests(unittest.TestCase):
         self.assertFalse(r['vermagic_equal'])
         self.assertFalse(r['dependencies_equal'])
         self.assertEqual(r['load_safety'], 'NOT_ESTABLISHED_EVEN_IF_METADATA_MATCHES')
+
+    def test_valid_synthetic_module_report(self):
+        names = b'\0.shstrtab\0.modinfo\0.strtab\0.symtab\0__versions\0'
+        blobs = [b'', names, b'vermagic=4.9.227\0depends=\0license=GPL\0', b'\0external_symbol\0', bytes(16) + struct.pack('<IIIBBH', 1, 0, 0, 0x10, 0, 0), b'CRCSTUB!']
+        offsets = []
+        body = bytearray(52)
+        for blob in blobs:
+            while len(body) % 4:
+                body.append(0)
+            offsets.append(len(body))
+            body.extend(blob)
+        while len(body) % 4:
+            body.append(0)
+        shoff = len(body)
+        specs = [('', 0, 0, 0), ('.shstrtab', 3, 0, 0), ('.modinfo', 1, 0, 0), ('.strtab', 3, 0, 0), ('.symtab', 2, 3, 16), ('__versions', 1, 0, 0)]
+        for i, (name, kind, link, entsize) in enumerate(specs):
+            ni = names.index(name.encode() + b'\0') if name else 0
+            body.extend(struct.pack('<IIIIIIIIII', ni, kind, 0, 0, offsets[i], len(blobs[i]), link, 1 if i == 4 else 0, 4, entsize))
+        ident = b'\x7fELF' + bytes([1, 1, 1]) + bytes(9)
+        body[:52] = struct.pack('<16sHHIIIIIHHHHHH', ident, 1, 40, 1, 0, 0, shoff, 0x5000000, 52, 0, 0, 40, len(specs), 1)
+        r = report(bytes(body))
+        self.assertTrue(r['has_symbol_versions'])
+        self.assertEqual(r['undefined_symbols'], ['external_symbol'])
+        self.assertEqual(r['load_safety'], 'NOT_ESTABLISHED')
+        self.assertEqual(r['modinfo']['depends'], [''])
+        self.assertEqual(r['section_bytes']['__versions'], 8)
 
     def test_rejects_non_elf(self):
         with self.assertRaises(ELFError):

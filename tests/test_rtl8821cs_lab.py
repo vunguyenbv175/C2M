@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""Host-only guards for the RTL8821CS offline build lab.
+
+No network, no ARM toolchain, no kernel source, no device. Validates the
+portable contract: pinned hashes, profile patches, env/CLI wiring, kernel
+config parsing, metadata labelling and report assembly. The actual cross
+compile runs only in the manual CI workflow.
+"""
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+WIFI = ROOT / "tools" / "wifi"
+LAB_PY = WIFI / "rtl8821cs_lab.py"
+SCRIPT = WIFI / "build_rtl8821cs_lab.sh"
+PROFILES = WIFI / "rtl8821cs_profiles"
+
+sys.path.insert(0, str(WIFI))
+import rtl8821cs_lab as lab  # noqa: E402
+
+# Independently recorded pins (parent-confirmed, from the upstream HTTPS
+# checksum file and the public driver archive). These must not drift.
+KERNEL_SHA = "38c485b411a14e825f8a66a5c2e64f1480397325a5f692b4929f68d228070c5f"
+DRIVER_ARCHIVE_SHA = "f7f6cdf34260f55bbca7ad0e3ce5959f4f8ee41dead30d1ee52ae1255c85347e"
+RTW_VERSION_SHA = "aae92ac00973d72e56b7b03023c2aa1184e1e0a53b914e0995be00ca6dc39e53"
+
+SCRIPT_TOKENS = (
+    "set -uo pipefail",
+    "arm-linux-gnueabi-",
+    "multi_v7_defconfig",
+    "olddefconfig",
+    "modules_prepare",
+    "scripts/config",
+    "MODVERSIONS",
+    "THUMB2_KERNEL",
+    "ARM_PATCH_PHYS_VIRT",
+    "KCFLAGS",
+    "HOSTCFLAGS",
+    "-fcommon",
+    "NO LOAD, EVER",
+    "NOT the camera",
+    "report.json",
+    "metadata.json",
+    "build-baseline.log",
+    "build-concurrent.log",
+    "kernel-prepare.log",
+    "toolchain.txt",
+    "--exit-code",
+    "sha256_mismatch",
+)
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+class PinTests(unittest.TestCase):
+    def test_pinned_hashes(self):
+        self.assertEqual(lab.PINS["kernel"]["sha256"], KERNEL_SHA)
+        self.assertEqual(lab.PINS["driver"]["archive_sha256"], DRIVER_ARCHIVE_SHA)
+        self.assertEqual(lab.PINS["driver"]["files"]["include/rtw_version.h"], RTW_VERSION_SHA)
+        self.assertEqual(lab.PINS["driver"]["version_string"], "v5.14.2-28-g6011b0372.20220328")
+
+    def test_hash_format(self):
+        for value in (KERNEL_SHA, DRIVER_ARCHIVE_SHA, RTW_VERSION_SHA):
+            self.assertRegex(value, r"^[0-9a-f]{64}$")
+        for value in lab.PINS["driver"]["files"].values():
+            self.assertRegex(value, r"^[0-9a-f]{64}$")
+
+    def test_no_camera_abi_claim(self):
+        claim = lab.PINS["claim"]
+        self.assertEqual(claim["camera_abi_claim"], "NOT_CAMERA_ABI")
+        self.assertFalse(claim["load_authorized"])
+        self.assertEqual(claim["load_policy"], "NO_LOAD_EVER_FROM_THIS_LAB")
+        self.assertFalse(claim["camera_config_reproduced"])
+
+
+class ScriptTests(unittest.TestCase):
+    def test_script_present_lf(self):
+        self.assertTrue(SCRIPT.is_file(), f"missing {SCRIPT}")
+        raw = SCRIPT.read_bytes()
+        self.assertNotIn(b"\r", raw, "script must be LF-only")
+
+    def test_run_step_preserves_failure_status(self):
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("bash unavailable")
+        script = SCRIPT.read_text(encoding="utf-8")
+        start = script.index("run_step() {")
+        end = script.index("\n}\n", start) + 3
+        with tempfile.TemporaryDirectory() as tmp:
+            log = str(Path(tmp) / "step.log").replace("\\", "/")
+            snippet = 'record_step() { :; }; remaining() { echo 30; };\n' + script[start:end] + '\nrun_step deliberate_failure "' + log + '" 5 false\n'
+            result = subprocess.run([bash, "-c", snippet], capture_output=True)
+            self.assertEqual(result.returncode, 1, result.stderr)
+
+    def test_required_tokens(self):
+        raw = _read(SCRIPT)
+        for token in SCRIPT_TOKENS:
+            self.assertIn(token, raw, f"missing script token: {token}")
+
+    def test_no_firmware_or_load(self):
+        raw = _read(SCRIPT)
+        for forbidden in ("insmod", "modprobe", "rmmod", "dd if=", "dd of=", "flash", "fw_setenv"):
+            self.assertNotIn(forbidden, raw, f"forbidden token in lab script: {forbidden}")
+
+    def test_bash_syntax_when_available(self):
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("bash not available on this host")
+        proc = subprocess.run([bash, "-n", str(SCRIPT)], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+
+class ProfileTests(unittest.TestCase):
+    def test_patches_present(self):
+        for profile in lab.PINS["profiles"]:
+            patch = PROFILES / profile / "Makefile.patch"
+            self.assertTrue(patch.is_file(), f"missing {patch}")
+            self.assertNotIn(b"\r", patch.read_bytes(), "patch must be LF-only")
+
+    def test_baseline_single_vif(self):
+        raw = _read(PROFILES / "baseline" / "Makefile.patch")
+        self.assertIn("CONFIG_PLATFORM_ARM_RK3188 = n", raw)
+        self.assertIn("CONFIG_PLATFORM_C2M = y", raw)
+        self.assertIn("-DCONFIG_IOCTL_CFG80211", raw)
+        # The baseline patch must not add the concurrency flag (a comment may
+        # still refer to it).
+        self.assertNotIn("EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE", raw)
+
+    def test_concurrent_two_vif(self):
+        raw = _read(PROFILES / "concurrent" / "Makefile.patch")
+        self.assertIn("CONFIG_PLATFORM_C2M = y", raw)
+        self.assertIn("EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE", raw)
+
+
+class CliTests(unittest.TestCase):
+    def test_env_output(self):
+        proc = subprocess.run([sys.executable, str(LAB_PY), "env"], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        env = dict(line.split("=", 1) for line in proc.stdout.splitlines() if "=" in line)
+        self.assertEqual(env["C2M_KERNEL_SHA256"], KERNEL_SHA)
+        self.assertEqual(env["C2M_DRIVER_ARCHIVE_SHA256"], DRIVER_ARCHIVE_SHA)
+        self.assertEqual(env["C2M_DRIVER_DIR"], lab.PINS["driver"]["extracted_dir"])
+        self.assertEqual(env["C2M_KERNEL_DIR"], lab.PINS["kernel"]["extracted_dir"])
+
+    def test_verify_file_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "artifact.bin"
+            target.write_bytes(b"c2m-rtl8821cs-lab")
+            good = lab.sha256_file(target)
+            ok = subprocess.run([sys.executable, str(LAB_PY), "verify-file", str(target), good], capture_output=True, text=True)
+            self.assertEqual(ok.returncode, 0, ok.stderr)
+            self.assertTrue(json.loads(ok.stdout)["match"])
+            bad = subprocess.run([sys.executable, str(LAB_PY), "verify-file", str(target), "0" * 64], capture_output=True, text=True)
+            self.assertEqual(bad.returncode, 1)
+            self.assertFalse(json.loads(bad.stdout)["match"])
+
+
+class ConfigStateTests(unittest.TestCase):
+    REQUIRED = {
+        "CONFIG_MODULES": "y",
+        "CONFIG_SMP": "y",
+        "CONFIG_PREEMPT": "y",
+        "CONFIG_MODULE_UNLOAD": "y",
+        "CONFIG_THUMB2_KERNEL": "y",
+        "CONFIG_ARM_PATCH_PHYS_VIRT": "y",
+        "CONFIG_LOCALVERSION": "",
+    }
+
+    def _write(self, tmp, extra_lines=()):
+        lines = []
+        for key, value in self.REQUIRED.items():
+            if value == "":
+                lines.append(f'{key}=""')
+            else:
+                lines.append(f"{key}={value}")
+        lines.extend(
+            [
+                "CONFIG_AEABI=y",
+                "CONFIG_CPU_V7=y",
+                "CONFIG_CFG80211=m",
+                "CONFIG_MMC=m",
+                "CONFIG_WIRELESS_EXT=y",
+                "CONFIG_CFG80211_WEXT=y",
+                "# CONFIG_MODVERSIONS is not set",
+                "# CONFIG_CC_STACKPROTECTOR_STRONG is not set",
+                "# CONFIG_CC_STACKPROTECTOR_REGULAR is not set",
+                "# CONFIG_GCC_PLUGINS is not set",
+            ]
+        )
+        lines.extend(extra_lines)
+        path = Path(tmp) / ".config"
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+
+    def test_all_required_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = lab.config_state(self._write(tmp))
+        self.assertTrue(state["vermagic_required_ok"], state["vermagic_required_missing"])
+        self.assertTrue(state["expected_ok"], state["expected_mismatch"])
+        self.assertEqual(state["observed"]["CONFIG_THUMB2_KERNEL"], "y")
+
+    def test_missing_required_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp)
+            text = path.read_text(encoding="utf-8").replace("CONFIG_PREEMPT=y\n", "")
+            path.write_text(text, encoding="utf-8")
+            state = lab.config_state(path)
+        self.assertFalse(state["vermagic_required_ok"])
+        self.assertTrue(any("CONFIG_PREEMPT" in item for item in state["vermagic_required_missing"]))
+        self.assertEqual(state["observed"]["CONFIG_PREEMPT"], "n")
+
+
+class ReportTests(unittest.TestCase):
+    def test_report_assembled_from_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "steps.tsv").write_text(
+                "kernel-download\tok\tsha256_verified\nbuild-baseline\tok\tok\n",
+                encoding="utf-8",
+            )
+            (out / "toolchain.txt").write_text("arm-linux-gnueabi-gcc 13\n", encoding="utf-8")
+            (out / "kernel-config.json").write_text(
+                json.dumps({"vermagic_required_ok": True, "expected_mismatch": []}),
+                encoding="utf-8",
+            )
+            (out / "baseline.metadata.json").write_text(
+                json.dumps({"profile": "baseline", "camera_abi_claim": "NOT_CAMERA_ABI"}),
+                encoding="utf-8",
+            )
+            report = lab.build_report(out, 0)
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["failed_steps"], [])
+        self.assertEqual(report["profiles"]["baseline"]["status"], "built")
+        self.assertEqual(report["profiles"]["concurrent"]["status"], "absent")
+        self.assertEqual(report["identity"]["camera_abi_claim"], "NOT_CAMERA_ABI")
+        self.assertFalse(report["identity"]["load_authorized"])
+
+    def test_report_failure_is_honest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "steps.tsv").write_text("build-concurrent\tfail\texit=2\n", encoding="utf-8")
+            report = lab.build_report(out, 1)
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["failed_steps"], ["build-concurrent"])
+
+
+class ModuleMetadataTests(unittest.TestCase):
+    def test_labels_without_pyelftools(self):
+        import module_abi_report
+
+        original = module_abi_report.report
+        with tempfile.TemporaryDirectory() as tmp:
+            ko = Path(tmp) / "8821cs.ko"
+            ko.write_bytes(b"\x7fELF")
+            module_abi_report.report = lambda blob: {  # noqa: ARG005
+                "sha256": lab.sha256_file(ko),
+                "bytes": 4,
+                "modinfo": {"vermagic": ["4.9.227 SMP preempt mod_unload ARMv7 thumb2 p2v8"]},
+                "undefined_symbols": ["kmalloc", "cfg80211_connect_result"],
+                "undefined_symbol_count": 2,
+                "has_symbol_versions": False,
+                "load_safety": "NOT_ESTABLISHED",
+            }
+            try:
+                meta = lab.module_metadata(ko, "concurrent")
+            finally:
+                module_abi_report.report = original
+        self.assertEqual(meta["camera_abi_claim"], "NOT_CAMERA_ABI")
+        self.assertFalse(meta["load_authorized"])
+        self.assertEqual(meta["load_policy"], "NO_LOAD_EVER_FROM_THIS_LAB")
+        self.assertEqual(meta["elf"]["undefined_symbols"], ["kmalloc", "cfg80211_connect_result"])
+        self.assertEqual(meta["elf"]["undefined_symbol_count"], 2)
+        self.assertEqual(meta["elf"]["load_safety"], "NOT_ESTABLISHED")
+        self.assertEqual(meta["role"], "reconstructed_upstream_armv7_thumb2_same_channel_two_vif")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

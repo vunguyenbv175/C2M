@@ -1,0 +1,80 @@
+name: rtl8821cs-offline-lab
+# EXPLICIT RESEARCH-BRANCH / MANUAL PUBLIC-SOURCE LAB. Never a camera release.
+# No device access, secrets, firmware, private SDK, network association or module load.
+# Upstream kernel + reconstructed config cannot establish vendor camera ABI.
+"on":
+  workflow_dispatch:
+  push:
+    branches: [lab/rtl8821cs-offline-20261018]
+    paths:
+      - .github/workflows/rtl8821cs-offline-lab.yml
+      - tools/wifi/build_rtl8821cs_lab.sh
+      - tools/wifi/rtl8821cs_lab.py
+      - tools/wifi/rtl8821cs_profiles/**
+      - tests/test_rtl8821cs_lab.py
+      - tools/fw/module_abi_report.py
+      - tools/fw/test_module_abi_report.py
+concurrency:
+  group: rtl8821cs-offline-lab
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  public-source-module-lab:
+    if: github.ref_name == 'lab/rtl8821cs-offline-20261018'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install public host build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi bc bison flex libssl-dev libelf-dev python3-pyelftools
+      - name: Offline lab source tests
+        run: |
+          bash -n tools/wifi/build_rtl8821cs_lab.sh
+          python3 tests/test_rtl8821cs_lab.py
+          python3 tools/fw/test_module_abi_report.py
+          python3 tests/test_d3_dhcp_lease.py
+          python3 fw/diag/test_diag_contract.py
+      - name: Build research baseline and concurrent variants
+        run: |
+          bash tools/wifi/build_rtl8821cs_lab.sh "$RUNNER_TEMP/c2m-rtl-lab"
+      - name: Validate bounded metadata evidence
+        id: evidence
+        if: always()
+        env:
+          LAB_DIR: ${{ runner.temp }}/c2m-rtl-lab
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['LAB_DIR'])
+          report = root / 'report.json'
+          if not report.is_file():
+              raise SystemExit('No build report; inspect failed preparation step')
+          data = json.loads(report.read_text())
+          assert 'NOT' in str(data.get('load_safety', '')), 'report must disclaim load safety'
+          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt']:
+              p = root / name
+              if p.exists():
+                  assert p.is_file() and not p.is_symlink(), name
+                  assert p.stat().st_size <= 16 * 1024 * 1024, name + ' exceeds evidence cap'
+                  if p.suffix == '.json':
+                      json.loads(p.read_text())
+          PY
+      - name: Preserve metadata only, never modules or source trees
+        if: always() && steps.evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtl8821cs-offline-lab-metadata
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/c2m-rtl-lab/report.json
+            ${{ runner.temp }}/c2m-rtl-lab/baseline.metadata.json
+            ${{ runner.temp }}/c2m-rtl-lab/concurrent.metadata.json
+            ${{ runner.temp }}/c2m-rtl-lab/build-baseline.log
+            ${{ runner.temp }}/c2m-rtl-lab/build-concurrent.log
+            ${{ runner.temp }}/c2m-rtl-lab/kernel-prepare.log
+            ${{ runner.temp }}/c2m-rtl-lab/toolchain.txt
