@@ -7,8 +7,11 @@ ancestors and nothing else:
     /tmp, /var, /customer = 0755 1000:1000
   VI customer UBIFS manifest (same local carve, 227 entries):
     /minieye, /minieye/config = 0755 1000:1000
-  EN preserved cpio fact:
-    /tmp = 0775 1001:1001, /customer = 0755 1001:1001,
+  EN preserved facts:
+    /tmp = 0775 1001:1001, /customer = 1001:1001 at 0755 (legacy
+    pre-preservation rebuild, observed on the D4-debug field image) and at
+    0775 (stock EN customer UBIFS root, observed on the Candidate E field
+    image and in the stock EN customer manifest),
     /customer/minieye(+/config) = 0775 1001:1001
 
 Only /tmp, /customer, /customer/minieye(+/config) are trusted; /var is
@@ -152,10 +155,11 @@ int main(void) {
     mk(&st, 1001, 1001, 0755); CHECK(!stock_config_ancestor("/tmp", &st));
     mk(&st, 1000, 1000, 0777); CHECK(!stock_config_ancestor("/tmp", &st));
     mk(&st, 0, 0, 0755); CHECK(!stock_config_ancestor("/tmp", &st));
-    /* /customer: 0755 with either 1000:1000 (VI) or 1001:1001 (EN). */
+    /* /customer: 0755 with 1000:1000 (VI), 1001:1001 at 0755 (legacy EN
+     * rebuild fact) and at 0775 (stock EN UBIFS root; Candidate E field). */
     mk(&st, 1000, 1000, 0755); CHECK(stock_config_ancestor("/customer", &st));
     mk(&st, 1001, 1001, 0755); CHECK(stock_config_ancestor("/customer", &st));
-    mk(&st, 1001, 1001, 0775); CHECK(!stock_config_ancestor("/customer", &st));
+    mk(&st, 1001, 1001, 0775); CHECK(stock_config_ancestor("/customer", &st));
     mk(&st, 1000, 1000, 0775); CHECK(!stock_config_ancestor("/customer", &st));
     mk(&st, 0, 0, 0755); CHECK(!stock_config_ancestor("/customer", &st));
     /* /customer/minieye and /config: VI 0755 1000 vs EN 0775 1001. */

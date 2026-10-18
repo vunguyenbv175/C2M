@@ -447,9 +447,10 @@ static int ap_unchanged(struct worker *w) {
 }
 /* Traverse every component with O_NOFOLLOW. Only root-owned sticky writable
  * ancestors plus the exact stock tuples in stock_config_ancestor
- * (/tmp VI 0755 1000:1000, /tmp EN 0775 1001:1001, /customer 0755
- * 1000:1000/1001:1001, /customer/minieye(+/config) VI 0755 1000:1000 and
- * EN 0775 1001:1001) are allowed. Never mkdir intermediate ancestors. */
+ * (/tmp VI 0755 1000:1000, /tmp EN 0775 1001:1001, /customer VI 0755
+ * 1000:1000 and EN 1001:1001 at 0755 (legacy rebuild) or 0775 (stock
+ * UBIFS root), /customer/minieye(+/config) VI 0755 1000:1000 and EN 0775
+ * 1001:1001) are allowed. Never mkdir intermediate ancestors. */
 static int absolute_path(const char *in, char *out, size_t size) {
     char cwd[PATH_MAX];
     int n;
@@ -464,7 +465,9 @@ static int stock_config_ancestor(const char *path, const struct stat *st) {
      * VI facts are read-only verified from the exact local VI base
      * (V2023.09.20.1_C2M_U_FR_WIFI_VI.tar): rootfs cpio /tmp,/var,/customer
      * are 0755 1000:1000 and customer UBIFS /minieye,/minieye/config are
-     * 0755 1000:1000. EN /tmp 0775 1001:1001 is the preserved EN cpio fact.
+     * 0755 1000:1000. EN /tmp 0775 1001:1001 is the preserved EN cpio fact;
+     * the stock EN customer UBIFS root is 0775 1001:1001 (current rebuilds
+     * preserve it; pre-preservation rebuilds normalized it to 0755).
      * Never change its mode/owner just to make our private child work. */
     if (!strcmp(path, "/tmp")) {
         if (st->st_uid == 1000 && st->st_gid == 1000)
@@ -475,9 +478,10 @@ static int stock_config_ancestor(const char *path, const struct stat *st) {
     }
     if (!strcmp(path, "/customer")) {
         if (st->st_uid == 1000 && st->st_gid == 1000)
-            return (st->st_mode & 07777) == 0755;
+            return (st->st_mode & 07777) == 0755;   /* VI raw cpio fact */
         if (st->st_uid == 1001 && st->st_gid == 1001)
-            return (st->st_mode & 07777) == 0755;
+            return (st->st_mode & 07777) == 0755 || /* legacy pre-preservation */
+                   (st->st_mode & 07777) == 0775;   /* stock EN UBIFS root */
         return 0;
     }
     if (!strcmp(path, "/customer/minieye") ||
