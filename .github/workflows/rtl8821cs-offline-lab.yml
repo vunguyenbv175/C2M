@@ -64,7 +64,9 @@ jobs:
               for profile in ['baseline', 'concurrent']:
                   assert (root / (profile + '.metadata.json')).is_file()
                   assert (root / (profile + '.storage.json')).is_file()
-          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log', 'baseline.storage.json', 'concurrent.storage.json']:
+                  assert (root / (profile + '.memzero-attribution.json')).is_file()
+              assert (root / 'memzero-probe.json').is_file()
+          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log', 'baseline.storage.json', 'concurrent.storage.json', 'memzero-probe.json', 'memzero-probe.log', 'baseline.memzero-attribution.json', 'concurrent.memzero-attribution.json']:
               p = root / name
               if p.exists():
                   assert p.is_file() and not p.is_symlink(), name
@@ -91,3 +93,7 @@ jobs:
             ${{ runner.temp }}/c2m-rtl-lab/layout-probe.log
             ${{ runner.temp }}/c2m-rtl-lab/baseline.storage.json
             ${{ runner.temp }}/c2m-rtl-lab/concurrent.storage.json
+            ${{ runner.temp }}/c2m-rtl-lab/memzero-probe.json
+            ${{ runner.temp }}/c2m-rtl-lab/memzero-probe.log
+            ${{ runner.temp }}/c2m-rtl-lab/baseline.memzero-attribution.json
+            ${{ runner.temp }}/c2m-rtl-lab/concurrent.memzero-attribution.json

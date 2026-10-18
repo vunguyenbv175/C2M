@@ -65,6 +65,11 @@ SCRIPT_TOKENS = (
     "toolchain.txt",
     "module-storage",
     "storage.json",
+    "memzero-scan",
+    "memzero-probe",
+    "memzero-probe.json",
+    "flags.tsv",
+    "memzero-attribution.json",
     "--exit-code",
     "sha256_mismatch",
 )
@@ -308,7 +313,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(report["profiles"]["concurrent"]["status"], "absent")
         self.assertEqual(report["identity"]["camera_abi_claim"], "NOT_CAMERA_ABI")
         self.assertFalse(report["identity"]["load_authorized"])
-        self.assertEqual(report["iteration"], 4)
+        self.assertEqual(report["iteration"], 5)
         self.assertEqual(report["hypothesis"]["label"], lab.HYPOTHESIS["label"])
         self.assertFalse(report["hypothesis"]["config_changed_since_iteration2"])
         self.assertFalse(report["hypothesis"]["abi_success_claim"])
@@ -437,7 +442,7 @@ class LayoutProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = lab.layout_probe(Path(tmp) / "probe.o")
         self.assertEqual(result["object"]["status"], "missing")
-        self.assertEqual(result["probe_iteration"], 4)
+        self.assertEqual(result["probe_iteration"], 5)
 
 
 class MemzeroScanTests(unittest.TestCase):
@@ -550,6 +555,72 @@ class ModuleStorageTests(unittest.TestCase):
         self.assertEqual(result["role"], "reconstructed_upstream_armv7_thumb2_single_vif")
         self.assertEqual(result["summary"]["common_total_bytes"], 64)
         self.assertEqual(result["load_safety"], "NOT_ESTABLISHED")
+
+
+class MemzeroAttributionTests(unittest.TestCase):
+    @staticmethod
+    def _object(undefined, defined=()):
+        symbols = [(name, 0, 0) for name in undefined]
+        symbols += [(name, 1, 16) for name in defined]
+        return LayoutProbeTests._probe_elf(symbols)
+
+    def test_attribution_counts_objects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "core").mkdir()
+            (root / "core" / "zero_a.o").write_bytes(self._object(["__memzero", "memset"], ["c2m_a"]))
+            (root / "core" / "fill_b.o").write_bytes(self._object(["memset"], ["c2m_b"]))
+            (root / "plain_c.o").write_bytes(self._object([], ["c2m_c"]))
+            (root / "junk.o").write_bytes(b"not an elf")
+            result = lab.memzero_attribution(root, "baseline")
+        self.assertEqual(result["objects_scanned"], 3)
+        self.assertEqual(result["unparseable_count"], 1)
+        self.assertEqual(result["objects_with_memzero_count"], 1)
+        self.assertEqual(result["objects_with_memzero"][0]["object"], "core/zero_a.o")
+        self.assertEqual(result["objects_with_memset_count"], 2)
+        self.assertFalse(result["truncated"])
+        self.assertEqual(result["load_safety"], "NOT_ESTABLISHED")
+
+    def test_attribution_limit_truncates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for index in range(3):
+                (root / f"z{index}.o").write_bytes(self._object(["__memzero"]))
+            result = lab.memzero_attribution(root, None, limit=1)
+        self.assertEqual(result["objects_with_memzero_count"], 3)
+        self.assertEqual(len(result["objects_with_memzero"]), 1)
+        self.assertTrue(result["truncated"])
+
+    def test_probe_variants_from_flags_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "default.o").write_bytes(self._object(["__memzero", "memset"]))
+            (root / "fno_builtin.o").write_bytes(self._object(["memset"]))
+            (root / "flags.tsv").write_text(
+                "default\t-O2 -mthumb\nfno_builtin\t-O2 -mthumb -fno-builtin\n", encoding="utf-8")
+            (root / "toolchain.txt").write_text("arm-linux-gnueabi-gcc 13\n", encoding="utf-8")
+            result = lab.memzero_probe(root)
+        self.assertEqual(result["variant_count"], 2)
+        self.assertTrue(result["variants"]["default"]["has_memzero"])
+        self.assertFalse(result["variants"]["fno_builtin"]["has_memzero"])
+        self.assertEqual(result["variants"]["fno_builtin"]["flags"], "-O2 -mthumb -fno-builtin")
+        self.assertEqual(result["toolchain"], "arm-linux-gnueabi-gcc 13")
+
+    def test_report_attaches_memzero_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "steps.tsv").write_text("memzero-baseline\tok\tattribution_written\n", encoding="utf-8")
+            (out / "baseline.memzero-attribution.json").write_text(json.dumps({
+                "objects_scanned": 12,
+                "objects_with_memzero_count": 2,
+                "objects_with_memset_count": 5,
+                "load_safety": "NOT_ESTABLISHED",
+            }), encoding="utf-8")
+            report = lab.build_report(out, 0)
+        entry = report["profiles"]["baseline"]
+        self.assertEqual(entry["memzero_artifact"], "baseline.memzero-attribution.json")
+        self.assertEqual(entry["memzero_summary"]["objects_with_memzero_count"], 2)
+        self.assertNotIn("memzero_summary", report["profiles"]["concurrent"])
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ reads or writes firmware. Supports ``tools/wifi/build_rtl8821cs_lab.sh``:
 * ``config-state``    -- read a reconstructed kernel ``.config`` and report flags
 * ``config-sticky``   -- report whether the iteration-2 forced choices stuck
 * ``layout-probe``    -- compile-only struct-layout probe metadata + arch scan
+* ``memzero-scan``   -- per-object ``__memzero``/``memset`` attribution in a driver build tree
+* ``memzero-probe``  -- parse compile-only codegen variant objects into a flag table
 * ``module-metadata`` -- ELF module modinfo / section / undefined-symbol metadata
 * ``module-storage``  -- allocated/COMMON object-symbol storage accounting (bounded)
 * ``report``          -- assemble ``report.json`` from a run's artifacts
@@ -81,38 +83,33 @@ PINS = {
 # undefined-symbol set is evidence about the reconstructed config only; it is
 # never an ABI-success or load-safety claim.
 # --------------------------------------------------------------------------
-ITERATION = 4
+ITERATION = 5
 
 HYPOTHESIS = {
-    "label": "iteration4-target-no-common",
+    "label": "iteration5-memzero-attribution",
     "statement": (
-        "Enabling DEBUG_KERNEL/DEBUG_SPINLOCK/DEBUG_MUTEXES, explicitly disabling "
-        "DEBUG_LOCK_ALLOC/PROVE_LOCKING, selecting CC_STACKPROTECTOR_REGULAR and "
-        "disabling IPV6 will shift the reconstructed kernel's struct layout and "
-        "export surface closer to the stock module's undefined-symbol set."
+        "The extra __memzero undefined reference (the stock module has memset only) "
+        "can be attributed to exact driver translation units, and its emission is "
+        "controlled by specific target codegen flag choices in the pinned host "
+        "cross toolchain; no Kconfig or driver source changes in this iteration."
     ),
-    "config_changes": [
-        "enable CONFIG_DEBUG_KERNEL",
-        "enable CONFIG_DEBUG_SPINLOCK",
-        "enable CONFIG_DEBUG_MUTEXES",
-        "explicitly disable CONFIG_DEBUG_LOCK_ALLOC",
-        "explicitly disable CONFIG_PROVE_LOCKING",
-        "enable CONFIG_CC_STACKPROTECTOR_REGULAR (disable STRONG/NONE)",
-        "disable CONFIG_IPV6",
-    ],
+    "config_changes": [],
     "prediction": (
-        "stock undefined-symbol set plus __memzero if the reconstructed debug/lock "
-        "config really matches the stock build"
+        "constant-zero memset emits __memzero under the lab target flags; the "
+        "variant table shows which flag choices remove it; object attribution "
+        "localizes every reference in both profiles"
     ),
     "camera_debug_lock_alloc_state": "inferred_not_proven",
     "abi_success_claim": False,
     "evidence_goal": (
-        "Same inferred Kconfig as run two; target KCFLAGS now use -fno-common, while host "
-        "tools alone retain -fcommon. Predict zero SHN_COMMON in final modules; build errors "
-        "must surface rather than be hidden. Stock WEXT/layout and __memzero remain unresolved."
+        "object-level attribution (which .o files reference __memzero and/or memset) plus a "
+        "compile-only codegen variant table isolating toolchain flag effects; the stock "
+        "WEXT/layout difference, vendor ABI, recovery and any live test remain unresolved"
     ),
     "config_changed_since_iteration2": False,
-    "target_codegen_changed_since_iteration3": "-fcommon replaced by -fno-common",
+    "target_codegen_changed_since_iteration3": "-fcommon replaced by -fno-common (iteration 4; unchanged)",
+    "build_change_since_iteration4": "none: iteration 5 adds metadata evidence only",
+    "iteration5_scope": "attribution + flag-variant measurement; no codegen/config change, no load",
 }
 
 # Explicitly forced iteration-2 choices. ``config_state`` reports any that
@@ -433,6 +430,111 @@ def memzero_export(ksrc: Path) -> dict:
     }
 
 
+def memzero_attribution(objects_dir: Path, profile: str | None = None,
+                        limit: int = 400) -> dict:
+    """Object-level __memzero / memset attribution across one driver build tree.
+
+    Pure metadata: every regular ``*.o`` under ``objects_dir`` is parsed as
+    ELF32 and only undefined-symbol names are used. Objects are never linked
+    into a module here and nothing is executed or loaded.
+    """
+    candidates = sorted(p for p in objects_dir.rglob("*.o") if p.is_file()) \
+        if objects_dir.is_dir() else []
+    scanned = 0
+    unparseable: list[str] = []
+    memzero_objects: list[dict] = []
+    memset_objects = 0
+    for path in candidates:
+        relative = str(path.relative_to(objects_dir)).replace("\\", "/")
+        try:
+            parsed = parse_elf32(path.read_bytes())
+        except Exception:  # noqa: BLE001 - record honestly, never fake evidence
+            unparseable.append(relative)
+            continue
+        scanned += 1
+        undefined = {s["name"] for s in parsed["symbols"] if s["undefined"] and s["name"]}
+        if "memset" in undefined:
+            memset_objects += 1
+        if "__memzero" in undefined:
+            memzero_objects.append({
+                "object": relative,
+                "undefined_symbol_count": len(undefined),
+            })
+    return {
+        "probe": "memzero-object-attribution",
+        "profile": profile,
+        "objects_dir": str(objects_dir),
+        "objects_seen": len(candidates),
+        "objects_scanned": scanned,
+        "unparseable_count": len(unparseable),
+        "unparseable_objects": unparseable[:limit],
+        "objects_with_memset_count": memset_objects,
+        "objects_with_memzero_count": len(memzero_objects),
+        "objects_with_memzero": memzero_objects[:limit],
+        "truncated": len(memzero_objects) > limit,
+        "load_safety": "NOT_ESTABLISHED",
+        "notes": [
+            "public-source compile metadata only; no module was built from these objects in this step",
+            "attribution localizes the extra __memzero reference; it does not by itself explain the stock build difference",
+        ],
+    }
+
+
+def memzero_probe(probe_dir: Path) -> dict:
+    """Parse compile-only codegen variant objects into a flag -> symbol table.
+
+    ``probe_dir`` holds one ``<variant>.o`` per flag set plus an optional
+    ``flags.tsv`` (name TAB flags, written by the shell as the single source of
+    truth) and an optional ``toolchain.txt``. Parse failures are reported as
+    such; nothing is linked or loaded.
+    """
+    flags: dict[str, str] = {}
+    flags_file = probe_dir / "flags.tsv"
+    if flags_file.is_file():
+        for raw in flags_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not raw.strip():
+                continue
+            parts = raw.split("\t", 1)
+            flags[parts[0]] = parts[1] if len(parts) > 1 else ""
+    toolchain = None
+    toolchain_file = probe_dir / "toolchain.txt"
+    if toolchain_file.is_file():
+        toolchain = toolchain_file.read_text(encoding="utf-8", errors="replace").strip()
+    variants: dict[str, dict] = {}
+    for path in sorted(probe_dir.glob("*.o")):
+        entry = {
+            "object": path.name,
+            "flags": flags.get(path.stem),
+            "sha256": sha256_file(path),
+            "bytes": path.stat().st_size,
+        }
+        try:
+            parsed = parse_elf32(path.read_bytes())
+            undefined = sorted({s["name"] for s in parsed["symbols"] if s["undefined"] and s["name"]})
+            entry.update(
+                status="parsed",
+                undefined_symbols=undefined,
+                undefined_symbol_count=len(undefined),
+                has_memzero="__memzero" in undefined,
+                has_memset="memset" in undefined,
+            )
+        except Exception as exc:  # noqa: BLE001 - surface parse failure honestly
+            entry.update(status="unparseable", error=str(exc),
+                         has_memzero=None, has_memset=None)
+        variants[path.stem] = entry
+    return {
+        "probe": "memzero-codegen-variant-table",
+        "variants": variants,
+        "variant_count": len(variants),
+        "toolchain": toolchain,
+        "load_safety": "NOT_ESTABLISHED",
+        "notes": [
+            "variant flags are a reduced subset of the kbuild command line; they isolate flag effects, not a byte-exact kbuild reproduction",
+            "compile-only objects: never linked into a module and never loaded",
+        ],
+    }
+
+
 def layout_probe(obj_path: Path, ksrc: Path | None = None) -> dict:
     result = {"probe_iteration": ITERATION, "hypothesis_label": HYPOTHESIS["label"]}
     if obj_path.is_file():
@@ -611,11 +713,44 @@ def build_report(out_dir: Path, exit_code: int) -> dict:
                 }
             except (OSError, ValueError) as exc:
                 entry["storage_summary_error"] = str(exc)
+        attribution = out_dir / f"{profile}.memzero-attribution.json"
+        if attribution.is_file():
+            # Reference the full bounded artifact; attach only the safe summary.
+            entry["memzero_artifact"] = attribution.name
+            try:
+                data = json.loads(attribution.read_text(encoding="utf-8"))
+                entry["memzero_summary"] = {
+                    "objects_scanned": data.get("objects_scanned"),
+                    "objects_with_memzero_count": data.get("objects_with_memzero_count"),
+                    "objects_with_memset_count": data.get("objects_with_memset_count"),
+                    "load_safety": data.get("load_safety"),
+                }
+            except (OSError, ValueError) as exc:
+                entry["memzero_summary_error"] = str(exc)
         report["profiles"][profile] = entry
 
     layout = out_dir / "layout-probe.json"
     if layout.is_file():
         report["layout_probe"] = json.loads(layout.read_text(encoding="utf-8"))
+    memzero_table = out_dir / "memzero-probe.json"
+    if memzero_table.is_file():
+        try:
+            data = json.loads(memzero_table.read_text(encoding="utf-8"))
+            report["memzero_probe"] = {
+                "variant_count": data.get("variant_count"),
+                "toolchain": data.get("toolchain"),
+                "variants": {
+                    name: {
+                        "flags": item.get("flags"),
+                        "status": item.get("status"),
+                        "has_memzero": item.get("has_memzero"),
+                        "has_memset": item.get("has_memset"),
+                    }
+                    for name, item in data.get("variants", {}).items()
+                },
+            }
+        except (OSError, ValueError) as exc:
+            report["memzero_probe_error"] = str(exc)
     if "hypothesis" not in report:
         report["hypothesis"] = {**HYPOTHESIS, "config_choices_forced": dict(STICKY_KCONFIG), "config_choices_ok": None, "config_choices_mismatch": []}
 
@@ -750,6 +885,41 @@ def _cmd_module_storage(args) -> int:
     return 0 if common_count == 0 else 1
 
 
+def _cmd_memzero_scan(args) -> int:
+    result = memzero_attribution(Path(args.objects_dir), getattr(args, "profile", None),
+                                 getattr(args, "limit", 400))
+    if args.out:
+        Path(args.out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary = {
+        "profile": result["profile"],
+        "objects_scanned": result["objects_scanned"],
+        "objects_with_memzero_count": result["objects_with_memzero_count"],
+        "objects_with_memset_count": result["objects_with_memset_count"],
+        "objects_with_memzero": [item["object"] for item in result["objects_with_memzero"]][:20],
+        "unparseable_count": result["unparseable_count"],
+        "load_safety": result["load_safety"],
+    }
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_memzero_probe(args) -> int:
+    result = memzero_probe(Path(args.dir))
+    if args.out:
+        Path(args.out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary = {
+        name: {
+            "flags": item["flags"],
+            "status": item["status"],
+            "has_memzero": item["has_memzero"],
+            "has_memset": item["has_memset"],
+        }
+        for name, item in result["variants"].items()
+    }
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
 def _cmd_report(args) -> int:
     report = build_report(Path(args.out), args.exit_code)
     target = Path(args.out) / "report.json"
@@ -795,6 +965,16 @@ def main(argv=None) -> int:
     storage.add_argument("--cmd")
     storage.add_argument("--out")
 
+    mzscan = sub.add_parser("memzero-scan")
+    mzscan.add_argument("--objects-dir", required=True)
+    mzscan.add_argument("--profile")
+    mzscan.add_argument("--limit", type=int, default=400)
+    mzscan.add_argument("--out")
+
+    mzprobe = sub.add_parser("memzero-probe")
+    mzprobe.add_argument("--dir", required=True)
+    mzprobe.add_argument("--out")
+
     report = sub.add_parser("report")
     report.add_argument("--out", required=True)
     report.add_argument("--exit-code", type=int, default=0)
@@ -810,6 +990,8 @@ def main(argv=None) -> int:
         "layout-probe": _cmd_layout_probe,
         "module-metadata": _cmd_module_metadata,
         "module-storage": _cmd_module_storage,
+        "memzero-scan": _cmd_memzero_scan,
+        "memzero-probe": _cmd_memzero_probe,
         "report": _cmd_report,
     }
     return handlers[args.command](args)
