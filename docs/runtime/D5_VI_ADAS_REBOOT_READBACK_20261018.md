@@ -62,6 +62,20 @@ The representation/readback defect repeated: source673 bytes, decoded498 bytes, 
 
 Logger naturally relaunched as PID1117, sample10/card_result0/truncated0. Across boot, its source observation changed at monotonic8.721s and decoded observation converged by18.722s. Both calibration hashes stayed unchanged and ADAS/lane processes were present; no driving-health verdict follows from process presence. No camera mutation was performed in this check.
 
+## Owner normal-driving report: no collision warning heard
+
+The owner later reported having driven during the observation period without hearing a collision warning. This is an owner symptom, not proof a safe, naturally occurring scene crossed the vendor trigger thresholds. No provocative driving test was requested.
+
+Read-only check at uptime1536s found all six flags still true3, current ADAS/lane PIDs2069/2070/2071 (same as the early postboot check), logger running sample306/card_result0/truncated0. The available log tail covers roughly25 minutes of the current boot. After early decoded-file convergence, no further config change appeared in this tail; sampled kernel substring counters were all zero. Vendor-log incremental substring counters for FCW/HMW/etc were zero, but those counters are not guaranteed warning-event telemetry and cannot prove no events occurred. Recorder PID remained640; no driving acceptance is claimed from process presence.
+
+D4 advisory freshness remained0 and its allowlisted current status was waiting_gps. /tmp/car_info exists. This is evidence about the separate C2M advisory consumer, **not proof that vendor ADAS lacked GPS/speed** or that GPS explains the collision-warning symptom. No coordinates, speed history, UART stream, license payload or raw media was displayed. Further context should be requested only when the owner is safely stopped.
+
+## Follow-up GPS hypothesis check
+
+After the owner reported no other warnings and suspected GPS, five bounded read-only samples of the existing regular /tmp/car_info GPS region (offset0x330, length0x1c0) were **entirely zero and unchanged**. No coordinate/speed/UTC values were output or saved. The VI writer layout is independently documented in CANDIDATE_D5_VI_20261016.md:51-55, so this is stronger than the D4 freshness flag alone: that documented UI snapshot currently contains no usable GPS record. It does not establish the state of every vendor internal GPS/ADAS channel or isolate antenna/fix/parser/publication failure.
+
+Two passive /proc/tty/driver/ms_uart counter reads separated by at least3 seconds showed RX advancing on serial1/2 with no observed overrun increase. No UART was opened, configured or attached, and no payload read. These ports have existing cardv users; byte arrival does not identify the data as GPS, prove a satellite fix or prove ADAS speed delivery. GPS/speed gating remains a leading investigation direction, not a confirmed cause or permission to bypass thresholds.
+
 ## Causality limits and next check
 
 **Do not call the OFF UI explained yet.** Muse v2 documents Android Base64.DEFAULT accepting whitespace; multiline encoding by itself is not a sufficient explanation. Its reported catch fallback is Medium, not Off. Truncated-tail parsing, transport preprocessing, actual phone response and final UI path must be checked against this new fixture. Previous good372-byte/single-line fixture did not exercise this condition.
