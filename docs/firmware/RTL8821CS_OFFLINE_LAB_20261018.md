@@ -102,3 +102,63 @@ ephemeral runner scratch directory. Resolution of the stock `memset`-only
 difference, the legacy WEXT/layout question, vendor ABI, recovery and any
 live test remain open gates. Iteration5 source: commit `4d74218`; workflow
 run [39137457671](https://github.com/vunguyenbv175/C2M/actions/runs/39137457671).
+
+### Iteration5 results and resolution of the `__memzero` question
+
+Run status **ok** (toolchain `arm-linux-gnueabi-gcc (Ubuntu 13.3.0)`,
+both profiles built):
+
+- **Object attribution** (180 objects scanned per profile): exactly **11
+  objects** reference `__memzero`, identical in both profiles — `8821cs.o`,
+  `core/rtw_br_ext.o`, `core/rtw_debug.o`, `core/rtw_xmit.o`,
+  `os_dep/linux/ioctl_cfg80211.o`, `os_dep/linux/ioctl_linux.o`,
+  `os_dep/linux/ioctl_mp.o`, `os_dep/linux/os_intfs.o`,
+  `os_dep/linux/rtw_android.o`, `os_dep/linux/rtw_proc.o`,
+  `os_dep/osdep_service.o`; **39 objects** reference `memset`.
+- **Codegen variant table** (lab flags, `-fno-builtin`,
+  `-fno-builtin-memset`, `-Os`, `-marm`): every variant references `memset`
+  only — none emits `__memzero`. That is the correct control result: the
+  snippet calls the declared function directly and never includes the kernel
+  string header.
+
+**Resolution (source-verified, not suppressed).** Upstream v4.9
+`arch/arm/include/asm/string.h` defines a `memset` macro that routes
+compile-time-constant-zero fills to `__memzero`:
+
+```c
+#define memset(p,v,n)						\
+	({							\
+		void *__p = (p); size_t __n = n;		\
+		if ((__n) != 0) {				\
+			if (__builtin_constant_p((v)) && (v) == 0) \
+				__memzero((__p),(__n));		\
+			else					\
+				memset((__p),(v),(__n));	\
+		}						\
+		(__p);						\
+	})
+```
+
+Inside the kernel build this macro is what every constant-zero
+`memset(ptr, 0, n)` site compiles into the `__memzero` call — which is
+exactly why the kbuild layout probe and those 11 driver objects reference
+it, and why no compiler-flag variant in the table can remove it. The stock
+module references `memset` only even though it certainly contains zero-fill
+sites, and the live vendor kernel exposes no `__memzero` export marker; the
+consistent inference is that the vendor tree compiles drivers without this
+macro (downstream divergence at this header and/or missing export). The
+header bytes were cross-checked independently at `torvalds/linux@v4.9` and
+`gregkh/linux@v4.9.227` (`raw.githubusercontent.com`); local copy sha256
+`4fe916018746d6834e091512d8d0b2fc08a19e13c820401aa3f552455df00482`
+(provenance copy kept outside the repository).
+
+Consequences: (a) the lab must NOT patch or suppress the reference — it is
+faithful upstream behavior; (b) a camera-targeted module cannot be judged
+loadable against the vendor kernel from this reconstruction and would need
+vendor header/export evidence first (NO_LOAD policy unchanged); (c) the
+`__memzero` question is closed as a source-resolution; a future iteration
+should carry this header automatically in the source scan (planned, not yet
+wired).
+
+Remaining open: legacy WEXT/layout difference (`rtw_handlers_def`, `.text`
+delta), vendor ABI, AP-independent recovery, and any live test.
