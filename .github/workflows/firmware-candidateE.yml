@@ -1,7 +1,8 @@
 name: firmware-candidateE
 # MANUAL ONLY. E = D4-debug (EN core; C/D/D3/D4 asset set; owner-authorized
-# AP-only debug SSH service: Dropbear 2026.94 + c2m-debug supervisor +
-# debug_boot.sh + pinned owner Ed25519 pub) PLUS the checked VI oneed_cust
+# AP-only debug SSH service: Dropbear 2026.94 + c2m-debug lifetime-boot
+# supervisor (window 0, no listener deadline) + debug_boot.sh + pinned owner
+# Ed25519 pub) PLUS the checked VI oneed_cust
 # system-audio swap: exactly the 17 /audio wavs whose EN and VI bytes differ
 # are replaced with VI donor bytes (all PCM16/mono/24kHz). Every other oneed
 # file, and every system payload, stays EN. ADAS audio and all C/D/D3/D4/debug
@@ -462,7 +463,10 @@ jobs:
           EOF
       - name: Mandatory debug Dropbear/supervisor build + exact deploy + host gates (GATE)
         run: |
-          # Pinned upstream Dropbear 2026.94 via fw/debug/build_dropbear.sh.
+          # Pinned upstream Dropbear 2026.94 via fw/debug/build_dropbear.sh
+          # --lifetime (lifetime-boot supervisor edition: window 0, no listener
+          # deadline; AP startup still bounded at 60 s and AP loss / SIGTERM /
+          # child exit still stop the owned listener).
           # Never put this group in `if ! (...)`, which disables errexit and
           # can hide build failures. The real owner key bytes never enter logs.
           # Read-only copy of the existing stock glibc-2.30 NSS module. The
@@ -492,8 +496,16 @@ jobs:
           : > work/debug_build.log
           : > work/debug_build_tests.txt
           trap 'cat work/debug_build.log work/debug_build_tests.txt' ERR
-          bash fw/debug/build_dropbear.sh --out work/debug-build --sysroot work/sysroot \
+          bash fw/debug/build_dropbear.sh --out work/debug-build --sysroot work/sysroot --lifetime \
             > work/debug_build.log 2>&1
+          # Supervisor --lifetime edition proof: work/debug-build/reports/
+          # c2m-debug-edition.txt must show lifetime-boot + window_sec=0; the
+          # debug_report below repeats the edition fields.
+          test -f work/debug-build/reports/c2m-debug-edition.txt
+          cat work/debug-build/reports/c2m-debug-edition.txt
+          grep -q 'edition=lifetime-boot' work/debug-build/reports/c2m-debug-edition.txt
+          grep -q 'window_sec=0' work/debug-build/reports/c2m-debug-edition.txt
+          grep -q 'lifetime' work/debug-build/reports/c2m-debug-edition.txt
           (
             set -eu
             # Exact five-file deploy; objects/reports/licenses stay PRIVATE
@@ -556,10 +568,11 @@ jobs:
           find fw/debug -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.py' \) \
             -print0 | sort -z | xargs -0 sha256sum > work/debug_source.sha256
           sha256sum tests/test_debug_supervisor.py tools/fw/test_debug_mutation.py \
-            tools/fw/mutate_customer.py .github/workflows/firmware-candidateD4-debug.yml > work/debug_test_source.sha256
+            tools/fw/mutate_customer.py .github/workflows/firmware-candidateE.yml > work/debug_test_source.sha256
           sha256sum tests/test_debug_ssh.py >> work/debug_test_source.sha256
           cp work/debug-services/debug_boot.sh work/debug_boot.sh
           cp fw/debug/build_dropbear.sh work/debug_build.sh
+          cp work/debug-build/reports/c2m-debug-edition.txt work/debug_edition.txt
           python3 - <<'EOF'
           import hashlib
           import json
@@ -567,6 +580,8 @@ jobs:
           def digest(path):
               return hashlib.sha256(Path(path).read_bytes()).hexdigest()
           owner = json.loads(Path("work/debug_owner.json").read_text())
+          edition = Path("work/debug_edition.txt").read_text()
+          assert "lifetime" in edition and "window_sec=0" in edition, "lifetime edition proof missing"
           report = {
               "build_script_sha256": digest("work/debug_build.sh"),
               "boot_script_sha256": digest("work/debug_boot.sh"),
@@ -578,10 +593,14 @@ jobs:
               "assets_count": 5,
               "dropbear_version": "2026.94",
               "dropbear_tar_sha256": "e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81",
+              "lifetime": True,
+              "lifetime_edition": "boot",
+              "window_sec": 0,
           }
           expected = {"build_script_sha256", "boot_script_sha256", "c2m_debug_sha256",
                       "dropbear_sha256", "dropbearkey_sha256", "debug_owner_sha256",
-                      "assets_count", "dropbear_version", "dropbear_tar_sha256", "nss_module_sha256"}
+                      "assets_count", "dropbear_version", "dropbear_tar_sha256", "nss_module_sha256",
+                      "lifetime", "lifetime_edition", "window_sec"}
           if set(report) != expected:
               raise SystemExit("DEBUG-GATE: report supplemental-data mismatch")
           if report["debug_owner_sha256"] != owner["sha256"]:
@@ -592,6 +611,8 @@ jobs:
               raise SystemExit("DEBUG-GATE: assets count mismatch")
           if report["nss_module_sha256"] != "381a2aa8348259f1722aa09a90c4345a4460a94350d60b1df6782b3dc23ebffd":
               raise SystemExit("DEBUG-GATE: stock NSS module changed")
+          if report["lifetime"] is not True or report["window_sec"] != 0 or report["lifetime_edition"] != "boot":
+              raise SystemExit("DEBUG-GATE: lifetime fields mismatch (want lifetime=true window_sec=0 boot)")
           # Hashes only; never key bytes.
           Path("work/debug_report.json").write_text(json.dumps(report, indent=2) + "\n")
           print(json.dumps(report, sort_keys=True))
@@ -784,7 +805,7 @@ jobs:
             work/d4_boot.sh work/d4_build.sh \
             work/debug_build_tests.txt work/debug_services.sha256 work/debug_source.sha256 \
             work/debug_test_source.sha256 work/debug_report.json \
-            work/debug_boot.sh work/debug_build.sh work/debug_build.log work/debug_owner.json \
+            work/debug_boot.sh work/debug_build.sh work/debug_build.log work/debug_owner.json work/debug_edition.txt \
             work/e_host_tests.txt work/oneed_audio_SHA256SUMS.txt work/oneed_audio_map.json \
             work/oneed_audio_pins.json work/oneed_diff_ci.json work/mutation_oneed.json \
             "$R/BUILD_EVIDENCE/"
@@ -872,12 +893,16 @@ jobs:
           No source records, labels, private IDs or coordinates are public.
 
           ### Owner-authorized AP-only debug SSH (one flash, RAM use after)
-          E inherits the D4-debug owner-authorized AP-only Dropbear SSH debug service
-          for the owner's own camera: bind 192.168.1.1:2222 on wlan0 only,
-          key-only root login with the pinned owner Ed25519 public key
+          E inherits the owner-authorized AP-only Dropbear SSH debug service
+          (lifetime-boot edition, same as the current VI line): bind
+          192.168.1.1:2222 on wlan0 only, key-only root login with the pinned
+          owner Ed25519 public key
           (SHA256 08517bcf7b737d76ff1dcc2c5ef0fc8f2005bf2d12a475f5be606e53a924f36d),
-          no passwords, no forwarding, 120-minute listener window, then the
-          supervisor stops its own listener. The persistent hostkey generates
+          no passwords, no forwarding, NO supervisor window (window_sec=0,
+          status lifetime=boot; serve until boot ends, AP loss, or child exit;
+          AP startup still bounded at 60 s). Idle SSH sessions stay bounded by
+          Dropbear -M600 and the supervisor stops only its OWN listener. The
+          persistent hostkey generates
           on first boot only under the private config dir; later boots reuse
           it. The service starts detached after D3/D4 boot and never edits
           radio, firewall, passwd/shadow/ssh or stock boot files. After one
@@ -1012,6 +1037,7 @@ jobs:
             work/debug_report.json
             work/debug_boot.sh
             work/debug_build.sh
+            work/debug_edition.txt
             work/e_host_tests.txt
             work/oneed_geometry.json
             work/oneed_manifest.json
