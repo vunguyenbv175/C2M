@@ -81,10 +81,10 @@ PINS = {
 # undefined-symbol set is evidence about the reconstructed config only; it is
 # never an ABI-success or load-safety claim.
 # --------------------------------------------------------------------------
-ITERATION = 3
+ITERATION = 4
 
 HYPOTHESIS = {
-    "label": "iteration3-object-accounting",
+    "label": "iteration4-target-no-common",
     "statement": (
         "Enabling DEBUG_KERNEL/DEBUG_SPINLOCK/DEBUG_MUTEXES, explicitly disabling "
         "DEBUG_LOCK_ALLOC/PROVE_LOCKING, selecting CC_STACKPROTECTOR_REGULAR and "
@@ -107,11 +107,12 @@ HYPOTHESIS = {
     "camera_debug_lock_alloc_state": "inferred_not_proven",
     "abi_success_claim": False,
     "evidence_goal": (
-        "SAME CONFIG as run two: add bounded per-profile object/COMMON storage accounting so the "
-        "-fcommon .bss-vs-COMMON split can be compared with the stock .bss effective footprint. "
-        "This is metadata evidence only; it does not change the inferred config and is not an ABI claim."
+        "Same inferred Kconfig as run two; target KCFLAGS now use -fno-common, while host "
+        "tools alone retain -fcommon. Predict zero SHN_COMMON in final modules; build errors "
+        "must surface rather than be hidden. Stock WEXT/layout and __memzero remain unresolved."
     ),
     "config_changed_since_iteration2": False,
+    "target_codegen_changed_since_iteration3": "-fcommon replaced by -fno-common",
 }
 
 # Explicitly forced iteration-2 choices. ``config_state`` reports any that
@@ -728,6 +729,12 @@ def _cmd_module_storage(args) -> int:
     except Exception as exc:  # noqa: BLE001 - surface parse failure honestly, never fake evidence
         print(json.dumps({"status": "error", "profile": args.profile, "error": str(exc)}, indent=2, sort_keys=True))
         return 1
+    common_count = result["summary"]["common_symbol_count"]
+    result["target_common_gate"] = {
+        "passed": common_count == 0,
+        "count": common_count,
+        "reason": "Linux 4.9 simplify_symbols rejects non-LTO SHN_COMMON; no load attempted",
+    }
     if args.out:
         Path(args.out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     summary = {
@@ -740,7 +747,7 @@ def _cmd_module_storage(args) -> int:
         **result["summary"],
     }
     print(json.dumps(summary, indent=2, sort_keys=True))
-    return 0
+    return 0 if common_count == 0 else 1
 
 
 def _cmd_report(args) -> int:

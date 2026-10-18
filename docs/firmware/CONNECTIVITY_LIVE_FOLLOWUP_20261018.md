@@ -96,7 +96,8 @@ No VIF, association, radio-mode change, driver unload/reload, firmware flash or 
 
 ## Next gates
 
-1. Trace the exact module's station-VIF branch and adapter allocation limit against the explicit one-interface report.
-2. Determine whether matching driver/kernel source and configuration are available for a separately reviewed concurrent-driver candidate; generic upstream code is not a flashable replacement.
-3. Determine Bluetooth kernel availability and transport routing without touching cardv-owned UARTs.
-4. No driver/kernel/firmware replacement should be presented as ready before ABI, rollback, AP retention and hardware acceptance checks.
+1. Inspect iteration3 object/COMMON accounting against the stock table; do not infer missing features from .bss size alone.
+2. Resolve the extra `__memzero` dependency against verified vendor source/header evidence; do not suppress unresolved checks or force metadata.
+3. Obtain/validate matching kernel config/generated headers/layout and establish AP-independent recovery before any separately reviewed driver test. The installed adapter-limit trace is complete; no need to attempt forced VIF creation.
+4. Determine Bluetooth kernel availability and transport routing without touching cardv-owned UARTs.
+5. No driver/kernel/firmware replacement should be presented as ready before ABI, rollback, AP retention and hardware acceptance checks.

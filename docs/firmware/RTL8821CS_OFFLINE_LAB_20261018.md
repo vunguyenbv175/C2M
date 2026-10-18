@@ -65,4 +65,14 @@ One research claim was independently rejected before implementation: upstream `a
 
 Stock .bss is28,190 bytes versus iteration2 baseline13,974, a14,216-byte difference. Stock named objects include the4096-byte PHY path, BT-coexist state and efuse arrays. However, the lab's `-fcommon` can keep tentative definitions in SHN_COMMON instead of .bss; comparing .bss section size alone cannot prove those features are absent or that allocated memory shrank by that amount. Proposed iteration3 retains the inferred iteration2 config and adds per-module object/COMMON tables, with interval-union accounting to avoid alias double counting. No compile-option change is justified solely to make a section size match.
 
-The same metadata-only artifact boundary and no-load policy apply; actual result will be recorded after the next run.
+Iteration3 [run39106160974](https://github.com/vunguyenbv175/C2M/actions/runs/39106160974), source `3454cb6`, **passed** in2m43s. Artifact inspection found no config mismatches or failed steps. Baseline SHA-256 `9a05824d39ce49ff540074a98e4f10c26f0407714b69b3a4f86da23bf6945f17`; concurrent `f219be49d3da18cfa954c17f61b71bf54f3fcb0c06c10b729f80786731e5ff88`.
+
+Both modules have38 COMMON objects totaling14,117 bytes, while .bss remains13,974. The large PHY path, efuse and BT-coexist objects are present with stock-matching sizes; absence of those features is therefore disproven as an explanation of the section-size difference. Common total plus named NOBITS union is28,019 bytes, not a finalized memory layout. Every shared named writable object had matching size in the name-based comparison; the sole stock name absent from the lab table is `rtw_handlers_def` (24 bytes). This is evidence to investigate legacy WEXT configuration, not proof of a complete vendor net_device layout.
+
+A further source check found that upstream4.9.227 kernel/module.c simplify_symbols rejects non-LTO SHN_COMMON with `please compile with -fno-common` and -ENOEXEC. Thus the previous target `-fcommon` workaround produced another known load blocker. This does not undo compilation success but prevents treating those modules as deployable. The host-tool workaround must not leak into target modules.
+
+## Iteration4: separate target code generation from host compatibility
+
+Keep inferred Kconfig unchanged; use target KCFLAGS `-fno-common -fno-pie`, retaining `-fcommon` only in HOSTCFLAGS for old host tools. Predict zero COMMON symbols. Add a failing offline gate if any remain while retaining metadata evidence. Link/build failures are reported, never suppressed; no header patch, force-vermagic or live load is involved. WEXT/vendor layout, live-missing `__memzero`, target export checks and independent recovery remain unresolved.
+
+The same metadata-only artifact boundary and no-load policy apply; iteration4 result will be recorded after artifact inspection.

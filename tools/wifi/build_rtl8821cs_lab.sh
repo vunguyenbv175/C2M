@@ -45,7 +45,9 @@ case "$OUT" in -*) usage; exit 2 ;; esac
 LAB_PY=$PWD/tools/wifi/rtl8821cs_lab.py
 PROFILES_DIR=$PWD/tools/wifi/rtl8821cs_profiles
 CROSS=arm-linux-gnueabi-
-KCFLAGS_LAB="-fcommon -fno-pie"
+# Target modules must not retain SHN_COMMON: Linux 4.9 rejects it.
+# Host dtc compatibility is handled separately in HOSTCFLAGS below.
+KCFLAGS_LAB="-fno-common -fno-pie"
 # Keep the distribution HOSTCFLAGS defaults and add -fcommon so GCC-10+
 # -fno-common does not break the bundled host tools (notably scripts/dtc).
 HOSTCFLAGS_LAB="-Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89 -fcommon"

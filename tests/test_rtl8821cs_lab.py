@@ -114,6 +114,12 @@ class ScriptTests(unittest.TestCase):
             result = subprocess.run([bash, "-c", snippet], capture_output=True)
             self.assertEqual(result.returncode, 1, result.stderr)
 
+    def test_target_no_common_is_separate_from_host_workaround(self):
+        raw = _read(SCRIPT)
+        self.assertIn('KCFLAGS_LAB="-fno-common -fno-pie"', raw)
+        self.assertRegex(raw, r'HOSTCFLAGS_LAB="[^"\n]*-fcommon"')
+        self.assertNotIn('KCFLAGS_LAB="-fcommon', raw)
+
     def test_required_tokens(self):
         raw = _read(SCRIPT)
         for token in SCRIPT_TOKENS:
@@ -302,7 +308,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(report["profiles"]["concurrent"]["status"], "absent")
         self.assertEqual(report["identity"]["camera_abi_claim"], "NOT_CAMERA_ABI")
         self.assertFalse(report["identity"]["load_authorized"])
-        self.assertEqual(report["iteration"], 3)
+        self.assertEqual(report["iteration"], 4)
         self.assertEqual(report["hypothesis"]["label"], lab.HYPOTHESIS["label"])
         self.assertFalse(report["hypothesis"]["config_changed_since_iteration2"])
         self.assertFalse(report["hypothesis"]["abi_success_claim"])
@@ -431,7 +437,7 @@ class LayoutProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = lab.layout_probe(Path(tmp) / "probe.o")
         self.assertEqual(result["object"]["status"], "missing")
-        self.assertEqual(result["probe_iteration"], 3)
+        self.assertEqual(result["probe_iteration"], 4)
 
 
 class MemzeroScanTests(unittest.TestCase):
@@ -499,6 +505,25 @@ class ModuleMetadataTests(unittest.TestCase):
 
 
 class ModuleStorageTests(unittest.TestCase):
+    def test_common_gate_rejects_but_preserves_evidence(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        import contextlib
+        import io
+        for count in [0, 1, 38]:
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as tmp:
+                out = Path(tmp) / "storage.json"
+                fake = {"status": "parsed", "profile": "baseline", "sha256": "0" * 64,
+                        "bytes": 4, "bounds": {}, "load_safety": "NOT_ESTABLISHED",
+                        "summary": {"common_symbol_count": count}}
+                args = SimpleNamespace(cmd=None, ko="unused.ko", profile="baseline", out=str(out))
+                with patch.object(lab, "module_storage", return_value=fake), contextlib.redirect_stdout(io.StringIO()):
+                    code = lab._cmd_module_storage(args)
+                saved = json.loads(out.read_text())
+                self.assertEqual(code, 0 if count == 0 else 1)
+                self.assertEqual(saved["target_common_gate"]["passed"], count == 0)
+                self.assertEqual(saved["load_safety"], "NOT_ESTABLISHED")
+
     def test_wiring_labels_without_pyelftools(self):
         import module_storage_report
 
