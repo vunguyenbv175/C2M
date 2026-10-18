@@ -36,13 +36,21 @@ def main() -> int:
     stock = {r["path"]: r for r in json.loads(args.stock.read_text(encoding="utf-8"))["entries"]}
     actual = {r["path"]: r for r in json.loads(args.actual.read_text(encoding="utf-8"))["entries"]}
     mut = json.loads(args.mut.read_text(encoding="utf-8"))
-    added = {a["path"]: a for a in mut["added"]}
+    kind = mut.get("kind", "customer")
+    if kind not in ("customer", "oneed"):
+        raise SystemExit(f"verify_b_manifest: unknown mutation kind {kind!r}")
+    added = {a["path"]: a for a in mut.get("added", [])}
     replaced = mut.get("replaced", {})
-    hook = mut["hook"]
-    new_hook_sha = next(m["new_sha256"] for m in mut["modified"] if m["path"] == hook)
+    if kind == "oneed":
+        # Hook-less kind: only explicit 'replaced' byte swaps are authorized.
+        hook = None
+        new_hook_sha = None
+    else:
+        hook = mut["hook"]
+        new_hook_sha = next(m["new_sha256"] for m in mut["modified"] if m["path"] == hook)
     bad: list[str] = []
     for p, s in stock.items():
-        if p == hook:
+        if hook is not None and p == hook:
             continue
         if p in replaced:
             # Authorized content swap (e.g. wav assets + md5sum.txt): the
@@ -80,11 +88,12 @@ def main() -> int:
         for k in ("type", "mode", "size", "sha256", "uid", "gid"):
             if k in a and r.get(k) != a.get(k):
                 bad.append(f"ADDED-MISMATCH {p} {k}: {a.get(k)!r} -> {r.get(k)!r}")
-    h = actual.get(hook)
-    if h is None:
-        bad.append(f"HOOK-MISSING {hook}")
-    elif h.get("sha256") != new_hook_sha:
-        bad.append(f"HOOK-SHA {hook}: {h.get('sha256')} != {new_hook_sha}")
+    if hook is not None:
+        h = actual.get(hook)
+        if h is None:
+            bad.append(f"HOOK-MISSING {hook}")
+        elif h.get("sha256") != new_hook_sha:
+            bad.append(f"HOOK-SHA {hook}: {h.get('sha256')} != {new_hook_sha}")
     allowed_new = {p for p, r in replaced.items()
                    if r.get("old_sha256") == "(absent-in-image)"}
     for p in sorted(allowed_new):
@@ -98,7 +107,7 @@ def main() -> int:
     if extra:
         bad.append(f"UNEXPECTED-PATHS {sorted(extra)}")
     doc = {"verdict": "OK" if not bad else "BLOCK", "violations": bad,
-           "checked": len(stock), "added": sorted(added), "hook": hook}
+           "kind": kind, "checked": len(stock), "added": sorted(added), "hook": hook}
     if args.out:
         args.out.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     print(json.dumps(doc, indent=2))

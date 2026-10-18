@@ -15,6 +15,14 @@ Authorized differences (everything else must be identical):
          oneed_cust.es only (sizes/offsets consistent with the new layout).
   protected (from --deep-report): cardv + adas SHAs unchanged vs golden.
 
+Candidate E (only with --oneed-mut/--oneed-pins/--oneed-verify): the
+oneed_cust.es payload bytes AND size may also differ, but only when the
+mutate_oneed manifest, the independently pinned swap list and the
+verify_b_manifest report all agree exactly (replaced set == pinned set,
+per-file sha/size pins, verify verdict OK, checked count == stock entries);
+the oneed image must fit its declared 'ubi create oneed_cust' volume and
+the script 'ubi write oneed_cust' size must track the new image exactly.
+
 Usage:
   python3 tools/fw/candidate_diff.py --base EN.json --cand B.json \\
       --deep-report validate_b_deep.json --out diff_report.json
@@ -29,6 +37,8 @@ FATLOAD_RE = re.compile(
     r"fatload\s+mmc\s+\d+\s+0x[0-9a-fA-F]+\s+\$\(SdUpgradeImage\)\s+"
     r"(0x[0-9a-fA-F]+|\d+)\s+(0x[0-9a-fA-F]+|\d+)", re.I)
 UBIWRITE_RE = re.compile(r"ubi\s+write\s+0x[0-9a-fA-F]+\s+(\w+)\s+(0x[0-9a-fA-F]+|\d+)", re.I)
+ONEED_CREATE_RE = re.compile(
+    r"ubi\s+create\s+oneed_cust\s+(0x[0-9a-fA-F]+|\d+)", re.I)
 
 
 def loads_by_section(contract: dict) -> dict:
@@ -44,6 +54,12 @@ def main() -> int:
     ap.add_argument("--cand", type=Path, required=True)
     ap.add_argument("--deep-report", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--oneed-mut", type=Path, default=None,
+                    help="mutate_oneed.py manifest authorizing the oneed_cust swap")
+    ap.add_argument("--oneed-pins", type=Path, default=None,
+                    help="pins JSON: {swaps:[{path,vi_sha256,vi_size}],stock_entries}")
+    ap.add_argument("--oneed-verify", type=Path, default=None,
+                    help="verify_b_manifest.py report for the rebuilt oneed image")
     args = ap.parse_args()
 
     base = json.loads(args.base.read_text(encoding="utf-8"))
@@ -54,6 +70,33 @@ def main() -> int:
 
     def block(msg: str):
         blocks.append(msg)
+
+    oneed_auth = args.oneed_mut is not None
+    if oneed_auth:
+        if args.oneed_pins is None or args.oneed_verify is None:
+            ap.error("--oneed-mut requires --oneed-pins and --oneed-verify")
+        mut = json.loads(args.oneed_mut.read_text(encoding="utf-8"))
+        pins = json.loads(args.oneed_pins.read_text(encoding="utf-8"))
+        ver = json.loads(args.oneed_verify.read_text(encoding="utf-8"))
+        if mut.get("kind") != "oneed":
+            block("oneed mutation kind is not 'oneed'")
+        if ver.get("kind") != "oneed":
+            block("oneed verify report kind is not 'oneed'")
+        if ver.get("verdict") != "OK":
+            block(f"oneed verify verdict is {ver.get('verdict')}")
+        replaced = mut.get("replaced", {})
+        swaps = {s["path"]: s for s in pins.get("swaps", [])}
+        if not swaps or set(replaced) != set(swaps):
+            block("oneed replaced set != pinned swap set")
+        for p, s in swaps.items():
+            r = replaced.get(p, {})
+            if (r.get("new_sha256") != s.get("vi_sha256")
+                    or r.get("new_size") != s.get("vi_size")):
+                block(f"oneed swap pin mismatch: {p}")
+        if (pins.get("stock_entries") is not None
+                and ver.get("checked") != pins["stock_entries"]):
+            block(f"oneed verify checked {ver.get('checked')} != "
+                  f"stock entries {pins['stock_entries']}")
 
     # outer members
     bm = {m["name"]: m for m in base["outer_members"]}
@@ -85,10 +128,21 @@ def main() -> int:
                     delta = c["size"] - b["size"]
                 notes.append(f"customer.es size {b['size']} -> {c['size']} (delta {c['size'] - b['size']})")
             else:
-                if b["sha256"] != c["sha256"]:
-                    block(f"{sec}#{b['load_index']} payload bytes changed (protected)")
-                if b["size"] != c["size"]:
-                    block(f"{sec}#{b['load_index']} size changed")
+                if sec == "oneed_cust.es" and oneed_auth:
+                    if b["sha256"] == c["sha256"]:
+                        block("oneed_cust.es unchanged (expected the E audio mutation)")
+                    cap = ONEED_CREATE_RE.search(cand["upgrade_script_text"])
+                    if cap is None:
+                        block("cand script missing 'ubi create oneed_cust'")
+                    elif c["size"] > int(cap.group(1), 0):
+                        block("oneed_cust.es larger than declared ubi volume size")
+                    notes.append(f"oneed_cust.es size {b['size']} -> {c['size']} "
+                                 "(authorized wav swap)")
+                else:
+                    if b["sha256"] != c["sha256"]:
+                        block(f"{sec}#{b['load_index']} payload bytes changed (protected)")
+                    if b["size"] != c["size"]:
+                        block(f"{sec}#{b['load_index']} size changed")
     if delta is None:
         block("could not establish customer delta")
         delta = 0
@@ -147,6 +201,22 @@ def main() -> int:
             if base_cust_size == cand_cust_size:
                 notes.append("customer.es same size, content-only change "
                              "(fits in existing UBIFS slack)")
+        elif vol == "oneed_cust" and oneed_auth:
+            # Mirror the customer rule: the script ubi-write size must track
+            # the rebuilt oneed image size exactly in both directions.
+            b_oneed = next((r["size"] for r in base["loads"]
+                            if r["section"] == "oneed_cust.es"), None)
+            c_oneed = next((r["size"] for r in cand["loads"]
+                            if r["section"] == "oneed_cust.es"), None)
+            if b_oneed is None or c_oneed is None:
+                block("oneed_cust.es load missing for ubi-write consistency")
+            elif bw[vol] == b_oneed and cw[vol] == c_oneed:
+                notes.append(f"ubi write oneed_cust size {hex(bw[vol])} -> "
+                             f"{hex(cw[vol])} tracked")
+            else:
+                block(f"ubi write oneed_cust size inconsistent: script "
+                      f"{hex(bw[vol])}->{hex(cw[vol])} vs images "
+                      f"{hex(b_oneed)}->{hex(c_oneed)}")
         elif bw[vol] != cw[vol]:
             block(f"ubi write {vol} size changed")
 
@@ -161,7 +231,7 @@ def main() -> int:
 
     verdict = "BLOCK" if blocks else "ALLOWLIST-OK"
     doc = {"verdict": verdict, "blocks": blocks, "notes": notes,
-           "customer_delta": delta,
+           "customer_delta": delta, "oneed_authorized": oneed_auth,
            "base_inner": base["inner_sha256"], "cand_inner": cand["inner_sha256"]}
     args.out.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     print(json.dumps(doc, indent=2))
