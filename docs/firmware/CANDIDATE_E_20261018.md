@@ -60,15 +60,46 @@ played some English system audio.
     the token string `20261016000003` occurs exactly once in the inner image and
     the stock token occurs zero times.
 - **Rollbacks kept locally only** (never staged together with E):
-  `rollback_d5vi_20261016000004` (D5-VI content) and
-  `rollback_d4en_20261016000005` (D4-EN original content); both
-  `ALLOWLIST-OK` version-only.
+  the earlier `rollback_d5vi_20261016000004` (D5-VI content) and
+  `rollback_d4en_20261016000005` (D4-EN original) mintings were deleted when
+  the E2 bundle took token 0004; the current fallback is
+  `rollback_e_20261016000005` (E content, `ALLOWLIST-OK`); D5-VI/D4-EN
+  fallbacks are re-mintable on request with fresh tokens.
+
+## Candidate E2 — post-flash follow-up build (2026-10-18 late)
+
+Owner-approved bundle for the second flash: **E content unchanged + two deltas**:
+1. `c2m-wifi` ancestor fix (`0c53462`) so the controller starts and reports the
+   honest capability verdict instead of `private_paths_or_supplicant_unavailable`.
+2. **Lifetime-boot SSH debug edition**: `build_dropbear.sh --lifetime`
+   (`window_sec=0`, status `lifetime=boot`) — no supervisor deadline, same as
+   the current VI line; AP startup still bounded at 60 s and AP
+   loss/SIGTERM/child exit still stop the owned listener.
+
+- CI `firmware-candidateE.yml` run **39141030235** (main `f257d12`): all green;
+  allowlist diff `ALLOWLIST-OK`, `oneed_authorized=true`, customer delta
+  identical to E (+2793472), stock-token inner sha256 `74f464cc…`;
+  `debug_report.json` proves `lifetime=true, lifetime_edition=boot,
+  window_sec=0` (rebuilt `c2m-debug` `df3edd2e…`).
+- **Private vault**: `deliverables/20261018-e-r39141030235` (commit `6aba707`);
+  all four member sha256 verified against the CI `SHA256SUMS.txt`.
+- **Local version-only preparation**: `20230803193750 → 20261016000004`,
+  verdict `ALLOWLIST-OK`, 4/4 readback; outputs: bin
+  `3654dda9607b17b29beff113cc3fa97507cf87afeaf6daadd915d65f506847cc`,
+  sysVer.txt `cb05b7833bc87a01bf2418dc0bbe837c1a74796bc248c91223a10586675df4f7`,
+  minieye_firmware.md5 `a5c86e8c80b2f946f8bcde795d51516da87cbe00aad258a8a68dc3116f1b4903`,
+  adas_upgrade.sh unchanged `0e18c91f…`; new inner md5 sidecar
+  `466d877c7bb9da71fc33e46196729cc7`. Deep validation of the minted tar
+  **VALID (33 checks)**; minted tar sha256 `fbb7450f…`.
 
 ## Tokens
 
-`20261015000001` installed D4-debug · `20261016000001` D5-VI (current on camera)
-· `20261016000002` D4-EN rollback (prepared, unused) · **`20261016000003`
-Candidate E (staged, to flash)** · `20261016000004`/`0005` local rollbacks.
+`20261015000001` installed D4-debug · `20261016000001` D5-VI ·
+`20261016000002` D4-EN rollback (prepared, unused) · `20261016000003`
+Candidate E (flashed, verified) · **`20261016000004` Candidate E2 (to flash)**
+· `20261016000005` rollback to E content (local only; the obsolete
+D5-VI/D4-EN mintings of 0004/0005 were deleted and are re-mintable on
+request).
 
 ## Owner acceptance checklist (separate from CI; not hardware-proven here)
 
@@ -79,7 +110,8 @@ Candidate E (staged, to flash)** · `20261016000004`/`0005` local rollbacks.
    (card insert/remove, format, record start/stop, Wi-Fi, low-card, video lock);
    ADAS warnings as before; FCW/HMW on a drive (unchanged EN core).
 3. If anything regresses, report it; the matching rollback package can be
-   staged on request (0004 → D5-VI, 0005 → D4-EN original).
+   staged on request (0005 → back to the current E content; D5-VI/D4-EN
+   fallbacks re-mintable with fresh tokens).
 
 ## Repo changes enabling E
 
