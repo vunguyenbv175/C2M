@@ -12,6 +12,7 @@ Source pin and hashes: [source provenance](RTL8821CS_SOURCE_PROVENANCE_20261018.
 |---|---|---|---|
 | baseline | absent | 1 | Compare selected observed features against current driver |
 | concurrent | enabled | 2 | Separate research profile for same-channel AP+STA |
+| wext | absent | 1 | Iteration-6 legacy-WEXT gate emulation (driver-side `-DCONFIG_WIRELESS_EXT` only; added 2026-10-19) |
 
 Both disable the downloaded source's default RK3188 platform block, which would otherwise inject Rockchip/Android and concurrency flags. The replacement C2M profile explicitly selects little-endian cfg80211/STA events. It must not inherit a Rockchip shutdown path on the SigmaStar board.
 

@@ -67,7 +67,7 @@ PINS = {
             "include/autoconf.h": "7470f2b517425fc27955e607b215242ea3796d105d0d1e172102152a139aa6d6",
         },
     },
-    "profiles": ["baseline", "concurrent"],
+    "profiles": ["baseline", "wext", "concurrent"],
     "claim": {
         "camera_abi_claim": "NOT_CAMERA_ABI",
         "load_authorized": False,
@@ -82,34 +82,59 @@ PINS = {
 # research choices, NOT a reproduction of any camera configuration. A matching
 # undefined-symbol set is evidence about the reconstructed config only; it is
 # never an ABI-success or load-safety claim.
+#
+# Iteration 6 keeps that reconstructed kernel config unchanged and tests a
+# driver-side build-time difference instead: the vendor legacy-WEXT gate.
 # --------------------------------------------------------------------------
-ITERATION = 5
+ITERATION = 6
 
 HYPOTHESIS = {
-    "label": "iteration5-memzero-attribution",
+    "label": "iteration6-legacy-wext-gate",
     "statement": (
-        "The extra __memzero undefined reference (the stock module has memset only) "
-        "can be attributed to exact driver translation units, and its emission is "
-        "controlled by specific target codegen flag choices in the pinned host "
-        "cross toolchain; no Kconfig or driver source changes in this iteration."
+        "The stock module's sole stock-only named writable object rtw_handlers_def "
+        "(24 bytes) is emitted because the vendor build defined the legacy "
+        "CONFIG_WIRELESS_EXT macro for the driver translation units (the driver "
+        "itself injects -DCONFIG_WIRELESS_EXT in its CONFIG_PLATFORM_RTK_DMP "
+        "block; osdep_service_linux.h derives it only from CONFIG_NET_RADIO, "
+        "which the pinned 4.9 config cannot enable). A third profile that adds "
+        "only that driver-side define will emit the object and quantify how much "
+        "of the recorded stock section-size difference the legacy-WEXT code "
+        "explains. No kernel config, driver source or load change."
     ),
     "config_changes": [],
     "prediction": (
-        "constant-zero memset emits __memzero under the lab target flags; the "
-        "variant table shows which flag choices remove it; object attribution "
-        "localizes every reference in both profiles"
+        "the wext profile emits a 24-byte rtw_handlers_def writable object plus "
+        "the WEXT-gated stats/table/assignment code; the in-run wext-minus-"
+        "baseline section delta is far smaller than the recorded 58,388-byte "
+        "stock .text gap, so legacy WEXT explains the named object, not the "
+        ".text difference; undefined-symbol changes are recorded honestly"
     ),
     "camera_debug_lock_alloc_state": "inferred_not_proven",
     "abi_success_claim": False,
     "evidence_goal": (
-        "object-level attribution (which .o files reference __memzero and/or memset) plus a "
-        "compile-only codegen variant table isolating toolchain flag effects; the stock "
-        "WEXT/layout difference, vendor ABI, recovery and any live test remain unresolved"
+        "third driver-flag profile (wext) with in-run baseline control, plus a "
+        "compile-only WEXT-define layout probe measuring sizeof(struct net_device), "
+        "sizeof(struct iw_handler_def) and the net_device wireless-field offsets; "
+        "vendor ABI, load safety, AP-independent recovery and any live test remain "
+        "unresolved"
     ),
     "config_changed_since_iteration2": False,
     "target_codegen_changed_since_iteration3": "-fcommon replaced by -fno-common (iteration 4; unchanged)",
-    "build_change_since_iteration4": "none: iteration 5 adds metadata evidence only",
-    "iteration5_scope": "attribution + flag-variant measurement; no codegen/config change, no load",
+    "build_change_since_iteration5": "adds the wext profile (driver-side -DCONFIG_WIRELESS_EXT) and the WEXT layout probe; baseline/concurrent codegen and the kernel config are unchanged",
+    "iteration6_scope": "driver-flag gate reproduction + layout delta measurement; no kernel config change, no source patch, no load",
+}
+
+# Recorded stock-module reference facts from the bounded private read-only
+# hardware analysis (only aggregate numbers, already published in the docs).
+# These anchors make the iteration-6 report self-describing; they are never an
+# ABI or load-safety claim.
+STOCK_REFERENCE = {
+    "module_sha256": "81323242c6fa1e60296921395063a2124ed2a8af330ac5568cfa5e20d80734cc",
+    "module_bytes": 2899872,
+    "undefined_symbol_count": 219,
+    "sole_missing_named_writable_object": {"name": "rtw_handlers_def", "size_bytes": 24},
+    "iteration4_baseline_text_delta_bytes": 58388,
+    "source": "docs/firmware/RTL8821CS_OFFLINE_LAB_20261018.md (iterations 2-5) and docs/firmware/RTL8821CS_CONCURRENCY_STATIC_20261016.md",
 }
 
 # Explicitly forced iteration-2 choices. ``config_state`` reports any that
@@ -554,6 +579,8 @@ def layout_probe(obj_path: Path, ksrc: Path | None = None) -> dict:
 def _profile_role(profile: str) -> str:
     if profile == "baseline":
         return "reconstructed_upstream_armv7_thumb2_single_vif"
+    if profile == "wext":
+        return "reconstructed_upstream_armv7_thumb2_single_vif_plus_legacy_wext_gate"
     if profile == "concurrent":
         return "reconstructed_upstream_armv7_thumb2_same_channel_two_vif"
     return "unknown_profile"
@@ -624,6 +651,69 @@ def _read_steps(step_file: Path) -> list:
         detail = parts[2] if len(parts) > 2 else ""
         steps.append({"step": name, "status": status, "detail": detail})
     return steps
+
+
+def _wext_experiment(out_dir: Path) -> "dict | None":
+    """Assemble the iteration-6 wext-vs-baseline comparison from bounded artifacts.
+
+    Pure metadata assembly: reads only the already-written per-profile metadata
+    and storage JSONs. Missing artifacts produce ``None`` (the caller then
+    leaves the report without the block); parse problems are surfaced honestly.
+    """
+    baseline_file = out_dir / "baseline.metadata.json"
+    wext_file = out_dir / "wext.metadata.json"
+    if not (baseline_file.is_file() and wext_file.is_file()):
+        return None
+    try:
+        baseline = json.loads(baseline_file.read_text(encoding="utf-8"))
+        wext = json.loads(wext_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"error": str(exc)}
+    baseline_elf = baseline.get("elf", {})
+    wext_elf = wext.get("elf", {})
+    baseline_sections = {k: int(v) for k, v in baseline_elf.get("section_bytes", {}).items()}
+    wext_sections = {k: int(v) for k, v in wext_elf.get("section_bytes", {}).items()}
+    section_delta = {
+        key: wext_sections.get(key, 0) - baseline_sections.get(key, 0)
+        for key in sorted(set(baseline_sections) | set(wext_sections))
+    }
+    baseline_undefined = set(baseline_elf.get("undefined_symbols", []))
+    wext_undefined = set(wext_elf.get("undefined_symbols", []))
+    handlers = None
+    truncated = None
+    storage_file = out_dir / "wext.storage.json"
+    if storage_file.is_file():
+        try:
+            storage = json.loads(storage_file.read_text(encoding="utf-8"))
+            truncated = bool(storage.get("bounds", {}).get("truncated", False))
+            handlers = next(
+                (item for item in storage.get("objects", []) if item.get("name") == "rtw_handlers_def"),
+                None,
+            )
+        except (OSError, ValueError):
+            handlers = None
+    text_delta = section_delta.get(".text")
+    recorded_gap = STOCK_REFERENCE["iteration4_baseline_text_delta_bytes"]
+    return {
+        "purpose": "iteration-6 driver-side legacy-WEXT gate emulation; no kernel config change",
+        "section_delta_wext_minus_baseline": section_delta,
+        "undefined_symbols_added": sorted(wext_undefined - baseline_undefined),
+        "undefined_symbols_removed": sorted(baseline_undefined - wext_undefined),
+        "rtw_handlers_def": {
+            "present": handlers is not None,
+            "size_bytes": handlers.get("size") if handlers else None,
+            "section": handlers.get("section") if handlers else None,
+            "stock_size_bytes": STOCK_REFERENCE["sole_missing_named_writable_object"]["size_bytes"],
+            "storage_table_truncated": truncated,
+        },
+        "stock_reference": STOCK_REFERENCE,
+        "stock_text_gap_remaining_bytes": None if text_delta is None else recorded_gap - text_delta,
+        "notes": [
+            "the wext profile differs from baseline only by the driver-side -DCONFIG_WIRELESS_EXT define (tools/wifi/rtl8821cs_profiles/wext)",
+            "the recorded stock .text gap predates the baseline codegen that is unchanged since iteration 4; the remaining-bytes figure assumes that continuity",
+            "matching the named object is not an ABI or load-safety result; the NO_LOAD policy is unchanged",
+        ],
+    }
 
 
 def build_report(out_dir: Path, exit_code: int) -> dict:
@@ -751,6 +841,12 @@ def build_report(out_dir: Path, exit_code: int) -> dict:
             }
         except (OSError, ValueError) as exc:
             report["memzero_probe_error"] = str(exc)
+    wext_layout = out_dir / "layout-probe-wext.json"
+    if wext_layout.is_file():
+        report["layout_probe_wext"] = json.loads(wext_layout.read_text(encoding="utf-8"))
+    wext_experiment = _wext_experiment(out_dir)
+    if wext_experiment is not None:
+        report["wext_experiment"] = wext_experiment
     if "hypothesis" not in report:
         report["hypothesis"] = {**HYPOTHESIS, "config_choices_forced": dict(STICKY_KCONFIG), "config_choices_ok": None, "config_choices_mismatch": []}
 

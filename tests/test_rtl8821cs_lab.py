@@ -53,6 +53,10 @@ SCRIPT_TOKENS = (
     "config-sticky",
     "layout-probe.json",
     "layout-probe.log",
+    "layout-probe-wext.json",
+    "layout-probe-wext.log",
+    "build_profile wext",
+    "-DCONFIG_WIRELESS_EXT",
     "probe.o",
     'M="$PROBEDIR"',
     "NO LOAD, EVER",
@@ -175,6 +179,22 @@ class ProfileTests(unittest.TestCase):
         raw = _read(PROFILES / "concurrent" / "Makefile.patch")
         self.assertIn("CONFIG_PLATFORM_C2M = y", raw)
         self.assertIn("EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE", raw)
+
+    def test_wext_legacy_gate_profile(self):
+        raw = _read(PROFILES / "wext" / "Makefile.patch")
+        self.assertIn("CONFIG_PLATFORM_C2M = y", raw)
+        self.assertIn("EXTRA_CFLAGS += -DCONFIG_WIRELESS_EXT", raw)
+        # The wext profile emulates only the vendor legacy-WEXT gate: it must
+        # not add the concurrency flag.
+        self.assertNotIn("EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE", raw)
+
+    def test_wext_layout_flag_only_in_script_probe(self):
+        raw = _read(SCRIPT)
+        self.assertIn("-DCONFIG_WIRELESS_EXT", raw)
+        # Kernel-config reconstruction must remain unchanged: the iteration-6
+        # gate emulation is a driver-side define only.
+        self.assertNotIn("CONFIG_NET_RADIO", lab.EXPECTED_KCONFIG)
+        self.assertNotIn("CONFIG_WIRELESS_EXT", lab.EXPECTED_KCONFIG)
 
 
 class CliTests(unittest.TestCase):
@@ -313,7 +333,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(report["profiles"]["concurrent"]["status"], "absent")
         self.assertEqual(report["identity"]["camera_abi_claim"], "NOT_CAMERA_ABI")
         self.assertFalse(report["identity"]["load_authorized"])
-        self.assertEqual(report["iteration"], 5)
+        self.assertEqual(report["iteration"], 6)
         self.assertEqual(report["hypothesis"]["label"], lab.HYPOTHESIS["label"])
         self.assertFalse(report["hypothesis"]["config_changed_since_iteration2"])
         self.assertFalse(report["hypothesis"]["abi_success_claim"])
@@ -370,6 +390,59 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(entry["storage_summary"]["summary"]["common_total_bytes"], 128)
         self.assertEqual(entry["storage_summary"]["load_safety"], "NOT_ESTABLISHED")
         self.assertNotIn("storage_summary", report["profiles"]["concurrent"])
+
+    def test_report_wext_experiment_block(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "steps.tsv").write_text("build-baseline\tok\tok\nbuild-wext\tok\tok\n", encoding="utf-8")
+            (out / "baseline.metadata.json").write_text(
+                json.dumps(
+                    {
+                        "profile": "baseline",
+                        "elf": {"section_bytes": {".text": 1000, ".data": 100}, "undefined_symbols": ["memset", "__memzero"]},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (out / "wext.metadata.json").write_text(
+                json.dumps(
+                    {
+                        "profile": "wext",
+                        "elf": {"section_bytes": {".text": 1300, ".data": 124}, "undefined_symbols": ["memset", "__memzero", "wireless_send_event"]},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (out / "wext.storage.json").write_text(
+                json.dumps({"bounds": {"truncated": False}, "objects": [{"name": "rtw_handlers_def", "size": 24, "section": ".data"}]}),
+                encoding="utf-8",
+            )
+            (out / "layout-probe-wext.json").write_text(
+                json.dumps({"probe_iteration": 6, "object": {"status": "parsed", "struct_sizes": {"iw_handler_def": 24}}}),
+                encoding="utf-8",
+            )
+            report = lab.build_report(out, 0)
+        experiment = report["wext_experiment"]
+        self.assertEqual(experiment["section_delta_wext_minus_baseline"][".text"], 300)
+        self.assertEqual(experiment["section_delta_wext_minus_baseline"][".data"], 24)
+        self.assertEqual(experiment["undefined_symbols_added"], ["wireless_send_event"])
+        self.assertEqual(experiment["undefined_symbols_removed"], [])
+        self.assertEqual(experiment["rtw_handlers_def"]["present"], True)
+        self.assertEqual(experiment["rtw_handlers_def"]["size_bytes"], 24)
+        self.assertEqual(experiment["rtw_handlers_def"]["stock_size_bytes"], 24)
+        self.assertEqual(experiment["rtw_handlers_def"]["storage_table_truncated"], False)
+        expected_remaining = lab.STOCK_REFERENCE["iteration4_baseline_text_delta_bytes"] - 300
+        self.assertEqual(experiment["stock_text_gap_remaining_bytes"], expected_remaining)
+        self.assertEqual(experiment["stock_reference"], lab.STOCK_REFERENCE)
+        self.assertEqual(report["layout_probe_wext"]["object"]["struct_sizes"]["iw_handler_def"], 24)
+
+    def test_report_wext_experiment_absent_without_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "steps.tsv").write_text("build-baseline\tok\tok\n", encoding="utf-8")
+            report = lab.build_report(out, 0)
+        self.assertNotIn("wext_experiment", report)
+        self.assertNotIn("layout_probe_wext", report)
 
 
 class LayoutProbeTests(unittest.TestCase):
@@ -442,7 +515,7 @@ class LayoutProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = lab.layout_probe(Path(tmp) / "probe.o")
         self.assertEqual(result["object"]["status"], "missing")
-        self.assertEqual(result["probe_iteration"], 5)
+        self.assertEqual(result["probe_iteration"], 6)
 
 
 class MemzeroScanTests(unittest.TestCase):

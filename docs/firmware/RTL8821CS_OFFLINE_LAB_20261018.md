@@ -162,3 +162,45 @@ wired).
 
 Remaining open: legacy WEXT/layout difference (`rtw_handlers_def`, `.text`
 delta), vendor ABI, AP-independent recovery, and any live test.
+
+## Iteration6: legacy-WEXT gate reproduction (recorded before execution)
+
+Iteration6 keeps the reconstructed kernel config and target flags unchanged
+from iteration4/5 and adds a third driver-build profile (`wext`) that applies
+exactly one driver-side change: `EXTRA_CFLAGS += -DCONFIG_WIRELESS_EXT`
+(`tools/wifi/rtl8821cs_profiles/wext/Makefile.patch`).
+
+Source-verified mechanism. The stock module's only stock-only named writable
+object is `rtw_handlers_def` (24 bytes, iteration3). In the pinned public
+source that object is gated by `CONFIG_WIRELESS_EXT` in
+`os_dep/linux/ioctl_linux.c:12577-12647` with the `pnetdev->wireless_handlers`
+assignment in `os_dep/linux/os_intfs.c:2007-2009`; the driver derives the
+macro itself only from `CONFIG_NET_RADIO`
+(`include/osdep_service_linux.h:80-82`), which the pinned unmodified v4.9.227
+Kconfig resolves to `n` (promptless `WIRELESS_EXT`, no select), and the
+driver also injects `-DCONFIG_WIRELESS_EXT` directly in its
+`CONFIG_PLATFORM_RTK_DMP` block (`Makefile:1590`). A driver-side define is
+therefore the faithful lab lever: no kernel config is forced just to make a
+section size match.
+
+Measurements (all metadata-only, NO_LOAD policy unchanged):
+
+1. `wext` profile module metadata/storage next to the unchanged baseline and
+   concurrent profiles from the same run, determining whether a 24-byte
+   `rtw_handlers_def` writable object appears (the stock-only name) and the
+   exact wext-minus-baseline `.text`/`.rodata`/`.data`/`.bss` deltas
+   (in-run control for the driver-flag effect).
+2. Undefined-symbol comparison (wext vs baseline): any added/removed kernel
+   references are recorded, not suppressed.
+3. A second compile-only layout probe object compiled with
+   `-DCONFIG_WIRELESS_EXT` recording `sizeof(struct net_device)`,
+   `sizeof(struct iw_handler_def)` and the `net_device`
+   `wireless_handlers`/`wireless_data` offsets
+   (`layout-probe-wext.json`), plus `sizeof(struct net_device)` under the
+   unchanged reconstructed config in the existing probe.
+
+Prediction: the named-object gap closes (24-byte `rtw_handlers_def`), while
+the wext code adds far less machine code than the 58,388-byte stock `.text`
+gap recorded in iteration4 — legacy WEXT explains the named object, not the
+`.text` delta; the remaining `.text` difference points at downstream vendor
+source and/or toolchain codegen and stays open.

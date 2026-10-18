@@ -40,7 +40,7 @@ jobs:
           python3 tools/fw/test_module_storage_report.py
           python3 tests/test_d3_dhcp_lease.py
           python3 fw/diag/test_diag_contract.py
-      - name: Build research baseline and concurrent variants
+      - name: Build research baseline, legacy-WEXT and concurrent variants
         run: |
           bash tools/wifi/build_rtl8821cs_lab.sh "$RUNNER_TEMP/c2m-rtl-lab"
       - name: Validate bounded metadata evidence
@@ -61,12 +61,22 @@ jobs:
           assert data['identity']['load_authorized'] is False
           assert data['identity']['load_policy'] == 'NO_LOAD_EVER_FROM_THIS_LAB'
           if data.get('status') == 'ok':
-              for profile in ['baseline', 'concurrent']:
+              for profile in ['baseline', 'wext', 'concurrent']:
                   assert (root / (profile + '.metadata.json')).is_file()
                   assert (root / (profile + '.storage.json')).is_file()
                   assert (root / (profile + '.memzero-attribution.json')).is_file()
               assert (root / 'memzero-probe.json').is_file()
-          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log', 'baseline.storage.json', 'concurrent.storage.json', 'memzero-probe.json', 'memzero-probe.log', 'baseline.memzero-attribution.json', 'concurrent.memzero-attribution.json']:
+              assert (root / 'layout-probe-wext.json').is_file()
+              wext_storage = json.loads((root / 'wext.storage.json').read_text())
+              assert not wext_storage.get('bounds', {}).get('truncated'), 'wext storage table unexpectedly truncated'
+              handlers = [obj for obj in wext_storage.get('objects', []) if obj.get('name') == 'rtw_handlers_def']
+              assert len(handlers) == 1 and handlers[0].get('size') == 24, 'wext profile must emit the 24-byte rtw_handlers_def object'
+              experiment = data.get('wext_experiment') or {}
+              assert experiment.get('rtw_handlers_def', {}).get('present') is True, 'report must record the wext rtw_handlers_def'
+              print('wext-vs-baseline section delta:', experiment.get('section_delta_wext_minus_baseline'))
+              print('wext undefined added:', experiment.get('undefined_symbols_added'))
+              print('stock .text gap remaining after wext:', experiment.get('stock_text_gap_remaining_bytes'))
+          for name in ['report.json', 'baseline.metadata.json', 'wext.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-wext.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log', 'layout-probe-wext.json', 'layout-probe-wext.log', 'baseline.storage.json', 'wext.storage.json', 'concurrent.storage.json', 'memzero-probe.json', 'memzero-probe.log', 'baseline.memzero-attribution.json', 'wext.memzero-attribution.json', 'concurrent.memzero-attribution.json']:
               p = root / name
               if p.exists():
                   assert p.is_file() and not p.is_symlink(), name
@@ -84,16 +94,22 @@ jobs:
           path: |
             ${{ runner.temp }}/c2m-rtl-lab/report.json
             ${{ runner.temp }}/c2m-rtl-lab/baseline.metadata.json
+            ${{ runner.temp }}/c2m-rtl-lab/wext.metadata.json
             ${{ runner.temp }}/c2m-rtl-lab/concurrent.metadata.json
             ${{ runner.temp }}/c2m-rtl-lab/build-baseline.log
+            ${{ runner.temp }}/c2m-rtl-lab/build-wext.log
             ${{ runner.temp }}/c2m-rtl-lab/build-concurrent.log
             ${{ runner.temp }}/c2m-rtl-lab/kernel-prepare.log
             ${{ runner.temp }}/c2m-rtl-lab/toolchain.txt
             ${{ runner.temp }}/c2m-rtl-lab/layout-probe.json
             ${{ runner.temp }}/c2m-rtl-lab/layout-probe.log
+            ${{ runner.temp }}/c2m-rtl-lab/layout-probe-wext.json
+            ${{ runner.temp }}/c2m-rtl-lab/layout-probe-wext.log
             ${{ runner.temp }}/c2m-rtl-lab/baseline.storage.json
+            ${{ runner.temp }}/c2m-rtl-lab/wext.storage.json
             ${{ runner.temp }}/c2m-rtl-lab/concurrent.storage.json
             ${{ runner.temp }}/c2m-rtl-lab/memzero-probe.json
             ${{ runner.temp }}/c2m-rtl-lab/memzero-probe.log
             ${{ runner.temp }}/c2m-rtl-lab/baseline.memzero-attribution.json
+            ${{ runner.temp }}/c2m-rtl-lab/wext.memzero-attribution.json
             ${{ runner.temp }}/c2m-rtl-lab/concurrent.memzero-attribution.json
