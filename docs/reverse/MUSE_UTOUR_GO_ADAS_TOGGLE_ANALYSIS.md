@@ -1,6 +1,7 @@
 # Phân tích: UTOUR GO hiển thị cảnh báo ADAS tắt sau khi mở lại trang
 
-Ngày: 2026-10-18. Nối tiếp `MUSE_UTOUR_GO_ADAS_TOGGLE_HANDOFF_20261018.md`.
+Ngày: 2026-10-18 (bản sửa đổi 2 — rút lại root cause v1 sau dữ liệu live mới).
+Nối tiếp `MUSE_UTOUR_GO_ADAS_TOGGLE_HANDOFF_20261018.md`.
 Phạm vi: **chỉ nhánh Android c2**, phân tích tĩnh APK, không gọi setter/reset/hiệu chuẩn/license trên camera.
 
 ## 0. APK đang phân tích (fingerprint)
@@ -13,193 +14,136 @@ Phạm vi: **chỉ nhánh Android c2**, phân tích tĩnh APK, không gọi sett
 | Dex chứa code c2 ADAS | `classes.dex` |
 | Obfuscation | không đáng kể |
 
-**Giới hạn:** chưa xác nhận đây là bản đang cài trên điện thoại của chủ máy (bàn giao ghi "chưa biết phiên bản hiện tại").
-Mọi class/method dưới đây đã verify trực tiếp trong dex.
+**Giới hạn:** chưa xác nhận đây là bản đang cài trên điện thoại của chủ máy.
 
-## 1. Kết luận: ROOT CAUSE (CONFIRMED)
+## 1. Rút lại kết luận v1 (RETRACTED)
 
-**Lỗi bất đối xứng định dạng key giữa đường ghi và đường đọc của app, trong khi firmware chuẩn hoá về key trần.**
+Bản v1 của báo cáo này kết luận: firmware chuẩn hoá key về dạng trần (bỏ `--`),
+trong khi parser app tra key `--enable_fcw` → null → false → UI toàn OFF.
 
-- **Đường ghi (save):** app serialize config với key có prefix `--`
-  (`AdasFlag.toString()` → `--enable_fcw=true\n--fcw_level=3\n…`) → base64 → `action=set&property=ADAS.config`.
-- **Firmware lưu/trả về key trần** (không `--`): bằng chứng live từ bàn giao —
-  `adas_de.flag` giải mã và `GET ADAS.config` qua HTTP đều là `enable_fcw=true`, `fcw_level=3`.
-- **Đường đọc (mở lại trang):** parser `toAdasBean` dựng map từ key trần,
-  nhưng tra cứu bằng key `--enable_fcw` → `map.get()` trả **null** →
-  `Boolean.parseBoolean(null)` = **false** cho mọi `enable_*` →
-  `bean.<warning> = enable ? level : 0` = **0** →
-  UI `adasFormatString(0)` → `R.string.close` → hiển thị **"tắt"** cho tất cả.
+**Tiền đề này SAI.** Dữ liệu live đọc lại ngày 2026-10-18 cho thấy sau giải mã base64:
+19/19 dòng **vẫn có tiền tố `--`** (`--enable_fcw=true`, `--fcw_level=3`,
+`--enable_hmw=true`, `--hmw_level=3`), 0 dòng key trần. Bảng key ở bàn giao §2.3
+là dạng rút gọn minh hoạ, không phải raw payload.
 
-Camera **không hề mất cấu hình** (FCW/HMW vẫn true/3 trong file và API).
-Lỗi hoàn toàn nằm ở parser readback phía app.
+Do đó chuỗi "firmware chuẩn hoá key trần → lookup --key thất bại" **chưa được chứng minh
+và hiện bị bằng chứng live bác bỏ**. Không triển khai patch thêm alias key.
 
-## 2. Call chain đầy đủ
+## 2. Kiểm chứng code dựng map (theo yêu cầu §1)
 
-### 2.1. Mở lại trang (reopen → readback → parser → UI OFF)
+`AdasConverter$Companion.toAdasBean(String):AdasBean`, `classes.dex`, `method_idx=41461`,
+507 instructions. Đoạn dựng map (ins 80–117), trích nguyên văn:
 
 ```
-AdasSettingActivity.parseIntent()
-  → AdasSettingActivity.getAdasSettings()
-    → AdasSettingViewModel.getAdasSettings()
-      → AdasSettingRepository.getSettings()
-        → AdasSettingRepository.get("*")
-          map = {action="get", property="ADAS.config", VersionPrototal="1.0.1"}
-          → SettingApi.config(map)
-            → GET http://192.168.1.1/cgi-bin/Config.cgi?action=get&property=ADAS.config&VersionPrototal=1.0.1
-            → HTTP 200, body = "0\nOK\nADAS.config=<base64>"
-        → AdasSettingRepository.parseResponse(response)
-            body.split("\n") → List ["0","OK","ADAS.config=<base64>"]   // Response.success(code, list)
-      → AdasSettingViewModel$getAdasSettings$1.invokeSuspend
-        → bodyToAdasBean(list): tìm dòng contains "ADAS.config="
-        → AdasConverter$Companion.toAdasBean(line)
-            split("ADAS.config=")[1]                    // base64
-            .replace('$', '=')                          // fix padding
-            Base64Util.decode → UTF-8 → trim → split("\n")
-            split("=") → map.put("enable_fcw","true")   // KEY TRẦN
-            ...
-            map.get("--enable_fcw")  → null  → parseBoolean → false   // ← BUG
-            map.get("--fcw_level")   → null  → default "1" → 1
-            bean.fcw = false ? 1 : 0  → 0
-            (tương tự hmw/ldw/pcw/sag/ufcw → 0)
-        → getAdasSettingsLiveData.setValue(bean)        // bean toàn 0
-    → observer (viewModelInit) → parseGetAdasSettingsLiveData(bean)
-        fcwShowText.setText(adasFormatString(0)) → R.string.close → "tắt"
-        (hmw/ldw/pcw/sag/ufcw tương tự; switchTsr.setChecked(bean.tsrEnable=false))
+80  iterator = lines.iterator()
+85  line = iterator.next()                          // v5, vd "--enable_fcw=true"
+91  filled-new-array v3, [String]                   // v3 = "=" (ins 3)
+97  split(line, ["="]) -> v10                       // ["--enable_fcw","true"]
+99  key = v10.get(0)                                // "--enable_fcw", NGUYÊN VĂN
+113 value = v5.get(1)                               // "true" (v5 = split lại dòng)
+116 map.put(key, value)
+117 goto loop
 ```
 
-Nhánh lỗi dự phòng: nếu `isSuccessful()==false` hoặc exception,
-`defaultAdasBean()` được dùng (C2M → `AdasBean(2,2,2,2,2,2,0,"Small","same",false)`),
-cũng hiển thị tắt — nhưng đây **không** phải đường đã kích hoạt trong case này
-(response 200 OK, parse "thành công" ra toàn false).
+**Không có** `removePrefix`, `substring`, `replace` hay bất kỳ thao tác nào bỏ `--`
+trên key trong toàn bộ 507 instructions (đã quét toàn method).
+`split("=")` tự nó không bỏ `--`. Key được dùng **verbatim**.
 
-### 2.2. Lưu cấu hình (save — hoạt động đúng)
+Các lookup sau đó (ins ~118–395) đều dùng key `--`-prefixed:
+`--enable_vehicle`, `--enable_ufcw`/`--ufcw_level`, `--enable_sag`/`--sag_level`,
+`--enable_hmw`/`--hmw_level`, `--headway_warning_speed_thresh`,
+`--enable_fcw`/`--fcw_level`, `--enable_ldw`/`--ldw_level`/`--ldw_speed_start`,
+`--enable_pcw`/`--pcw_level`, `--vehicle_width`, `--left_vehicle_edge_dist`,
+`--right_vehicle_edge_dist`, `--license_sn`.
+
+**Kết luận:** với payload live (`--`-prefixed), mọi lookup đều HIT. Parser đúng.
+
+## 3. Tái hiện offline bằng logic trích đúng từ APK (theo yêu cầu §2)
+
+Script: logic sao chép 1:1 từ smali (`split("ADAS.config=")[1]` → `replace('$','=')` →
+`Base64.decode(DEFAULT)` → UTF-8 → `trim()` → `split("\n")` → `split("=")` → map verbatim →
+lookup `--`-key → `parseBoolean` → `bean.x = enable_x ? level : 0`).
+
+Fixture: response `0\nOK\nADAS.config=<base64>`, decoded 19 dòng
+(`--enable_fcw=true`, `--fcw_level=3`, `--enable_hmw=true`, `--hmw_level=3`,
+các mục khác false/0, thiếu 5 key TSR như live), cộng bản đối chứng key trần.
+
+| Fixture | Map keys | Bean | UI hiển thị |
+|---|---|---|---|
+| PREFIXED (`--`, đúng format live) | 19 key `--…` | fcw=3, hmw=3, còn lại 0 | FCW=high, HMW=high, còn lại close — **ĐÚNG** |
+| BARE (không `--`) | 19 key trần | toàn 0 | toàn close — SAI (đúng như dự đoán lý thuyết) |
+
+**Kết quả:** fixture prefixed parse **đúng**. Parser của APK 6.1.20/23 không phải nguyên nhân
+với payload live hiện tại. (Chi tiết log map/bean đã in đầy đủ khi chạy.)
+
+## 4. Truy tiếp các nhánh còn lại (theo yêu cầu §3) — không nhánh nào trong APK này cho ra "tất cả OFF"
+
+Đã kiểm tra toàn bộ đường `getSettings → bodyToAdasBean → LiveData → observer → UI`:
+
+| Nhánh | Kết quả trong APK 6.1.20/23 |
+|---|---|
+| Parse thành công (`isSuccessful`, response live) | Bean đúng (mục 3) → UI đúng. Không phải bug. |
+| `!isSuccessful` → `defaultAdasBean()` → `setValue` | Bean default → hiển thị **medium** (hoặc super_high nếu model=C2L), **không phải off**. Loại trừ. |
+| Exception trong fetch/parse → catch → `defaultAdasBean()` → `setValue` | Như trên: medium/super_high, không phải off. Loại trừ. (Lưu ý: bản v1 viết sai "LiveData không được update" — catch có gọi `setValue(default)`.) |
+| `getAdasSettings()` không chạy / observer không fire | Layout `c2_activity_adas_setting.xml`: các `*ShowText` default text **rỗng** (không phải "tắt"); `switchTsr` default unchecked. Không khớp triệu chứng "hiển thị tắt". |
+| Ghi đè sau đó (writer khác vào LiveData) | Quét toàn bộ `c2/business/adas`: chỉ `getAdasSettings$1` ghi `getAdasSettingsLiveData`. Không có. |
+| Auto-save khi đóng/mở trang | `onBackPressed` không gọi submit/setAdas. Không có. |
+| Đọc calibration/AdasStatus rồi mờ switch | `parseGetAdasSettingsLiveData` không đọc các trạng thái này. Không có. |
+
+**Kết luận hẹp:** với payload live hiện tại, **APK 6.1.20/23 không có đường nào sinh ra "tất cả cảnh báo hiển thị tắt".**
+
+## 5. Đối chiếu mâu thuẫn defaultAdasBean (theo yêu cầu §4)
+
+Bản v1 viết: `defaultAdasBean(2,2,2,2,2,2,…)` "cũng hiển thị tắt", đồng thời mô tả
+`adasFormatString(2)` = medium — mâu thuẫn. Kiểm tra `AdasBean.<init>` (iput order):
 
 ```
-AdasSettingActivity (listener) → AdasSettingViewModel.submit(adasBean)
-  → AdasConverter$Companion.toBase64String(adasBean)
-      → AdasFlag.toString()   // key "--enable_fcw=" … (xem §3)
-      → base64
-  → AdasSettingRepository.setAdas(b64)
-      map = {action="set", property="ADAS.config", value=b64, VersionPrototal="1.0.1"}
-      → SettingApi.config(map) → GET action=set…
+param → field: p0→pcw, p1→ldw, p2→hmw, p3→sag, p4→fcw, p5→ufcw,
+               p6→devicePosition, p7→carSize, p8→type, p9→tsrEnable
 ```
 
-Restart ADAS sau save là **thiết kế firmware** (`Config.cgi` → `adas_config_update` → `config_changed`
-→ adas thoát → `mutualism` thoát → `adas_guard.sh` chạy lại `run.sh`), không phải app gọi reboot,
-không phải bằng chứng crash/license lỗi (đã truy ở bàn giao §3.1).
+(`ldwActiveSpeed`/`hmwActiveSpeed` khởi tạo 0 trong ctor, set sau qua setter.)
 
-## 3. Bằng chứng method/smali (classes.dex)
+Vậy `defaultAdasBean` bản non-C2L = pcw/ldw/hmw/sag/fcw/ufcw = **2** → UI hiện
+**"medium"** cho cả 6, không phải "tắt". Bản v1 sai ở điểm này; đã đính chính.
+(Không suy mapping từ vị trí tham số nữa — đã đọc trực tiếp ctor.)
 
-| # | Vị trí | Bằng chứng |
-|---|---|---|
-| 1 | `AdasConverter$Companion.toAdasBean(String):AdasBean` | ins đầu: `split("ADAS.config=")` → `get(1)`; `replace('$'→'=')`; `Base64Util.decode`; `trim`; `split("\n")`; vòng lặp `split("=")` → `map.put(key,value)` với key trần (ins ~85–116) |
-| 2 | cùng method, ins ~118–~395 | mọi lookup dùng prefix `--`: `map.get("--enable_vehicle")`, `"--enable_fcw"`, `"--fcw_level"`, `"--enable_hmw"`, `"--hmw_level"`, `"--enable_ldw"`, `"--ldw_level"`, `"--enable_pcw"`, `"--pcw_level"`, `"--enable_sag"`, `"--sag_level"`, `"--enable_ufcw"`, `"--ufcw_level"`, `"--headway_warning_speed_thresh"`, `"--vehicle_width"`, `"--left_vehicle_edge_dist"`, `"--right_vehicle_edge_dist"`, `"--license_sn"` |
-| 3 | cùng method, ins ~397–448 | `bean.x = flag.enable_x ? flag.x_level : 0` cho pcw/ldw/hmw/sag/fcw/ufcw (ldw có thêm gate `isC2M`) |
-| 4 | `AdasFlag.toString()` | const-string `"\n--enable_fcw="`, `"\n--fcw_level="`, `"\n--enable_hmw="`… — đường ghi dùng key `--` |
-| 5 | `AdasSettingRepository.get()` | const-string `property="ADAS.config"`, `action="get"`, `VersionPrototal="1.0.1"` → `SettingApi.config` |
-| 6 | `AdasSettingRepository.parseResponse` | `body().string()` → `split("\n")` → `Response.success(code, list)` |
-| 7 | `AdasSettingViewModel.bodyToAdasBean` | tìm dòng `contains("ADAS.config=")` → `toAdasBean(dòng)`; log tag `AdasSettingViewModel` |
-| 8 | `AdasSettingActivity.parseGetAdasSettingsLiveData` | `getFcw()→adasFormatString()→fcwShowText`, tương tự hmw/ldw/pcw/sag/ufcw; `switchTsr.setChecked(getTsrEnable())` |
-| 9 | `AdasSettingActivity.adasFormatString(int)` | `0 → R.string.close`; 1→low, 2→medium, 3→high, 4→super_high |
-| 10 | `AdasConverter.<clinit>` | `isC2M = deviceModel.equals("C2M")` — true trên máy này |
-| 11 | `AdasConverter$Companion.defaultAdasFlag()` | nhánh `isC2M=true` trả `AdasFlag` toàn 0/false (chỉ dùng khi fallback, không phải đường chính của bug này) |
-
-## 4. Trả lời các câu hỏi ưu tiên của bàn giao
-
-1. **Map công tắc:** FCW→`R.id.fcwShowText`/`getFcw()`; HMW→`hmwShowText`/`getHmw()`;
-   LDW→`ldwShowText`; PCW→`pcwShowText`; SAG→`sagShowText`; UFCW→`ufcwShowText`;
-   TSR→`R.id.switchTsr`/`getTsrEnable()`. Không có master switch nào trong UI render bean.
-2. **Câu lệnh đặt OFF:** `toAdasBean` ins ~433–440 (`enable_fcw=false → v13=0`) và các khối tương tự;
-   điểm hiển thị cuối là `adasFormatString(0) → R.string.close`.
-3. **Request thật duy nhất trong chain đọc:** `GET cgi-bin/Config.cgi?action=get&property=ADAS.config&VersionPrototal=1.0.1`
-   qua `SettingApi.config(@QueryMap)`. Không có request c1, không có fallback URL.
-4. **`ADAS.enable` GET: APP KHÔNG HỀ GỌI.** String `ADAS.enable` không tồn tại trong cả 3 dex
-   (chỉ có `ADAS.config`, `ADAS.Adjust`/`ADAS.adjust`). Câu hỏi "GET thiếu giá trị" là moot —
-   app không đọc master enable từ camera.
-5. **Parser với response thực `0/OK/ADAS.config=<base64>`:**
-   - Lấy đúng dòng `ADAS.config=` (qua `contains`, không nhầm dòng `0`). ✔
-   - Base64 không padding chuẩn được chấp nhận (có `replace('$','=')`). ✔
-   - Split `--key=value`, trailing LF (`trim()`), `true/false`, level `0/3` đều xử lý đúng **nếu key khớp**. ✘ Key không khớp (`--` vs trần) → toàn bộ sai.
-   - Thiếu TSR keys: lookup null → `tsrEnable=false`, level→default — không crash, không phải nguyên nhân all-OFF.
-   - Không có try/catch trong `toAdasBean`; exception (vd response thiếu dòng `ADAS.config=`) nổi lên
-     `invokeSuspend` → log `getAdasSettings err`, LiveData giữ giá trị cũ.
-6. **Save:** app gửi **toàn bộ blob** mỗi lần (`action=set`, `value=<base64 của AdasFlag.toString()>`).
-   Vì `toString()` không emit các key `enable_tsr`/`tsrw_interval`…, mỗi lần save của app **xóa 5 key TSR**
-   khỏi file camera — đúng như bàn giao §2.3 quan sát. Đây là vấn đề persistence riêng,
-   **không phải nguyên nhân all-OFF** (FCW/HMW vẫn được ghi đúng).
-7. **Trạng thái chung:** `parseGetAdasSettingsLiveData` không đọc calibration/activation/AdasStatus —
-   không có logic làm mờ/disable switch theo `install_calib_state`. `calib_state=1` không liên quan đến bug này.
-
-## 5. Bảng CONFIRMED / HYPOTHESIS / UNKNOWN
+## 6. Bảng CONFIRMED / HYPOTHESIS / UNKNOWN (cập nhật)
 
 | # | Nội dung | Trạng thái |
 |---|---|---|
-| C1 | Parser readback tra key `--x` trong khi map chứa key `x` → mọi `enable_*`=false → UI toàn OFF | CONFIRMED (smali + response live) |
-| C2 | Camera lưu đúng FCW/HMW=true/3; API `ADAS.config` trả đúng | CONFIRMED (bàn giao §2.3–2.4) |
-| C3 | App không gọi `ADAS.enable` GET | CONFIRMED (string pool 3 dex) |
-| C4 | Restart sau save là thiết kế firmware, không phải crash | CONFIRMED (trace bàn giao §3.1) |
-| C5 | `calib_state=1` không gây all-OFF (UI không đọc state này) | CONFIRMED (render path) |
-| C6 | Mỗi lần save app xóa 5 key TSR khỏi blob camera | CONFIRMED (`AdasFlag.toString()` không emit chúng + quan sát §2.3) |
-| H1 | Firmware cũ/stock từng trả key `--` (lý do app viết parser này); bản D5-VI chuẩn hoá về key trần | HYPOTHESIS — cần sample response của firmware gốc để xác minh |
-| H2 | Base64 `$`-padding là di sản firmware cũ; bản hiện tại trả `=` chuẩn (parser chịu cả hai) | HYPOTHESIS nhẹ |
-| U1 | APK trên điện thoại có đúng 6.1.20/23 không | UNKNOWN |
-| U2 | Số dòng smali tuyệt đối sau apktool (offset trong báo cáo là index instruction tương đối trong method) | UNKNOWN — dùng class/method + const-string để định vị lại |
+| C1 | Parser `toAdasBean` parse **đúng** payload live (`--`-prefixed) — chứng minh bằng repro offline | CONFIRMED (rút lại C1 của v1) |
+| C2 | Code dựng map không strip `--`; key dùng verbatim (ins 80–117, method_idx 41461) | CONFIRMED |
+| C3 | Camera lưu đúng FCW/HMW=true/3; API `ADAS.config` trả đúng 19 dòng `--`-key | CONFIRMED (live 2026-10-18) |
+| C4 | App 6.1.20/23 không gọi `ADAS.enable` GET (string không tồn tại trong 3 dex) | CONFIRMED |
+| C5 | Restart sau save là cơ chế chủ đích của firmware | CONFIRMED (giữ từ v1) |
+| C6 | `calib_state=1` không gây all-OFF (UI không đọc state này) | CONFIRMED (giữ từ v1) |
+| C7 | `defaultAdasBean` cho ra medium/super_high, không phải off (mapping ctor đã verify) | CONFIRMED (đính chính v1) |
+| C8 | Đóng trang không auto-save (`onBackPressed` không gọi submit) | CONFIRMED |
+| C9 | Mỗi lần save app ghi đè toàn blob và làm mất 5 key TSR (`AdasFlag.toString()` không emit) | CONFIRMED (giữ từ v1, vấn đề riêng) |
+| H1 | **Điện thoại đang chạy bản UTOUR GO khác 6.1.20/23** — bản đó parse sai payload `--` (ví dụ lookup key trần, hoặc logic khác) → all lookup miss → all OFF. Khớp triệu chứng chính xác. | HYPOTHESIS — giả thuyết hàng đầu hiện tại |
+| H2 | Response mà app trên điện thoại nhận được khác với OpenCode đọc (thời điểm/kênh khác) | HYPOTHESIS — yếu hơn H1 |
+| U1 | Version APK thực tế trên điện thoại | UNKNOWN — artifact nhỏ nhất còn thiếu (xem §8) |
+| U2 | Số dòng smali tuyệt đối sau apktool (offset trong báo cáo là index instruction tương đối) | UNKNOWN |
 
-**Điều kiện phản chứng:** nếu logcat `AdasConverter` cho thấy `toAdasBean: map =>` chứa key **có** `--`
-mà UI vẫn OFF → C1 sai. Nếu map chứa key trần → C1 đứng vững.
+**Điều kiện phản chứng H1:** lấy được APK trên điện thoại, trích `toAdasBean` tương ứng —
+nếu parser giống hệt 6.1.20/23 thì H1 sai, phải truy tiếp phía response/runtime.
 
-## 6. Đề xuất sửa tối thiểu (chưa deploy, không đụng camera)
+## 7. Đề xuất patch
 
-**Vị trí:** `AdasConverter$Companion.toAdasBean`, vòng lặp dựng map (ins ~85–116).
+**Không đề xuất patch** cho đến khi tái hiện được lỗi (đúng yêu cầu).
+Parser của 6.1.20/23 đã đúng với firmware hiện tại; patch alias key không có cơ sở.
 
-**Sửa:** khi `map.put(key, value)`, lưu thêm biến thể `--`-prefixed:
+## 8. Artifact nhỏ nhất còn thiếu
 
-```kotlin
-// pseudo (tương đương smali cần chèn sau split("=")):
-val k = key
-map[k] = value
-if (!k.startsWith("--")) map["--$k"] = value else map[k.removePrefix("--")] = value
-```
-
-Chỉ chạm **một điểm** (put-loop), không sửa ~20 lookup, không sửa đường ghi,
-chịu được cả firmware trả key trần (hiện tại) lẫn key `--` (nếu H1 đúng với bản cũ).
-Không "bật cứng" cảnh báo, không giả trạng thái thành công — giá trị hiển thị vẫn là giá trị camera trả về.
-
-**Không làm:** bypass license, ép `calib_state=2`, reset config, gọi setter trên camera,
-sửa `defaultAdasFlag()` (đường fallback không phải nguyên nhân).
-
-**Ghi chú thêm (không bắt buộc cho bug này):** nếu muốn giữ TSR keys qua các lần save,
-`AdasFlag.toString()` cần emit lại `enable_tsr`/`tsrw_interval`/… hoặc chuyển save sang merge
-thay vì replace toàn blob — để riêng, không gộp vào fix tối thiểu.
-
-## 7. Test offline bằng fixture (không cần thiết bị)
-
-Dựng harness JVM/Kotlin sao chép đúng logic `toAdasBean` (hoặc unit test gọi trực tiếp method
-trong APK đã patch), chạy các fixture đã làm sạch:
-
-| Fixture | Input | Kỳ vọng sau fix |
-|---|---|---|
-| F1 (case thật) | `0\nOK\nADAS.config=<base64(key trần: enable_fcw=true,fcw_level=3,enable_hmw=true,hmw_level=3, còn lại false/0)>` | bean fcw=3, hmw=3; các mục user tắt =0; UI hiện đúng 2 mục bật |
-| F2 (định dạng cũ) | như F1 nhưng key `--`-prefixed | cùng kỳ vọng F1 (robustness) |
-| F3 (thiếu dòng config) | `0\nOK\n` | không crash; LiveData giữ giá trị cũ; log `getAdasSettings err` (hành vi hiện tại giữ nguyên) |
-| F4 (thiếu TSR keys) | F1 bỏ 5 key TSR | parse OK, tsrEnable=false, các warning khác đúng |
-| F5 (`$` padding) | base64 dùng `$` thay `=` cuối | parse OK như F1 |
-| F6 (level 0/3, true/false) | biên: `enable_fcw=false,fcw_level=3` | bean fcw=0 (enable gate đúng) |
-
-**Tiêu chí pass vòng 1:** F1 chuyển từ FAIL (bean toàn 0) → PASS; F2–F6 không regression.
-Nếu vẫn thiếu bằng chứng sau vòng này, artifact cần thêm duy nhất là logcat dòng
-`AdasConverter: toAdasBean: map =>` và `configBean:` khi mở trang ADAS trên máy thật
-(lấy bằng `adb logcat -s AdasConverter:I AdasSettingViewModel:I`, không cần thao tác xe).
-
-## 8. Chuỗi nhân quả tóm tắt (để đối chiếu nhanh)
-
-```
-app GHI "--enable_fcw=true" ──► firmware LƯU "enable_fcw=true" ──► firmware TRẢ "enable_fcw=true"
-         (AdasFlag.toString)            (chuẩn hoá, bỏ "--")              (GET ADAS.config)
-
-app ĐỌC: map{"enable_fcw":"true"}  +  lookup("--enable_fcw") → null → false → bean.fcw=0 → UI "tắt"
-```
+1. **Version UTOUR GO trên điện thoại** (Settings → Apps → UTOUR GO). Nếu khác 6.1.20/23 → lấy APK
+   (APK extractor hoặc `adb pull`) để so sánh trực tiếp hàm `toAdasBean`/`AdasConverter`.
+2. Nếu cùng 6.1.20/23: logcat khi mở trang ADAS —
+   `adb logcat -s AdasConverter:I AdasSettingViewModel:I AdasSettingActivity:E`
+   (xem các dòng `toAdasBean: decodeString:`, `toAdasBean: map =>`, `configBean:`,
+   `getAdasSettings:` để biết app thực sự nhận/parse ra gì). Không cần thao tác xe.
 
 ---
-*Phân tích tĩnh bằng androguard trên `classes.dex` của UTOUR GO 6.1.20/23; response live lấy từ
-`MUSE_UTOUR_GO_ADAS_TOGGLE_HANDOFF_20261018.md`. Không thực hiện bất kỳ lệnh ghi nào lên camera.*
+*Phân tích tĩnh bằng androguard trên `classes.dex` của UTOUR GO 6.1.20/23;
+repro offline chạy logic 1:1 từ smali; response live do OpenCode đọc ngày 2026-10-18.
+Không thực hiện bất kỳ lệnh ghi nào lên camera.*
