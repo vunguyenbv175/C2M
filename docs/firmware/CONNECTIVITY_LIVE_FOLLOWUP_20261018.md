@@ -86,6 +86,14 @@ Work continues after the dead-source-link result; it is not an abandonment decis
 - A pure DHCP lease-validation component now exists at `fw/d3/dhcp_lease.c/.h`, with22 passing host tests in `tests/test_d3_dhcp_lease.py`. It validates IPv4/mask/router/DNS/lease bounds and protected-subnet overlap, with no I/O or network commands. It is **not integrated into the controller or deployed**, and does not provide DHCP/Internet by itself. Independent edge-case review found a raw protected-subnet normalization bypass and broad-subnet/DNS edge cases. These were fixed: caller-supplied protected masks are validated and host bits normalized; forbidden subnet intersections and local network/broadcast DNS are rejected. The22-test suite passes with those regressions. This does not exercise a DHCP client or authorize network integration/deployment.
 - Continuous diagnostics remained live at sample1129 (~94 minutes from its first continuous sample), card_result0 and ~2.0MB card log. ADAS/lane and main recorder PIDs remained the same at that spot check. This is not driver/concurrency acceptance.
 
+## Later offline builds and renewed powered-camera check
+
+Actual public-source baseline/concurrent builds passed in iterations1/2; see [lab results](RTL8821CS_OFFLINE_LAB_20261018.md). These use upstream4.9.227/reconstructed config and remain NO_LOAD. Iteration2 has all219 stock undefined symbols plus `__memzero`; selected lock sizes match stock evidence but vendor ABI remains unvalidated. Iteration3 object/COMMON accounting was pushed as `3454cb6` and started [run39106160974](https://github.com/vunguyenbv175/C2M/actions/runs/39106160974); result pending inspection.
+
+The owner requested renewed Wi-Fi work while the camera was powered. Read-only live inventory again reports interface count1, wlan0 up and logger running/card_result0. A bounded read of /proc/kallsyms found names for all219 stock undefined references but **no `__memzero`**, and no `__ksymtab___memzero` marker. This is a concrete unresolved-symbol blocker for the upstream-built research module, not a reason to force loading.171 of220 checked export markers were visible; many missing markers belong to already-loaded cfg80211/mmc_core modules, so marker absence must not be equated automatically with absence of all those working exports. Kernel addresses/raw inventory were not published. Upstream ARM exports `__memzero`, but the live vendor kernel does not expose that name in the checked inventory; upstream export evidence must not be substituted for target evidence.
+
+No VIF, association, radio-mode change, driver unload/reload, firmware flash or camera config write occurred in this renewed check.
+
 ## Next gates
 
 1. Trace the exact module's station-VIF branch and adapter allocation limit against the explicit one-interface report.

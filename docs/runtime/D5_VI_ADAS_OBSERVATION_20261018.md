@@ -1,6 +1,10 @@
 # D5-VI ADAS observation — 2026-10-18
 
-## Current conclusion
+## Later power-cycle reproduction
+
+The owner subsequently powered the camera off/on and explicitly confirmed FCW/HMW now display Off, without a new save. Read-only evidence shows camera flags still true3 but a boot-associated config expansion and incomplete CGI response. See [post-reboot investigation](D5_VI_ADAS_REBOOT_READBACK_20261018.md). The earlier successful app-reopen result below must not be generalized to power cycling.
+
+## Earlier observation conclusion (before the power cycle)
 
 **No functional repair has been applied and the reported OFF-on-reopen failure was not reproduced in the final phone capture.** The owner confirmed the two selected warnings still displayed **High (Cao)** after both captured reopens. The available UI choices are Off/Low/Medium/High/Very High, not simple Boolean toggles.
 
