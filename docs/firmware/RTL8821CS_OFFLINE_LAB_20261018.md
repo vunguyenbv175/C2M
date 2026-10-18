@@ -78,3 +78,27 @@ Keep inferred Kconfig unchanged; use target KCFLAGS `-fno-common -fno-pie`, reta
 Iteration4 [run39106622652](https://github.com/vunguyenbv175/C2M/actions/runs/39106622652), source `657b054`, **passed** in3m50s. Downloaded reports show no failed steps/config mismatches, zero COMMON symbols in both profiles, .bss28,106 bytes (84 bytes below stock). Baseline2,859,384 bytes/SHA-256 `5b5c0c76151cee158643268ba8dd863a1ad88ff990a4321fad179fd26a216f48`; concurrent2,882,968 bytes/`470987063507196e880bf797995bc21bd8b59a7b1e03dd4649957803f4eba196`. Both still have the stock219 undefined references plus `__memzero`; dependencies remain unpopulated and WEXT/vendor-layout/recovery checks remain open. Baseline .text remains58,388 bytes smaller than stock. The COMMON codegen issue is closed for these outputs, not the ABI/load-safety gate.
 
 The same metadata-only artifact boundary and no-load policy apply. No module was loaded or transferred to the camera.
+
+## Iteration5: `__memzero` attribution and codegen variant measurement (recorded before execution)
+
+Iteration5 is a metadata-only iteration: the reconstructed Kconfig and target
+flags are unchanged from iteration4. It adds two evidence passes:
+
+1. **Object-level attribution** — every regular `*.o` under each per-profile
+   driver build tree is parsed and the objects whose undefined set contains
+   `__memzero` (and/or `memset`) are listed, so the extra dependency can be
+   traced to exact translation units instead of only the final `.ko`.
+2. **Compile-only codegen variant table** — a tiny standalone snippet
+   (constant-zero sized fill, constant-size fill, variable fill) is compiled
+   with the pinned host cross compiler under five flag sets (lab target
+   flags, `-fno-builtin`, `-fno-builtin-memset`, `-Os`, `-marm`) and each
+   object's undefined set is recorded. Variant flags are a reduced subset of
+   the kbuild command line; the table isolates flag effects and is not a
+   byte-exact kbuild reproduction.
+
+Neither pass changes the built modules and both keep the NO_LOAD policy: the
+attribution/table JSON files are metadata and the objects stay in the
+ephemeral runner scratch directory. Resolution of the stock `memset`-only
+difference, the legacy WEXT/layout question, vendor ABI, recovery and any
+live test remain open gates. Iteration5 source: commit `4d74218`; workflow
+run [39137457671](https://github.com/vunguyenbv175/C2M/actions/runs/39137457671).
