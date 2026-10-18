@@ -92,6 +92,33 @@ Owner-approved bundle for the second flash: **E content unchanged + two deltas**
   `466d877c7bb9da71fc33e46196729cc7`. Deep validation of the minted tar
   **VALID (33 checks)**; minted tar sha256 `fbb7450f…`.
 
+### E2 post-flash inspection — 2026-10-19 (owner-reported flash + observed SSH)
+
+Owner flashed E2; a read-only SSH session (AP-only `192.168.1.1:2222`,
+dedicated key) observed:
+
+- Host key changed after the flash as usual; the E-era pin
+  `SHA256:clbNRtL12T2uQZN+8NyYjLt+pB5jFmnmv2avAPMbD5U` was archived and the new
+  owner-controlled pin is
+  `SHA256:ehLL+1VV+L4vcCDSEOXDGoldTdt+XuFkHdWQNMwxFXo`.
+- Assets match the E2 build exactly: `c2m-debug` `df3edd2e…` (lifetime
+  edition), `c2m-wifi` `3c617f6e…` (ancestor fix), `c2m-web` `653a144e…`,
+  `dropbear`/`dropbearkey`/`debug_boot.sh`/`libnss_files.so.2`/`boot.sh`/
+  `wpa_supplicant` unchanged.
+- **`c2m-wifi` is running** (`--serve` with the stock paths) and the status
+  file reports the honest verdict `sta_supported=unknown`,
+  `last_error=capability_combinations_empty` — the
+  `private_paths_or_supplicant_unavailable` failure is gone.
+- **Lifetime SSH live**: `/tmp/c2m_debug_status` shows `state=active`,
+  `reason=listening`, `window_sec=0`, `lifetime=boot` — no supervisor
+  deadline.
+- Vietnamese system audio intact (spot samples `Card_Err` `9e26a864…`,
+  `WiFi_Open` `8d167d9e…`); services healthy (cardv, minieye, c2m-idle,
+  c2m-signs, c2m-web, ADAS/lane, hostapd 5 GHz AP); recording active.
+- Not full acceptance: owner to confirm sounds, live view and ADAS/FCW/HMW
+  behavior as usual. Rollback to the previous E content remains prepared
+  locally (`rollback_e_20261016000005`).
+
 ## Tokens
 
 `20261015000001` installed D4-debug · `20261016000001` D5-VI ·
