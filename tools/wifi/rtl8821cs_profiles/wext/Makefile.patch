@@ -1,5 +1,5 @@
 diff --git a/Makefile b/Makefile
-index a01f60e..1e03f2f 100644
+index a01f60e..80de1b4 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -163,7 +163,13 @@ CONFIG_PLATFORM_ARM_TCC8920_JB42 = n
@@ -17,7 +17,7 @@ index a01f60e..1e03f2f 100644
  CONFIG_PLATFORM_ARM_URBETTER = n
  CONFIG_PLATFORM_ARM_TI_PANDA = n
  CONFIG_PLATFORM_MIPS_JZ4760 = n
-@@ -1727,6 +1733,20 @@ KSRC := /home/android_sdk/Rockchip/Rk3188/kernel
+@@ -1727,6 +1733,24 @@ KSRC := /home/android_sdk/Rockchip/Rk3188/kernel
  MODULE_NAME := rtl8821cs
  endif
  
@@ -26,13 +26,17 @@ index a01f60e..1e03f2f 100644
 +# No -DCONFIG_PLATFORM_ANDROID, no -DCONFIG_PLATFORM_ROCKCHIPS.
 +EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
 +EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
-+# Iteration-6 legacy-WEXT gate emulation: the stock module carries
-+# rtw_handlers_def; osdep_service_linux.h derives CONFIG_WIRELESS_EXT only
-+# from CONFIG_NET_RADIO (impossible to set in the pinned 4.9 config), and
-+# the driver itself injects -DCONFIG_WIRELESS_EXT the same way in its
-+# CONFIG_PLATFORM_RTK_DMP block. Driver-side define only: the
-+# reconstructed kernel config is unchanged.
++# Iteration-6 legacy-WEXT gate emulation: the stock module carries a
++# 24-byte rtw_handlers_def. -DCONFIG_WIRELESS_EXT opens the gated
++# stats/table/assignment code; -DCONFIG_WEXT_PRIV supplies the private
++# handler fields that make struct iw_handler_def 24 bytes (12 without).
++# osdep_service_linux.h derives CONFIG_WIRELESS_EXT only from
++# CONFIG_NET_RADIO (impossible to set in the pinned 4.9 config) and the
++# driver injects -DCONFIG_WIRELESS_EXT itself in CONFIG_PLATFORM_RTK_DMP,
++# so the lab defines both macros driver-side; the reconstructed kernel
++# config is unchanged.
 +EXTRA_CFLAGS += -DCONFIG_WIRELESS_EXT
++EXTRA_CFLAGS += -DCONFIG_WEXT_PRIV
 +endif
 +
  ifeq ($(CONFIG_PLATFORM_ARM_RK3066), y)

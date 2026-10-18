@@ -167,7 +167,8 @@ delta), vendor ABI, AP-independent recovery, and any live test.
 
 Iteration6 keeps the reconstructed kernel config and target flags unchanged
 from iteration4/5 and adds a third driver-build profile (`wext`) that applies
-exactly one driver-side change: `EXTRA_CFLAGS += -DCONFIG_WIRELESS_EXT`
+exactly one class of driver-side change:
+`EXTRA_CFLAGS += -DCONFIG_WIRELESS_EXT -DCONFIG_WEXT_PRIV`
 (`tools/wifi/rtl8821cs_profiles/wext/Makefile.patch`).
 
 Source-verified mechanism. The stock module's only stock-only named writable
@@ -204,3 +205,22 @@ the wext code adds far less machine code than the 58,388-byte stock `.text`
 gap recorded in iteration4 — legacy WEXT explains the named object, not the
 `.text` delta; the remaining `.text` difference points at downstream vendor
 source and/or toolchain codegen and stays open.
+
+### First-execution follow-up (recorded before the second run)
+
+The first iteration-6 run (workflow run
+[39177757068](https://github.com/vunguyenbv175/C2M/actions/runs/39177757068))
+built all three profiles successfully; the workflow evidence step then
+rejected the wext module because the harness expected a 24-byte
+`rtw_handlers_def` object there. Source follow-up: v4.9
+`include/net/iw_handler.h` defines `struct iw_handler_def` with its
+private-handler fields inside `#ifdef CONFIG_WEXT_PRIV` — 12 bytes without
+those fields, 24 bytes with them — and this kernel's `CFG80211_WEXT` selects
+only `WEXT_CORE`, so the reconstructed config's promptless `WEXT_PRIV`
+stays `n`. The stock object's recorded 24-byte size itself shows the vendor
+build had the private fields present. The profile therefore now defines
+**both** `-DCONFIG_WIRELESS_EXT` and `-DCONFIG_WEXT_PRIV` (still driver-side
+macros only), and the WEXT layout probe is compiled with both defines and
+measures `sizeof(struct iw_handler_def)` directly. The artifact-upload step
+now preserves evidence even when the evidence-validation step fails, so
+experiment data is never lost to a harness assertion.

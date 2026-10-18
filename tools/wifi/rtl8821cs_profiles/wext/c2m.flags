@@ -8,11 +8,13 @@
 # CONFIG_RTW_NAPI, CONFIG_RTW_GRO, CONFIG_RTW_DEBUG, CONFIG_PROC_DEBUG.
 # Explicitly OFF (not in live drv_cfg): CONFIG_P2P, CONFIG_WIFI_MONITOR,
 # CONFIG_TDLS, CONFIG_MCC_MODE, CONFIG_WOWLAN, CONFIG_RTW_ANDROID.
-# Iteration-6 (documentation only, like the rest of this file): the extra
-# -DCONFIG_WIRELESS_EXT emulates the vendor build-time legacy-WEXT gate that
-# the stock module's rtw_handlers_def implies. The driver injects the same
-# define itself in its CONFIG_PLATFORM_RTK_DMP block. This is a driver-side
-# macro, NOT a change to the reconstructed kernel config.
+# Iteration-6 (documentation only, like the rest of this file):
+# -DCONFIG_WIRELESS_EXT + -DCONFIG_WEXT_PRIV emulate the vendor build-time
+# legacy-WEXT gate that the stock module's 24-byte rtw_handlers_def implies
+# (the private-handler fields gated by CONFIG_WEXT_PRIV are what make
+# struct iw_handler_def 24 bytes; 12 without). The driver injects
+# -DCONFIG_WIRELESS_EXT itself in its CONFIG_PLATFORM_RTK_DMP block. These
+# are driver-side macros, NOT a change to the reconstructed kernel config.
 -DCONFIG_AP_MODE
 -DCONFIG_MP_INCLUDED
 -DCONFIG_POWER_SAVING
@@ -47,3 +49,4 @@
 -DCONFIG_IOCTL_CFG80211
 -DRTW_USE_CFG80211_STA_EVENT
 -DCONFIG_WIRELESS_EXT
+-DCONFIG_WEXT_PRIV

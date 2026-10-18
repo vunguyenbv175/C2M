@@ -93,13 +93,15 @@ HYPOTHESIS = {
     "statement": (
         "The stock module's sole stock-only named writable object rtw_handlers_def "
         "(24 bytes) is emitted because the vendor build defined the legacy "
-        "CONFIG_WIRELESS_EXT macro for the driver translation units (the driver "
-        "itself injects -DCONFIG_WIRELESS_EXT in its CONFIG_PLATFORM_RTK_DMP "
-        "block; osdep_service_linux.h derives it only from CONFIG_NET_RADIO, "
-        "which the pinned 4.9 config cannot enable). A third profile that adds "
-        "only that driver-side define will emit the object and quantify how much "
-        "of the recorded stock section-size difference the legacy-WEXT code "
-        "explains. No kernel config, driver source or load change."
+        "CONFIG_WIRELESS_EXT gate plus CONFIG_WEXT_PRIV for the driver "
+        "translation units (the v4.9 struct iw_handler_def is 12 bytes without "
+        "the private-handler fields and 24 with them; the driver itself injects "
+        "-DCONFIG_WIRELESS_EXT in its CONFIG_PLATFORM_RTK_DMP block and "
+        "osdep_service_linux.h derives it only from CONFIG_NET_RADIO, which the "
+        "pinned 4.9 config cannot enable). A third profile that adds only those "
+        "driver-side defines will emit the object and quantify how much of the "
+        "recorded stock section-size difference the legacy-WEXT code explains. "
+        "No kernel config, driver source or load change."
     ),
     "config_changes": [],
     "prediction": (
@@ -120,7 +122,7 @@ HYPOTHESIS = {
     ),
     "config_changed_since_iteration2": False,
     "target_codegen_changed_since_iteration3": "-fcommon replaced by -fno-common (iteration 4; unchanged)",
-    "build_change_since_iteration5": "adds the wext profile (driver-side -DCONFIG_WIRELESS_EXT) and the WEXT layout probe; baseline/concurrent codegen and the kernel config are unchanged",
+    "build_change_since_iteration5": "adds the wext profile (driver-side -DCONFIG_WIRELESS_EXT and -DCONFIG_WEXT_PRIV) and the WEXT layout probe; baseline/concurrent codegen and the kernel config are unchanged",
     "iteration6_scope": "driver-flag gate reproduction + layout delta measurement; no kernel config change, no source patch, no load",
 }
 
@@ -709,7 +711,7 @@ def _wext_experiment(out_dir: Path) -> "dict | None":
         "stock_reference": STOCK_REFERENCE,
         "stock_text_gap_remaining_bytes": None if text_delta is None else recorded_gap - text_delta,
         "notes": [
-            "the wext profile differs from baseline only by the driver-side -DCONFIG_WIRELESS_EXT define (tools/wifi/rtl8821cs_profiles/wext)",
+            "the wext profile differs from baseline only by the driver-side -DCONFIG_WIRELESS_EXT and -DCONFIG_WEXT_PRIV defines (tools/wifi/rtl8821cs_profiles/wext)",
             "the recorded stock .text gap predates the baseline codegen that is unchanged since iteration 4; the remaining-bytes figure assumes that continuity",
             "matching the named object is not an ABI or load-safety result; the NO_LOAD policy is unchanged",
         ],

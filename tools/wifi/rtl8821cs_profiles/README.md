@@ -18,7 +18,7 @@ time** from the pinned public URL; only these small patches are committed.
 | profile | file | effect |
 | --- | --- | --- |
 | baseline | `baseline/Makefile.patch` | disable stock RK3188 default (which forces `-DCONFIG_CONCURRENT_MODE` + Android/Rockchip), add minimal `CONFIG_PLATFORM_C2M` (SDIO + cfg80211 only) → `CONFIG_IFACE_NUMBER = 1` |
-| wext | `wext/Makefile.patch` | same as baseline, plus `-DCONFIG_WIRELESS_EXT` (iteration-6 emulation of the vendor build-time legacy-WEXT gate; driver-side macro only, the reconstructed kernel config is unchanged) |
+| wext | `wext/Makefile.patch` | same as baseline, plus `-DCONFIG_WIRELESS_EXT` and `-DCONFIG_WEXT_PRIV` (iteration-6 emulation of the vendor build-time legacy-WEXT gate; driver-side macros only, the reconstructed kernel config is unchanged) |
 | concurrent | `concurrent/Makefile.patch` | same, plus `-DCONFIG_CONCURRENT_MODE` → `CONFIG_IFACE_NUMBER = 2`, same-channel (`.num_different_channels = 1`) |
 
 `*/c2m.flags` records the derived `EXTRA_CFLAGS` set (documentation only; the

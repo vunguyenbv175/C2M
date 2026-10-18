@@ -57,6 +57,7 @@ SCRIPT_TOKENS = (
     "layout-probe-wext.log",
     "build_profile wext",
     "-DCONFIG_WIRELESS_EXT",
+    "-DCONFIG_WEXT_PRIV",
     "probe.o",
     'M="$PROBEDIR"',
     "NO LOAD, EVER",
@@ -184,6 +185,7 @@ class ProfileTests(unittest.TestCase):
         raw = _read(PROFILES / "wext" / "Makefile.patch")
         self.assertIn("CONFIG_PLATFORM_C2M = y", raw)
         self.assertIn("EXTRA_CFLAGS += -DCONFIG_WIRELESS_EXT", raw)
+        self.assertIn("EXTRA_CFLAGS += -DCONFIG_WEXT_PRIV", raw)
         # The wext profile emulates only the vendor legacy-WEXT gate: it must
         # not add the concurrency flag.
         self.assertNotIn("EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE", raw)
