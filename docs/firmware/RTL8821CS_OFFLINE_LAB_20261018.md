@@ -44,4 +44,19 @@ Next work is to identify which config/compiler choices explain the baseline symb
 
 Proposed offline-only config changes: DEBUG_SPINLOCK/DEBUG_MUTEXES enabled, regular stack protector enabled, IPv6 disabled and lockdep allocation disabled. These are hypotheses inferred from stock symbol references, **not recovered vendor config**. The expected outcome is closure of the two IPv6-notifier additions and four stock-only lock/canary references, potentially leaving `__memzero` as the remaining extra symbol. A compiler-emitted layout probe will record actual lock/mutex sizes and constant-zero/variable memset references without executing target code.
 
+Independent static stock-object anchors were checked by the parent directly against the pinned original module: `GLBtcBtMpOperLock`36 bytes (source typedef struct mutex), `GLBtcBtMpRptSema`28 bytes (struct semaphore), `GLBtcBtMpOperTimer`32 bytes (driver timer wrapper). The extra code trace observes spinlock-debug magic in semaphore initialization. These are strong layout clues, not recovery of the entire vendor config or proof every kernel structure matches. In particular, no standalone global spinlock object was available for a direct sizeof measurement; field-attribution models remain hypotheses until compared with emitted layout probes.
+
+Iteration2 was pushed as `424ba90`; [run39101623926](https://github.com/vunguyenbv175/C2M/actions/runs/39101623926) **passed** in3m58s. The parent downloaded and inspected the metadata, not merely workflow status.27 local lab tests passed before the run.
+
+| Variant | Bytes | SHA-256 |
+|---|---:|---|
+| baseline iteration2 | 2,859,464 | `c39f9ce75961283192c542a4b2c8f9f4be73da28ec3f6ab05c791015a555bbce` |
+| concurrent iteration2 | 2,883,032 | `7cf41dd8bfdd04ac24b77388b4b717ee1040367b86f04743d57ca35d07fc0902` |
+
+Both have220 undefined symbols: **all219 stock undefined symbols plus exactly `__memzero`, none removed**. The six config-associated differences from iteration1 closed. All proposed iteration2 config choices survived olddefconfig. This supports the stated hypothesis for these references, not a recovered vendor config.
+
+The compile-only probe measured spinlock/raw_spinlock16 bytes and mutex36 bytes, mutex owner offset28/magic offset32. Mutex size matches the independently measured stock lock global, while spinlock16 agrees with the stock semaphore-initialization trace. Probe emitted both `__memzero` and `memset`; the source scan confirmed upstream `EXPORT_SYMBOL(__memzero)` in armksyms.c.
+
+Remaining limitations are material: no vendor ABI acceptance or live export check, dependency metadata remains empty, expected WIRELESS_EXT observation remains mismatched, and baseline section differences remain (.text58,224 bytes smaller, .bss14,216 bytes smaller, .data328 bytes smaller than stock). Matching selected lock sizes does not validate every embedded kernel structure, compiler option, downstream patch or race behavior. No produced module was retained as a deployable artifact or sent to the camera.
+
 One research claim was independently rejected before implementation: upstream `arch/arm/kernel/armksyms.c` **does export `__memzero`**. Absence of an export declaration in `memzero.S` alone was not sufficient. Do not label the lab module unloadable merely because it references that symbol; target exports and vendor layout still require validation. No header patch will be used to hide it.
