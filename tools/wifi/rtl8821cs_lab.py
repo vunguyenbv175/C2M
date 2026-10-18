@@ -10,6 +10,8 @@ reads or writes firmware. Supports ``tools/wifi/build_rtl8821cs_lab.sh``:
 * ``verify-file``     -- strict SHA-256 check of one downloaded artifact
 * ``check-driver``    -- verify pinned source file hashes after extraction
 * ``config-state``    -- read a reconstructed kernel ``.config`` and report flags
+* ``config-sticky``   -- report whether the iteration-2 forced choices stuck
+* ``layout-probe``    -- compile-only struct-layout probe metadata + arch scan
 * ``module-metadata`` -- ELF module modinfo / section / undefined-symbol metadata
 * ``report``          -- assemble ``report.json`` from a run's artifacts
 
@@ -21,6 +23,7 @@ import argparse
 import hashlib
 import json
 import re
+import struct
 import sys
 from pathlib import Path
 
@@ -66,9 +69,56 @@ PINS = {
         "camera_abi_claim": "NOT_CAMERA_ABI",
         "load_authorized": False,
         "load_policy": "NO_LOAD_EVER_FROM_THIS_LAB",
-        "config_basis": "upstream multi_v7_defconfig + vermagic reconstruction (SMP/preempt/mod_unload/ARMv7/thumb2/p2v8)",
+        "config_basis": "upstream multi_v7_defconfig + vermagic reconstruction + iteration-2 inferred debug/lock/stackprotector/ipv6 deltas (NOT a camera config)",
         "camera_config_reproduced": False,
     },
+}
+
+# --------------------------------------------------------------------------
+# Iteration 2 hypothesis. These config deltas and the prediction are INFERRED
+# research choices, NOT a reproduction of any camera configuration. A matching
+# undefined-symbol set is evidence about the reconstructed config only; it is
+# never an ABI-success or load-safety claim.
+# --------------------------------------------------------------------------
+ITERATION = 2
+
+HYPOTHESIS = {
+    "label": "iteration2-debug-lock-stackprotector-config-delta",
+    "statement": (
+        "Enabling DEBUG_KERNEL/DEBUG_SPINLOCK/DEBUG_MUTEXES, explicitly disabling "
+        "DEBUG_LOCK_ALLOC/PROVE_LOCKING, selecting CC_STACKPROTECTOR_REGULAR and "
+        "disabling IPV6 will shift the reconstructed kernel's struct layout and "
+        "export surface closer to the stock module's undefined-symbol set."
+    ),
+    "config_changes": [
+        "enable CONFIG_DEBUG_KERNEL",
+        "enable CONFIG_DEBUG_SPINLOCK",
+        "enable CONFIG_DEBUG_MUTEXES",
+        "explicitly disable CONFIG_DEBUG_LOCK_ALLOC",
+        "explicitly disable CONFIG_PROVE_LOCKING",
+        "enable CONFIG_CC_STACKPROTECTOR_REGULAR (disable STRONG/NONE)",
+        "disable CONFIG_IPV6",
+    ],
+    "prediction": (
+        "stock undefined-symbol set plus __memzero if the reconstructed debug/lock "
+        "config really matches the stock build"
+    ),
+    "camera_debug_lock_alloc_state": "inferred_not_proven",
+    "abi_success_claim": False,
+}
+
+# Explicitly forced iteration-2 choices. ``config_state`` reports any that
+# olddefconfig silently changed (unmet dependency or dropped symbol).
+STICKY_KCONFIG = {
+    "CONFIG_DEBUG_KERNEL": "y",
+    "CONFIG_DEBUG_SPINLOCK": "y",
+    "CONFIG_DEBUG_MUTEXES": "y",
+    "CONFIG_DEBUG_LOCK_ALLOC": "n",
+    "CONFIG_PROVE_LOCKING": "n",
+    "CONFIG_CC_STACKPROTECTOR_REGULAR": "y",
+    "CONFIG_CC_STACKPROTECTOR_STRONG": "n",
+    "CONFIG_CC_STACKPROTECTOR_NONE": "n",
+    "CONFIG_IPV6": "n",
 }
 
 # Kernel flags that must hold for the reconstructed config to carry the same
@@ -86,6 +136,8 @@ REQUIRED_KCONFIG = {
 
 # Flags expected of the reconstructed config. Unmet entries are reported as
 # warnings, not hard failures (the module still builds with undefined symbols).
+# The debug/lock/stackprotector/ipv6 entries below are the iteration-2
+# hypothesis (see HYPOTHESIS); they were inferred, not read from a camera.
 EXPECTED_KCONFIG = {
     "CONFIG_AEABI": "y",
     "CONFIG_CPU_V7": "y",
@@ -94,9 +146,17 @@ EXPECTED_KCONFIG = {
     "CONFIG_WIRELESS_EXT": "y",
     "CONFIG_CFG80211_WEXT": "y",
     "CONFIG_MODVERSIONS": "n",
-    "CONFIG_CC_STACKPROTECTOR_STRONG": "n",
-    "CONFIG_CC_STACKPROTECTOR_REGULAR": "n",
     "CONFIG_GCC_PLUGINS": "n",
+    "CONFIG_DEBUG_KERNEL": "y",
+    "CONFIG_DEBUG_SPINLOCK": "y",
+    "CONFIG_DEBUG_MUTEXES": "y",
+    "CONFIG_DEBUG_LOCK_ALLOC": "n",
+    "CONFIG_PROVE_LOCKING": "n",
+    "CONFIG_CC_STACKPROTECTOR": "y",
+    "CONFIG_CC_STACKPROTECTOR_REGULAR": "y",
+    "CONFIG_CC_STACKPROTECTOR_STRONG": "n",
+    "CONFIG_CC_STACKPROTECTOR_NONE": "n",
+    "CONFIG_IPV6": "n",
 }
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -137,7 +197,7 @@ def parse_kconfig(text: str) -> dict:
 
 def config_state(config_path: Path) -> dict:
     observed_all = parse_kconfig(config_path.read_text(encoding="utf-8", errors="replace"))
-    wanted = list(REQUIRED_KCONFIG) + list(EXPECTED_KCONFIG)
+    wanted = list(dict.fromkeys(list(REQUIRED_KCONFIG) + list(EXPECTED_KCONFIG) + list(STICKY_KCONFIG)))
     observed = {symbol: observed_all.get(symbol, "n") for symbol in wanted}
     required_missing = [
         f"{symbol} (want {want!r}, saw {observed[symbol]!r})"
@@ -149,13 +209,23 @@ def config_state(config_path: Path) -> dict:
         for symbol, want in EXPECTED_KCONFIG.items()
         if observed[symbol] != want
     ]
+    # The iteration-2 choices were forced through scripts/config; olddefconfig
+    # can silently revert a symbol whose dependency is unmet. Report those.
+    sticky_mismatch = [
+        f"{symbol} (forced {want!r}, saw {observed[symbol]!r})"
+        for symbol, want in STICKY_KCONFIG.items()
+        if observed[symbol] != want
+    ]
     return {
         "config_path": str(config_path),
         "sha256": sha256_file(config_path),
+        "iteration": ITERATION,
         "vermagic_required_missing": required_missing,
         "vermagic_required_ok": not required_missing,
         "expected_mismatch": expected_mismatch,
         "expected_ok": not expected_mismatch,
+        "sticky_mismatch": sticky_mismatch,
+        "sticky_ok": not sticky_mismatch,
         "observed": observed,
     }
 
@@ -180,6 +250,191 @@ def check_driver(driver_dir: Path) -> dict:
         "files": results,
         "all_match": all_match,
     }
+
+
+# --------------------------------------------------------------------------
+# Compile-only layout probe. The probe is a relocatable ELF32 ARM object whose
+# global char arrays encode sizeof()/offsetof() values as symbol sizes. Only
+# ``probe.o`` is requested from kbuild, so no module is linked and no
+# modpost/MODULE_LICENSE step runs.
+# --------------------------------------------------------------------------
+_ELF_MACHINE = {0: "NONE", 3: "I386", 40: "ARM", 62: "X86_64"}
+_ELF_TYPE = {1: "ET_REL", 2: "ET_EXEC", 3: "ET_DYN", 4: "ET_CORE"}
+_SHT_SYMTAB = 2
+_SHN_UNDEF = 0
+_SIZEOF_PREFIX = "c2m_probe_sizeof_"
+_OFFSETOF_PREFIX = "c2m_probe_offsetof_"
+
+
+def parse_elf32(blob: bytes) -> dict:
+    """Dependency-free ELF32 little-endian reader for relocatable objects."""
+    if len(blob) < 52 or blob[:4] != b"\x7fELF":
+        raise ValueError("not an ELF file")
+    if blob[4] != 1:
+        raise ValueError("not ELFCLASS32")
+    if blob[5] != 1:
+        raise ValueError("not little-endian")
+    header = struct.unpack_from("<HHIIIIIHHHHHH", blob, 16)
+    e_type, e_machine = header[0], header[1]
+    e_shoff, e_shentsize, e_shnum, e_shstrndx = header[5], header[10], header[11], header[12]
+    if e_shoff == 0 or e_shnum == 0 or e_shentsize < 40:
+        raise ValueError("ELF has no section header table")
+    sections = []
+    for index in range(e_shnum):
+        off = e_shoff + index * e_shentsize
+        if off + 40 > len(blob):
+            raise ValueError("section header table out of bounds")
+        (sh_name, sh_type, sh_flags, sh_addr, sh_offset, sh_size,
+         sh_link, sh_info, sh_addralign, sh_entsize) = struct.unpack_from("<IIIIIIIIII", blob, off)
+        sections.append({
+            "index": index, "sh_name": sh_name, "type": sh_type, "flags": sh_flags,
+            "addr": sh_addr, "offset": sh_offset, "size": sh_size, "link": sh_link,
+            "info": sh_info, "addralign": sh_addralign, "entsize": sh_entsize, "name": "",
+        })
+    if e_shstrndx >= len(sections):
+        raise ValueError("invalid e_shstrndx")
+    shstr = sections[e_shstrndx]
+    shstrtab = blob[shstr["offset"]:shstr["offset"] + shstr["size"]]
+
+    def _name(base: bytes, name_off: int) -> str:
+        if name_off < 0 or name_off >= len(base):
+            return ""
+        end = base.find(b"\0", name_off)
+        if end < 0:
+            end = len(base)
+        return base[name_off:end].decode("utf-8", errors="replace")
+
+    for section in sections:
+        section["name"] = _name(shstrtab, section["sh_name"])
+
+    symbols = []
+    symtab = next((s for s in sections if s["type"] == _SHT_SYMTAB), None)
+    if symtab is not None:
+        linked = sections[symtab["link"]] if 0 <= symtab["link"] < len(sections) else {"offset": 0, "size": 0}
+        strtab = blob[linked["offset"]:linked["offset"] + linked["size"]]
+        entsize = symtab["entsize"] or 16
+        for index in range(symtab["size"] // entsize):
+            off = symtab["offset"] + index * entsize
+            if off + 16 > len(blob):
+                break
+            st_name, st_value, st_size, st_info, st_other, st_shndx = struct.unpack_from("<IIIBBH", blob, off)
+            symbols.append({
+                "name": _name(strtab, st_name),
+                "value": st_value,
+                "size": st_size,
+                "info": st_info,
+                "other": st_other,
+                "shndx": st_shndx,
+                "global": bool(st_info & 0x10),
+                "undefined": st_shndx == _SHN_UNDEF,
+            })
+    return {
+        "class": 32,
+        "little_endian": True,
+        "type": _ELF_TYPE.get(e_type, f"e_type={e_type}"),
+        "machine": _ELF_MACHINE.get(e_machine, f"e_machine={e_machine}"),
+        "sections": {s["name"]: {"type": s["type"], "size": s["size"]} for s in sections if s["name"]},
+        "symbols": symbols,
+    }
+
+
+def layout_probe_bytes(blob: bytes, object_name: str = "probe.o") -> dict:
+    parsed = parse_elf32(blob)
+    sizes: dict[str, int] = {}
+    offsets: dict[str, int] = {}
+    for symbol in parsed["symbols"]:
+        name = symbol["name"]
+        if name.startswith(_SIZEOF_PREFIX):
+            sizes[name[len(_SIZEOF_PREFIX):]] = symbol["size"]
+        elif name.startswith(_OFFSETOF_PREFIX):
+            offsets[name[len(_OFFSETOF_PREFIX):]] = symbol["size"]
+    undefined = sorted({s["name"] for s in parsed["symbols"] if s["undefined"] and s["name"]})
+    return {
+        "status": "parsed",
+        "object": object_name,
+        "sha256": hashlib.sha256(blob).hexdigest(),
+        "bytes": len(blob),
+        "elf": {
+            "class": parsed["class"],
+            "little_endian": parsed["little_endian"],
+            "type": parsed["type"],
+            "machine": parsed["machine"],
+        },
+        "struct_sizes": dict(sorted(sizes.items())),
+        "struct_offsets": dict(sorted(offsets.items())),
+        "undefined_symbols": undefined,
+        "undefined_symbol_count": len(undefined),
+        "memset_related_undefined": [s for s in undefined if s in ("memset", "__memzero", "memcpy", "memmove")],
+        "load_safety": "NOT_ESTABLISHED",
+        "notes": [
+            "compile-only probe: only probe.o is produced, so no modpost/MODULE_LICENSE step runs and no .ko exists",
+            "array symbol sizes encode sizeof()/offsetof() under the reconstructed config",
+            "these layouts do NOT prove vendor-camera struct layout or loading safety",
+        ],
+    }
+
+
+# The __memzero export is decided from BOTH files: memzero.S alone cannot show
+# whether the symbol is exported, and absence in these files is not a
+# kernel-wide proof. This mirrors the iteration-2 correction that the parent
+# found v4.9.227 arch/arm/kernel/armksyms.c does carry EXPORT_SYMBOL(__memzero).
+MEMZERO_SCAN_FILES = ("arch/arm/kernel/armksyms.c", "arch/arm/lib/memzero.S")
+
+
+def memzero_export(ksrc: Path) -> dict:
+    files = {}
+    combined = hashlib.sha256()
+    for rel in MEMZERO_SCAN_FILES:
+        target = ksrc / rel
+        entry = {"path": rel, "present": target.is_file()}
+        if entry["present"]:
+            text = target.read_text(encoding="utf-8", errors="replace")
+            digest = sha256_file(target)
+            export_lines = [ln.strip() for ln in text.splitlines() if "__memzero" in ln and "EXPORT_SYMBOL" in ln]
+            entry.update(
+                sha256=digest,
+                bytes=target.stat().st_size,
+                mentions_memzero="__memzero" in text,
+                export_symbol_lines=export_lines,
+                exports_memzero=bool(export_lines),
+            )
+            combined.update(rel.encode("utf-8"))
+            combined.update(digest.encode("ascii"))
+        files[rel] = entry
+    scanned = [entry for entry in files.values() if entry["present"]]
+    if any(entry.get("exports_memzero") for entry in files.values()):
+        verdict = "exported"
+    elif len(scanned) == len(MEMZERO_SCAN_FILES):
+        verdict = "not_exported_in_scanned_files"
+    else:
+        verdict = "unknown_partial_scan"
+    return {
+        "kernel_source": str(ksrc),
+        "files": files,
+        "arch_string_sha256": combined.hexdigest(),
+        "arch_string_source": "sha256 over scanned arch/arm relpaths plus each file sha256",
+        "memzero_export_verdict": verdict,
+        "scope_note": (
+            "verdict covers only the scanned files; __memzero absent from a module undefined set is a "
+            "source/codegen delta and is not by itself a load hazard"
+        ),
+    }
+
+
+def layout_probe(obj_path: Path, ksrc: Path | None = None) -> dict:
+    result = {"probe_iteration": ITERATION, "hypothesis_label": HYPOTHESIS["label"]}
+    if obj_path.is_file():
+        try:
+            obj = layout_probe_bytes(obj_path.read_bytes(), obj_path.name)
+            obj["path"] = str(obj_path)
+        except Exception as exc:  # noqa: BLE001 - surface the parse failure honestly
+            obj = {"status": "unparseable", "path": str(obj_path), "error": str(exc)}
+        result["object"] = obj
+    else:
+        result["object"] = {"status": "missing", "path": str(obj_path)}
+    if ksrc is not None:
+        result["source_scan"] = memzero_export(ksrc)
+    return result
 
 
 def module_metadata(ko_path: Path, profile: str) -> dict:
@@ -238,6 +493,8 @@ def build_report(out_dir: Path, exit_code: int) -> dict:
     steps = _read_steps(out_dir / "steps.tsv")
     report = {
         "lab": "rtl8821cs-offline-public-source",
+        "iteration": ITERATION,
+        "iteration_label": HYPOTHESIS["label"],
         "load_safety": "NOT_ESTABLISHED",
         "generated_by": "tools/wifi/build_rtl8821cs_lab.sh",
         "exit_code": exit_code,
@@ -277,6 +534,14 @@ def build_report(out_dir: Path, exit_code: int) -> dict:
         report["warnings"].extend(state.get("expected_mismatch", []))
         if not state.get("vermagic_required_ok", False):
             report["warnings"].append("reconstructed config is missing required vermagic flags")
+        report["hypothesis"] = {
+            **HYPOTHESIS,
+            "config_choices_forced": dict(STICKY_KCONFIG),
+            "config_choices_ok": state.get("sticky_ok"),
+            "config_choices_mismatch": state.get("sticky_mismatch", []),
+        }
+        for item in state.get("sticky_mismatch", []):
+            report["warnings"].append(f"config choice did not stick after olddefconfig: {item}")
 
     toolchain = out_dir / "toolchain.txt"
     if toolchain.is_file():
@@ -295,6 +560,12 @@ def build_report(out_dir: Path, exit_code: int) -> dict:
             entry["status"] = "built"
             entry["metadata"] = json.loads(meta.read_text(encoding="utf-8"))
         report["profiles"][profile] = entry
+
+    layout = out_dir / "layout-probe.json"
+    if layout.is_file():
+        report["layout_probe"] = json.loads(layout.read_text(encoding="utf-8"))
+    if "hypothesis" not in report:
+        report["hypothesis"] = {**HYPOTHESIS, "config_choices_forced": dict(STICKY_KCONFIG), "config_choices_ok": None, "config_choices_mismatch": []}
 
     failed = [s for s in steps if s["status"] == "fail"]
     report["failed_steps"] = [s["step"] for s in failed]
@@ -354,8 +625,32 @@ def _cmd_config_state(args) -> int:
     result = config_state(Path(args.config))
     if args.out:
         Path(args.out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({k: result[k] for k in ("vermagic_required_ok", "expected_ok", "vermagic_required_missing", "expected_mismatch")}, indent=2, sort_keys=True))
+    summary_keys = ("vermagic_required_ok", "expected_ok", "sticky_ok", "vermagic_required_missing", "expected_mismatch", "sticky_mismatch")
+    print(json.dumps({k: result[k] for k in summary_keys}, indent=2, sort_keys=True))
     return 0 if result["vermagic_required_ok"] else 1
+
+
+def _cmd_config_sticky(args) -> int:
+    state = config_state(Path(args.config))
+    print(json.dumps({"sticky_ok": state["sticky_ok"], "sticky_mismatch": state["sticky_mismatch"]}, indent=2, sort_keys=True))
+    return 0 if state["sticky_ok"] else 1
+
+
+def _cmd_layout_probe(args) -> int:
+    result = layout_probe(Path(args.obj), Path(args.ksrc) if args.ksrc else None)
+    if args.out:
+        Path(args.out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    obj = result["object"]
+    summary = {
+        "object_status": obj.get("status"),
+        "struct_sizes": obj.get("struct_sizes"),
+        "struct_offsets": obj.get("struct_offsets"),
+        "undefined_symbol_count": obj.get("undefined_symbol_count"),
+        "memset_related_undefined": obj.get("memset_related_undefined"),
+        "memzero_export_verdict": result.get("source_scan", {}).get("memzero_export_verdict"),
+    }
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0 if obj.get("status") == "parsed" else 1
 
 
 def _cmd_module_metadata(args) -> int:
@@ -401,6 +696,14 @@ def main(argv=None) -> int:
     config.add_argument("config")
     config.add_argument("--out")
 
+    sticky = sub.add_parser("config-sticky")
+    sticky.add_argument("config")
+
+    probe = sub.add_parser("layout-probe")
+    probe.add_argument("--obj", required=True)
+    probe.add_argument("--ksrc")
+    probe.add_argument("--out")
+
     meta = sub.add_parser("module-metadata")
     meta.add_argument("--ko", required=True)
     meta.add_argument("--profile", required=True)
@@ -417,6 +720,8 @@ def main(argv=None) -> int:
         "verify-file": _cmd_verify_file,
         "check-driver": _cmd_check_driver,
         "config-state": _cmd_config_state,
+        "config-sticky": _cmd_config_sticky,
+        "layout-probe": _cmd_layout_probe,
         "module-metadata": _cmd_module_metadata,
         "report": _cmd_report,
     }

@@ -36,6 +36,12 @@ Compared with stock, both add undefined symbols `__memzero`, `register_inet6addr
 
 The reconstructed config retained `CONFIG_CFG80211_WEXT=y` but did not retain expected `CONFIG_WIRELESS_EXT=y`; the report explicitly lists this mismatch. Compiler warnings include address comparisons and enum/integer mismatch in vendor code; they were logged, not silently removed. Section sizes differ from stock, including baseline .text69,148 bytes smaller and .bss14,568 bytes smaller. These differences need investigation before any further candidate claim.
 
-The independent general CI run39099821238 failed because the newly added metadata test imported pyelftools before that CI job installed it; the module-lab job installed its dependency and passed. The general CI dependency list is corrected separately; do not conflate that test-environment failure with a failed driver compile.
+The independent general CI run39099821238 failed because the newly added metadata test imported pyelftools before that CI job installed it; the module-lab job installed its dependency and passed. The general CI dependency list was corrected in `b8e72ac`; subsequent [general CI39100229565](https://github.com/vunguyenbv175/C2M/actions/runs/39100229565) passed. Do not conflate the earlier test-environment failure with a failed driver compile.
 
 Next work is to identify which config/compiler choices explain the baseline symbol/layout deltas, then run a separately recorded offline iteration. The produced modules remain **NO_LOAD_EVER_FROM_THIS_LAB**.
+
+## Iteration2 hypothesis (recorded before execution)
+
+Proposed offline-only config changes: DEBUG_SPINLOCK/DEBUG_MUTEXES enabled, regular stack protector enabled, IPv6 disabled and lockdep allocation disabled. These are hypotheses inferred from stock symbol references, **not recovered vendor config**. The expected outcome is closure of the two IPv6-notifier additions and four stock-only lock/canary references, potentially leaving `__memzero` as the remaining extra symbol. A compiler-emitted layout probe will record actual lock/mutex sizes and constant-zero/variable memset references without executing target code.
+
+One research claim was independently rejected before implementation: upstream `arch/arm/kernel/armksyms.c` **does export `__memzero`**. Absence of an export declaration in `memzero.S` alone was not sufficient. Do not label the lab module unloadable merely because it references that symbol; target exports and vendor layout still require validation. No header patch will be used to hide it.

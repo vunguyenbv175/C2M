@@ -55,7 +55,7 @@ jobs:
               raise SystemExit('No build report; inspect failed preparation step')
           data = json.loads(report.read_text())
           assert 'NOT' in str(data.get('load_safety', '')), 'report must disclaim load safety'
-          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt']:
+          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log']:
               p = root / name
               if p.exists():
                   assert p.is_file() and not p.is_symlink(), name
@@ -78,3 +78,5 @@ jobs:
             ${{ runner.temp }}/c2m-rtl-lab/build-concurrent.log
             ${{ runner.temp }}/c2m-rtl-lab/kernel-prepare.log
             ${{ runner.temp }}/c2m-rtl-lab/toolchain.txt
+            ${{ runner.temp }}/c2m-rtl-lab/layout-probe.json
+            ${{ runner.temp }}/c2m-rtl-lab/layout-probe.log
