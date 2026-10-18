@@ -23,4 +23,19 @@ Before a camera candidate: obtain/validate the vendor ABI, assess a baseline bui
 
 ## Execution status
 
-Preparation in progress. Build results and run URL will be recorded after the first workflow execution; no module compilation success is claimed at this stage.
+First actual build **passed**: [GitHub Actions39099821245](https://github.com/vunguyenbv175/C2M/actions/runs/39099821245), branch `lab/rtl8821cs-offline-20261018`, source commit `9de8d9c`, job duration3m58s. Both baseline and concurrent modules compiled. Report/downloaded metadata verified locally; no module binary was uploaded or transferred to the camera.
+
+| Variant | Bytes | SHA-256 |
+|---|---:|---|
+| baseline | 2,837,060 | `04508f36c9b4d9f481f9a921ada5223d491802e5ef5dc4ce3fdb2c00e507a119` |
+| concurrent | 2,860,660 | `5a97ff8e51145e038dfd33b40b579dc4f4584c512013c4204a59a361ed6a07b3` |
+
+Both report the same release/vermagic string as stock and218 undefined symbols versus stock219. **This is a compilation success, not an ABI acceptance.**
+
+Compared with stock, both add undefined symbols `__memzero`, `register_inet6addr_notifier`, `unregister_inet6addr_notifier`; both omit `__raw_spin_lock_init`, `__stack_chk_fail`, `__stack_chk_guard`, `mutex_destroy`. Dependency text is empty instead of cfg80211/mmc_core because this header-preparation-only lab has not built a kernel export database; no symbol-version CRCs exist in either case, so that axis supplies no safety proof.
+
+The reconstructed config retained `CONFIG_CFG80211_WEXT=y` but did not retain expected `CONFIG_WIRELESS_EXT=y`; the report explicitly lists this mismatch. Compiler warnings include address comparisons and enum/integer mismatch in vendor code; they were logged, not silently removed. Section sizes differ from stock, including baseline .text69,148 bytes smaller and .bss14,568 bytes smaller. These differences need investigation before any further candidate claim.
+
+The independent general CI run39099821238 failed because the newly added metadata test imported pyelftools before that CI job installed it; the module-lab job installed its dependency and passed. The general CI dependency list is corrected separately; do not conflate that test-environment failure with a failed driver compile.
+
+Next work is to identify which config/compiler choices explain the baseline symbol/layout deltas, then run a separately recorded offline iteration. The produced modules remain **NO_LOAD_EVER_FROM_THIS_LAB**.

@@ -41,7 +41,7 @@ jobs:
           done
       - name: Python tests (no firmware needed)
         run: |
-          pip install msgpack websocket-client 2>/dev/null || pip3 install msgpack websocket-client
+          pip install msgpack websocket-client pyelftools 2>/dev/null || pip3 install msgpack websocket-client pyelftools
           python3 tools/m4/test_protocol.py
           python3 tools/m4/test_decode_passive_records.py
           python3 tools/m4/test_ws_upgrade.py
