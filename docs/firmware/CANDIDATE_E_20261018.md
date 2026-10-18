@@ -89,3 +89,46 @@ Candidate E (staged, to flash)** · `20261016000004`/`0005` local rollbacks.
 `tools/fw/test_candidate_e_gates.py` (8 tests), and the manual workflow
 `.github/workflows/firmware-candidateE.yml`. All fail closed; every payload
 outside the authorized swaps is preserved byte-identically.
+
+## Post-flash inspection — 2026-10-18 (owner-reported flash + observed SSH)
+
+Owner flashed E and connected to its AP. A read-only SSH session (AP-only
+`192.168.1.1:2222`, dedicated key, strict pinned host key) then observed:
+
+- Debug/D3 assets match this build exactly: `dropbear` `988369a5…`,
+  `dropbearkey` `afa48a01…`, `c2m-debug` `565830f1…`, `debug_boot.sh`
+  `378bd43f…`, `libnss_files.so.2` `381a2aa8…`, `boot.sh` `1f40dfbd…`,
+  `c2m-wifi` `d047ff80…`, `c2m-web` `b1dd97af…`, `wpa_supplicant`
+  `97355222…` (all 1001:1001, expected modes).
+- **The 17 swapped system wavs are live**: sampled `/oneed_cust/audio` files
+  match the pinned VI sha256 exactly (Card_Err, WiFi_Open, WiFi_Close,
+  Shutter, Record_On, Record_Off, Insert_Card, Stop_Rec); 22 wavs total;
+  language-neutral wavs and ADAS audio unchanged.
+- Services healthy: `cardv`, `minieye_daemon`, `c2m-idle`, `c2m-signs`,
+  `c2m-debug`, `c2m-web`, ADAS/lane processes, hostapd 5 GHz AP; recording
+  card active.
+- Host key changed after the flash as usual; the D5-era pin was archived and
+  the new owner-controlled pin is
+  `SHA256:clbNRtL12T2uQZN+8NyYjLt+pB5jFmnmv2avAPMbD5U`.
+
+### Found and fixed in source: `c2m-wifi` refused to start
+
+Symptom: `/tmp/c2m_wifi_status` reported
+`last_error=private_paths_or_supplicant_unavailable` and no `c2m-wifi`
+process existed. Root cause (device-verified + static): the stock EN
+customer UBIFS root `/customer` is **0775 1001:1001**; `eff7040` began
+preserving exact stock ownership in rebuilds, so E's `/customer` is 0775
+(earlier rebuilds normalized it to 0755, which is why D4/D5 field images
+passed). `stock_config_ancestor()` in `fw/d3/wifi_control.c` listed only the
+0755 variant for `/customer`, so `safe_dir()` rejected the ancestor walk and
+the controller exited before any capability observation. The debug
+supervisor's table already accepted 0775 — only the wifi controller was
+missing it.
+
+Fix committed (`527907a`, source + host gate `tests/test_d3_vi_paths.py`):
+accept `1001:1001` at both 0755 (legacy rebuild) and 0775 (stock UBIFS
+root). **Not deployed** — the current E flash still reports the failure; the
+fix ships with the next firmware build. STA itself remains blocked by the
+installed single-interface driver (`CONFIG_IFACE_NUMBER=1`), so this is a
+status-correctness fix, not STA enablement.
+
