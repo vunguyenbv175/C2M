@@ -4,7 +4,7 @@
 
 **Installed and collecting on the camera's SD card.** One-sample smoke test returned0; continuous status reports `card_result=0`, `truncated=0`, `state=running`. Card log grew from2,299 bytes (smoke) to10,000 then17,261 and48,081 bytes while sample sequence advanced to25. Reinvoking the isolated launcher left the same single logger PID, confirming its no-duplicate guard.
 
-The startup hook is installed and verified, **but automatic startup after a natural power cycle has not yet been observed**. No camera reboot was forced for this test. Full-card/removal, actual8MiB rotation and long-drive acceptance remain pending; offline bounds/tests are not substitutes.
+The startup hook is installed and verified, **and automatic startup after a natural power cycle was subsequently observed**: after an owner-initiated natural power cycle (no forced reboot), the launcher started exactly one logger (`PID 1047`, `state=running`, `card_result=0`, `truncated=0`) with no duplicate. No camera reboot was forced for either test. Full-card/removal, actual8MiB rotation and long-drive acceptance remain pending; offline bounds/tests are not substitutes.
 
 The owner explicitly requested detailed continuous camera-side logs, including future boots, for debugging ADAS and other subsystems without a laptop connection. This supersedes the earlier two-hour, single-boot proposal. It does not authorize resets, recalibration, license changes, firmware replacement or vendor-service restarts.
 
@@ -88,3 +88,32 @@ Installer/rollback independent review passed within its scope. That does **not**
 ## Deployment is not a frozen D5 release update
 
 Any installed `c2m-diag`, launcher and modified `boot.sh` are an explicitly authorized diagnostic add-on, not byte-identical members of the frozen D5 release. Do not overwrite D5 release pins or claim the original manifest still matches all added/modified files. Keep the original boot backup and separate add-on hashes.
+
+## Update later on 2026-10-18 — drive collection, GPS-freshness caveat, owner pivot
+
+- Continuous collection ran across a natural boot and an owner drive:
+  ~4.7 h and 3,454 samples recorded by the card logger; cadence stayed 5 s;
+  `current.log` reached ~6.07 MB of the 8 MiB bound (rotation pending at
+  last check). No forced reboot was used.
+- `d4.gps_fresh` **never** reported 1 in any sample, including driving time
+  when the separate passive capture proved the GPS speed feed was live.
+  Treat `d4.gps_fresh` as an unreliable proxy; it is not evidence that GPS
+  or its speed feed is broken.
+- Recorder-log token counts (`rec_log_counts`) were nonzero only for index 0
+  (`Seamless` mux mentions; e.g. 280×"1" plus a few 9/19/29/33) while
+  `minieye.log` itself grew during driving (~359 KB). FCW/HMW/LDW/PCW/SAG/
+  VB/`adas_fail`/`tlr_green_on`/`error`/`fail` counts stayed zero. Counts
+  remain clues, not warning events (see boundaries above).
+- A bounded, reviewed passive loopback capture (RAM-only tool, auto-removed
+  after review) during driving saw 596 packets in exactly two flows from
+  source port 23666 to the ADAS and lane-postprocess consumers; speed values
+  were 68 zero / 150 in [1,10) / 76 in [10,30) / 4 sentinel 65535 — the
+  speed feed was genuinely live. No reverse-direction or other loopback
+  traffic appeared, so no ADAS warning-channel traffic exists on that
+  loopback. That drive stayed below the >30 km/h HMW gate, so HMW silence
+  there is expected; FCW silence at those speeds is not explained by these
+  counts.
+- Owner decision after this evidence: stop the VI FCW/HMW code-level
+  root-cause chase ("thôi khó quá") and build a new flash candidate instead:
+  **Candidate E = EN core (D4 asset set) plus the checked VI `oneed_cust`
+  system-audio swap (17 wavs)**. See `docs/firmware/CANDIDATE_E_20261018.md`.
