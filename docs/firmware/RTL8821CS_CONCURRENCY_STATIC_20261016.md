@@ -58,9 +58,22 @@ The stock scripts use one `wlan0` and explicitly stop AP before starting STA
 concurrency is impossible. Do not run those scripts to obtain STA at the cost
 of the working AP.
 
-## Conclusion and next gate
+## 2026-10-18 follow-up: exact installed build is single-interface
 
-**AP+STA remains unproven, not disproven.** The current safe controller must
+The numeric-limit uncertainty above is superseded for this exact module build by new live and static evidence; see [connectivity follow-up](CONNECTIVITY_LIVE_FOLLOWUP_20261018.md).
+
+- Live `drv_cfg` explicitly reports `CONFIG_IFACE_NUMBER = 1`.
+- Exact module `dump_drv_cfg` passes literal1 at0x006e8a.
+- The compiled adapter pool has one pointer slot. Its free-adapter helper checks only index0; wlan0 already occupies and registers that adapter.
+- `cfg80211_rtw_add_virtual_intf` does accept STATION/AP/P2P types, but requires an unregistered adapter. With the only slot in use it returns `ERR_PTR(-ENODEV)`; `if2name` cannot create another slot.
+- `rtw_wiphy_alloc` advertises interface types but leaves concurrency-combination data absent/zero, consistent with the empty runtime combinations attribute.
+- This was established by read-only observation and static analysis, **not by issuing a VIF-create or mode-switch request**.
+
+Thus a second simultaneous AP/STA interface is not supported by the **installed build**. It still does not disprove concurrent operation in another correctly built driver, or establish board-level RF/BT behavior. A matching driver/kernel build and an AP-independent recovery route are prerequisites before any future candidate test.
+
+## Original conclusion and next gate (historical)
+
+**At the time of the original review, AP+STA remained unproven, not disproven.** The current safe controller must
 keep UNKNOWN and refuse interface creation/association when advertisement is
 empty or unadvertised. Source diagnostic errors now distinguish those cases
 from malformed framing only after validating the complete target response,
