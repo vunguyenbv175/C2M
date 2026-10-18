@@ -13,6 +13,7 @@ reads or writes firmware. Supports ``tools/wifi/build_rtl8821cs_lab.sh``:
 * ``config-sticky``   -- report whether the iteration-2 forced choices stuck
 * ``layout-probe``    -- compile-only struct-layout probe metadata + arch scan
 * ``module-metadata`` -- ELF module modinfo / section / undefined-symbol metadata
+* ``module-storage``  -- allocated/COMMON object-symbol storage accounting (bounded)
 * ``report``          -- assemble ``report.json`` from a run's artifacts
 
 The lab never claims camera ABI compatibility and never authorises a load.
@@ -80,10 +81,10 @@ PINS = {
 # undefined-symbol set is evidence about the reconstructed config only; it is
 # never an ABI-success or load-safety claim.
 # --------------------------------------------------------------------------
-ITERATION = 2
+ITERATION = 3
 
 HYPOTHESIS = {
-    "label": "iteration2-debug-lock-stackprotector-config-delta",
+    "label": "iteration3-object-accounting",
     "statement": (
         "Enabling DEBUG_KERNEL/DEBUG_SPINLOCK/DEBUG_MUTEXES, explicitly disabling "
         "DEBUG_LOCK_ALLOC/PROVE_LOCKING, selecting CC_STACKPROTECTOR_REGULAR and "
@@ -105,6 +106,12 @@ HYPOTHESIS = {
     ),
     "camera_debug_lock_alloc_state": "inferred_not_proven",
     "abi_success_claim": False,
+    "evidence_goal": (
+        "SAME CONFIG as run two: add bounded per-profile object/COMMON storage accounting so the "
+        "-fcommon .bss-vs-COMMON split can be compared with the stock .bss effective footprint. "
+        "This is metadata evidence only; it does not change the inferred config and is not an ABI claim."
+    ),
+    "config_changed_since_iteration2": False,
 }
 
 # Explicitly forced iteration-2 choices. ``config_state`` reports any that
@@ -143,8 +150,12 @@ EXPECTED_KCONFIG = {
     "CONFIG_CPU_V7": "y",
     "CONFIG_CFG80211": "m",
     "CONFIG_MMC": "m",
-    "CONFIG_WIRELESS_EXT": "y",
+    # Linux 4.9 net/wireless/Kconfig selects WEXT_CORE via CFG80211_WEXT;
+    # promptless WIRELESS_EXT is independent and may legitimately remain n.
     "CONFIG_CFG80211_WEXT": "y",
+    "CONFIG_WEXT_CORE": "y",
+    "CONFIG_WEXT_PROC": "y",
+    "CONFIG_PROC_FS": "y",
     "CONFIG_MODVERSIONS": "n",
     "CONFIG_GCC_PLUGINS": "n",
     "CONFIG_DEBUG_KERNEL": "y",
@@ -437,17 +448,20 @@ def layout_probe(obj_path: Path, ksrc: Path | None = None) -> dict:
     return result
 
 
+def _profile_role(profile: str) -> str:
+    if profile == "baseline":
+        return "reconstructed_upstream_armv7_thumb2_single_vif"
+    if profile == "concurrent":
+        return "reconstructed_upstream_armv7_thumb2_same_channel_two_vif"
+    return "unknown_profile"
+
+
 def module_metadata(ko_path: Path, profile: str) -> dict:
     import module_abi_report
 
     blob = ko_path.read_bytes()
     elf = module_abi_report.report(blob)
-    if profile == "baseline":
-        role = "reconstructed_upstream_armv7_thumb2_single_vif"
-    elif profile == "concurrent":
-        role = "reconstructed_upstream_armv7_thumb2_same_channel_two_vif"
-    else:
-        role = "unknown_profile"
+    role = _profile_role(profile)
     return {
         "profile": profile,
         "role": role,
@@ -472,6 +486,26 @@ def module_metadata(ko_path: Path, profile: str) -> dict:
             "module bytes stay in the ephemeral runner scratch dir; only this metadata is retained",
         ],
     }
+
+
+def module_storage(ko_path: Path, profile: str, cmd_path: Path | None = None) -> dict:
+    """Bounded allocated/COMMON object accounting for one public-source .ko.
+
+    Delegates to ``tools/fw/module_storage_report`` so the same bounded helper is
+    exercised by the standalone tests. Only names/sizes/bindings/offsets are
+    reported; the module blob and any build ``.cmd`` are read, never executed.
+    """
+    import module_storage_report
+
+    blob = ko_path.read_bytes()
+    result = module_storage_report.report(blob, profile=profile, cmd_path=cmd_path)
+    result["role"] = _profile_role(profile)
+    result["camera_abi_claim"] = "NOT_CAMERA_ABI"
+    result["load_policy"] = "NO_LOAD_EVER_FROM_THIS_LAB"
+    result["notes"] = list(result.get("notes", [])) + [
+        "role/label is metadata only; the producing config is the reconstructed iteration-2 config (unchanged)",
+    ]
+    return result
 
 
 def _read_steps(step_file: Path) -> list:
@@ -559,6 +593,23 @@ def build_report(out_dir: Path, exit_code: int) -> dict:
         if meta.is_file():
             entry["status"] = "built"
             entry["metadata"] = json.loads(meta.read_text(encoding="utf-8"))
+        storage = out_dir / f"{profile}.storage.json"
+        if storage.is_file():
+            # Reference the full bounded artifact; attach only the safe summary
+            # so report.json stays small.
+            entry["storage_artifact"] = storage.name
+            try:
+                data = json.loads(storage.read_text(encoding="utf-8"))
+                entry["storage_summary"] = {
+                    "sha256": data.get("sha256"),
+                    "bytes": data.get("bytes"),
+                    "load_safety": data.get("load_safety"),
+                    "bounds": data.get("bounds"),
+                    "compiler": data.get("compiler"),
+                    "summary": data.get("summary"),
+                }
+            except (OSError, ValueError) as exc:
+                entry["storage_summary_error"] = str(exc)
         report["profiles"][profile] = entry
 
     layout = out_dir / "layout-probe.json"
@@ -670,6 +721,28 @@ def _cmd_module_metadata(args) -> int:
     return 0
 
 
+def _cmd_module_storage(args) -> int:
+    cmd_path = Path(args.cmd) if getattr(args, "cmd", None) else None
+    try:
+        result = module_storage(Path(args.ko), args.profile, cmd_path)
+    except Exception as exc:  # noqa: BLE001 - surface parse failure honestly, never fake evidence
+        print(json.dumps({"status": "error", "profile": args.profile, "error": str(exc)}, indent=2, sort_keys=True))
+        return 1
+    if args.out:
+        Path(args.out).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary = {
+        "status": result["status"],
+        "profile": result["profile"],
+        "sha256": result["sha256"],
+        "bytes": result["bytes"],
+        "bounds": result["bounds"],
+        "load_safety": result["load_safety"],
+        **result["summary"],
+    }
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
 def _cmd_report(args) -> int:
     report = build_report(Path(args.out), args.exit_code)
     target = Path(args.out) / "report.json"
@@ -709,6 +782,12 @@ def main(argv=None) -> int:
     meta.add_argument("--profile", required=True)
     meta.add_argument("--out")
 
+    storage = sub.add_parser("module-storage")
+    storage.add_argument("--ko", required=True)
+    storage.add_argument("--profile", required=True)
+    storage.add_argument("--cmd")
+    storage.add_argument("--out")
+
     report = sub.add_parser("report")
     report.add_argument("--out", required=True)
     report.add_argument("--exit-code", type=int, default=0)
@@ -723,6 +802,7 @@ def main(argv=None) -> int:
         "config-sticky": _cmd_config_sticky,
         "layout-probe": _cmd_layout_probe,
         "module-metadata": _cmd_module_metadata,
+        "module-storage": _cmd_module_storage,
         "report": _cmd_report,
     }
     return handlers[args.command](args)

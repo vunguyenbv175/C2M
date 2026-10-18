@@ -224,7 +224,7 @@ CONFIG_ARGS=(
     -e MODULES -e MODULE_UNLOAD -e MODULE_FORCE_UNLOAD
     -e SMP -d PREEMPT_NONE -d PREEMPT_VOLUNTARY -e PREEMPT
     -e THUMB2_KERNEL -e CPU_V7 -e ARM_PATCH_PHYS_VIRT -e AEABI
-    -m CFG80211 -e CFG80211_WEXT -e WIRELESS_EXT
+    -m CFG80211 -e CFG80211_WEXT -e PROC_FS
     -m MMC
     -d MODVERSIONS
     # Iteration-2 hypothesis (INFERRED, not a camera config): debug locks on,
@@ -413,9 +413,30 @@ build_profile() {
     if python3 "$LAB_PY" module-metadata --ko "$ko" --profile "$profile" \
             --out "$OUT/$profile.metadata.json" >>"$log" 2>&1; then
         record_step "ko-$profile" ok metadata_written
+    else
+        record_step "ko-$profile" fail metadata_failed
+        return 1
+    fi
+
+    # Bounded allocated/COMMON object accounting (metadata only, no raw bytes).
+    # A kbuild .cmd is public source and is read as TEXT ONLY, never executed.
+    local ko_cmd= storage_ok=0
+    # Use a C translation-unit command, not the final linker command.
+    for cand in "$drv/os_dep/.osdep_service.o.cmd" "$drv/os_dep/linux/.os_intfs.o.cmd"; do
+        if [ -f "$cand" ]; then ko_cmd=$cand; break; fi
+    done
+    if [ -n "$ko_cmd" ]; then
+        python3 "$LAB_PY" module-storage --ko "$ko" --profile "$profile" \
+            --cmd "$ko_cmd" --out "$OUT/$profile.storage.json" >>"$log" 2>&1 || storage_ok=$?
+    else
+        python3 "$LAB_PY" module-storage --ko "$ko" --profile "$profile" \
+            --out "$OUT/$profile.storage.json" >>"$log" 2>&1 || storage_ok=$?
+    fi
+    if [ "$storage_ok" -eq 0 ]; then
+        record_step "storage-$profile" ok storage_written
         return 0
     fi
-    record_step "ko-$profile" fail metadata_failed
+    record_step "storage-$profile" fail "storage_failed_exit=$storage_ok"
     return 1
 }
 

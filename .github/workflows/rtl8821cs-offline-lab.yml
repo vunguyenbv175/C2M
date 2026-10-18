@@ -14,6 +14,8 @@ name: rtl8821cs-offline-lab
       - tests/test_rtl8821cs_lab.py
       - tools/fw/module_abi_report.py
       - tools/fw/test_module_abi_report.py
+      - tools/fw/module_storage_report.py
+      - tools/fw/test_module_storage_report.py
 concurrency:
   group: rtl8821cs-offline-lab
   cancel-in-progress: true
@@ -35,6 +37,7 @@ jobs:
           bash -n tools/wifi/build_rtl8821cs_lab.sh
           python3 tests/test_rtl8821cs_lab.py
           python3 tools/fw/test_module_abi_report.py
+          python3 tools/fw/test_module_storage_report.py
           python3 tests/test_d3_dhcp_lease.py
           python3 fw/diag/test_diag_contract.py
       - name: Build research baseline and concurrent variants
@@ -54,8 +57,14 @@ jobs:
           if not report.is_file():
               raise SystemExit('No build report; inspect failed preparation step')
           data = json.loads(report.read_text())
-          assert 'NOT' in str(data.get('load_safety', '')), 'report must disclaim load safety'
-          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log']:
+          assert data.get('load_safety') == 'NOT_ESTABLISHED', 'report must disclaim load safety'
+          assert data['identity']['load_authorized'] is False
+          assert data['identity']['load_policy'] == 'NO_LOAD_EVER_FROM_THIS_LAB'
+          if data.get('status') == 'ok':
+              for profile in ['baseline', 'concurrent']:
+                  assert (root / (profile + '.metadata.json')).is_file()
+                  assert (root / (profile + '.storage.json')).is_file()
+          for name in ['report.json', 'baseline.metadata.json', 'concurrent.metadata.json', 'build-baseline.log', 'build-concurrent.log', 'kernel-prepare.log', 'toolchain.txt', 'layout-probe.json', 'layout-probe.log', 'baseline.storage.json', 'concurrent.storage.json']:
               p = root / name
               if p.exists():
                   assert p.is_file() and not p.is_symlink(), name
@@ -80,3 +89,5 @@ jobs:
             ${{ runner.temp }}/c2m-rtl-lab/toolchain.txt
             ${{ runner.temp }}/c2m-rtl-lab/layout-probe.json
             ${{ runner.temp }}/c2m-rtl-lab/layout-probe.log
+            ${{ runner.temp }}/c2m-rtl-lab/baseline.storage.json
+            ${{ runner.temp }}/c2m-rtl-lab/concurrent.storage.json

@@ -63,6 +63,8 @@ SCRIPT_TOKENS = (
     "build-concurrent.log",
     "kernel-prepare.log",
     "toolchain.txt",
+    "module-storage",
+    "storage.json",
     "--exit-code",
     "sha256_mismatch",
 )
@@ -211,7 +213,10 @@ class ConfigStateTests(unittest.TestCase):
                 "CONFIG_CPU_V7=y",
                 "CONFIG_CFG80211=m",
                 "CONFIG_MMC=m",
-                "CONFIG_WIRELESS_EXT=y",
+                "# CONFIG_WIRELESS_EXT is not set",
+                "CONFIG_WEXT_CORE=y",
+                "CONFIG_WEXT_PROC=y",
+                "CONFIG_PROC_FS=y",
                 "CONFIG_CFG80211_WEXT=y",
                 "# CONFIG_MODVERSIONS is not set",
                 "# CONFIG_GCC_PLUGINS is not set",
@@ -239,6 +244,14 @@ class ConfigStateTests(unittest.TestCase):
         self.assertTrue(state["expected_ok"], state["expected_mismatch"])
         self.assertTrue(state["sticky_ok"], state["sticky_mismatch"])
         self.assertEqual(state["observed"]["CONFIG_THUMB2_KERNEL"], "y")
+
+    def test_wext_compat_does_not_require_legacy_wireless_ext(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = lab.config_state(self._write(tmp))
+        self.assertNotIn("CONFIG_WIRELESS_EXT", lab.EXPECTED_KCONFIG)
+        self.assertTrue(state["expected_ok"])
+        self.assertEqual(state["observed"]["CONFIG_WEXT_CORE"], "y")
+        self.assertEqual(state["observed"]["CONFIG_WEXT_PROC"], "y")
 
     def test_missing_required_flagged(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -289,8 +302,9 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(report["profiles"]["concurrent"]["status"], "absent")
         self.assertEqual(report["identity"]["camera_abi_claim"], "NOT_CAMERA_ABI")
         self.assertFalse(report["identity"]["load_authorized"])
-        self.assertEqual(report["iteration"], 2)
+        self.assertEqual(report["iteration"], 3)
         self.assertEqual(report["hypothesis"]["label"], lab.HYPOTHESIS["label"])
+        self.assertFalse(report["hypothesis"]["config_changed_since_iteration2"])
         self.assertFalse(report["hypothesis"]["abi_success_claim"])
         self.assertTrue(report["hypothesis"]["config_choices_ok"])
         self.assertEqual(report["hypothesis"]["camera_debug_lock_alloc_state"], "inferred_not_proven")
@@ -318,6 +332,33 @@ class ReportTests(unittest.TestCase):
             report = lab.build_report(out, 1)
         self.assertEqual(report["status"], "failed")
         self.assertEqual(report["failed_steps"], ["build-concurrent"])
+
+    def test_report_attaches_storage_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "steps.tsv").write_text("storage-baseline\tok\tstorage_written\n", encoding="utf-8")
+            (out / "baseline.metadata.json").write_text(
+                json.dumps({"profile": "baseline"}), encoding="utf-8"
+            )
+            (out / "baseline.storage.json").write_text(
+                json.dumps(
+                    {
+                        "sha256": "0" * 64,
+                        "bytes": 10,
+                        "load_safety": "NOT_ESTABLISHED",
+                        "bounds": {"object_symbols_total": 3, "truncated": False},
+                        "compiler": {"cc": "arm-linux-gnueabi-gcc"},
+                        "summary": {"bss_section_bytes": 256, "common_total_bytes": 128},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = lab.build_report(out, 0)
+        entry = report["profiles"]["baseline"]
+        self.assertEqual(entry["storage_artifact"], "baseline.storage.json")
+        self.assertEqual(entry["storage_summary"]["summary"]["common_total_bytes"], 128)
+        self.assertEqual(entry["storage_summary"]["load_safety"], "NOT_ESTABLISHED")
+        self.assertNotIn("storage_summary", report["profiles"]["concurrent"])
 
 
 class LayoutProbeTests(unittest.TestCase):
@@ -390,7 +431,7 @@ class LayoutProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = lab.layout_probe(Path(tmp) / "probe.o")
         self.assertEqual(result["object"]["status"], "missing")
-        self.assertEqual(result["probe_iteration"], 2)
+        self.assertEqual(result["probe_iteration"], 3)
 
 
 class MemzeroScanTests(unittest.TestCase):
@@ -455,6 +496,35 @@ class ModuleMetadataTests(unittest.TestCase):
         self.assertEqual(meta["elf"]["undefined_symbol_count"], 2)
         self.assertEqual(meta["elf"]["load_safety"], "NOT_ESTABLISHED")
         self.assertEqual(meta["role"], "reconstructed_upstream_armv7_thumb2_same_channel_two_vif")
+
+
+class ModuleStorageTests(unittest.TestCase):
+    def test_wiring_labels_without_pyelftools(self):
+        import module_storage_report
+
+        original = module_storage_report.report
+        with tempfile.TemporaryDirectory() as tmp:
+            ko = Path(tmp) / "8821cs.ko"
+            ko.write_bytes(b"\x7fELF")
+            module_storage_report.report = lambda blob, profile=None, cmd_path=None: {  # noqa: ARG005
+                "status": "parsed",
+                "profile": profile,
+                "sha256": lab.sha256_file(ko),
+                "bytes": 4,
+                "summary": {"common_total_bytes": 64, "bss_section_bytes": 16},
+                "bounds": {"truncated": False},
+                "load_safety": "NOT_ESTABLISHED",
+                "notes": [],
+            }
+            try:
+                result = lab.module_storage(ko, "baseline")
+            finally:
+                module_storage_report.report = original
+        self.assertEqual(result["camera_abi_claim"], "NOT_CAMERA_ABI")
+        self.assertEqual(result["load_policy"], "NO_LOAD_EVER_FROM_THIS_LAB")
+        self.assertEqual(result["role"], "reconstructed_upstream_armv7_thumb2_single_vif")
+        self.assertEqual(result["summary"]["common_total_bytes"], 64)
+        self.assertEqual(result["load_safety"], "NOT_ESTABLISHED")
 
 
 if __name__ == "__main__":
