@@ -9,6 +9,13 @@ vẫn áp dụng; D1 chẩn đoán không còn mặc định là bản phải fl
 **Quyết định đã chốt:** giữ âm thanh/kích hoạt ADAS theo hãng; không thêm lời
 chào mỗi boot, không ép hiệu chuẩn lại chỉ để nghe câu chào.
 
+**Owner thay thế quyết định (2026-10-19):** owner yêu cầu rõ bản firmware kế
+tiếp có câu chào tiếng Việt "xin chào chị Diệp" mỗi boot và một câu nhắc theo
+ánh sáng ("Bật đèn xe" khi tối, "Tắt đèn khi trời sáng" khi sáng). Quyết định
+"không thêm lời chào mỗi boot" ở trên bị **thay thế** cho dòng F; chi tiết ở
+`docs/firmware/CANDIDATE_F_BOOT_VOICE_20261019.md`. Bản F chỉ phát lời nhắc
+bằng giọng nói — C2M không có đầu ra điều khiển đèn xe đã xác minh.
+
 ## 1. Kết luận phân tích
 
 Bản C chứng minh đường nâng cấp hẹp trên nền EN là khả thi: đã build qua
