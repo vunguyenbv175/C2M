@@ -1,9 +1,15 @@
 # Candidate F — boot voice advisory (Vietnamese) — 2026-10-19
 
-**Trạng thái:** recipe F đã viết; CI run `39279662410` dừng ở bước build boot
-voice vì link stock `libdl-2.30.so` với `-Wl,--no-undefined`
-(`_dl_*@GLIBC_PRIVATE`). Đã sửa sang `-Wl,--allow-shlib-undefined`; **chưa
-rerun CI**, chưa flash, chưa nghiệm thu phần cứng. Token flash chưa cấp.
+**Trạng thái:** recipe F đã được CI xác nhận đầy đủ tại run
+[`39287717224`](https://github.com/vunguyenbv175/C2M/actions/runs/39287717224)
+(commit `f954e0d`): toàn bộ gate xanh, gồm boot voice helper build/QEMU/host
+tests 7/7, exact five-file deploy, P2/P3 allowlist và publish private vault.
+Deliverable riêng tư: `deliverables/20261019-f-r39287717224` (vault commit
+`371e54d`), **giữ nguyên stock token — NOT FLASH-READY**. Token cục bộ đề xuất
+`20261019000001` đã được chuẩn bị bằng `reversion_sd_package.py`:
+`ALLOWLIST-OK`, read-back host 4/4, chỉ đổi token 14 byte + `sysVer.txt` +
+`minieye_firmware.md5`. **Chưa flash, chưa nghiệm thu phần cứng; đang chờ owner
+xác nhận token và cho phép flash.**
 
 ## 1. Yêu cầu owner và quyết định bị thay thế
 
@@ -170,10 +176,22 @@ Private vault: `assets/bootvoice/` đã push lên `origin/main` (commit
 `8413b0b`; WAV + MP3 + sums + README + generate.py). CI fetch đã xác nhận đúng
 3 WAV và pin SHA256.
 
-CI: run `39279662410` xanh 16 bước đầu; bước boot voice dừng ở link vì
-`-Wl,--no-undefined` gặp `_dl_*@GLIBC_PRIVATE` của stock `libdl-2.30.so`.
-Đã thay bằng `-Wl,--allow-shlib-undefined`; **cần dispatch lại** sau khi push
-commit sửa. Chưa có artifact F từ CI.
+Vault `origin/main` đã có deliverable F: commit `371e54d`,
+`deliverables/20261019-f-r39287717224/c2m-flash/` gồm `C2M_FLASH_A/`,
+`C2M_FLASH_F/`, `EN_REPACK_GOLDEN.tar` (A), `EN_ENHANCE_IDLE.tar` (F),
+`BUILD_EVIDENCE/` và `OPEN_SOURCE/`. Bốn tệp F đúng pin CI:
+bin `1ca3ea4b...`, adas `0e18c91f...`, md5 `79f85f...`, sysVer `7cc079...`.
+
+CI: run `39279662410` (commit cũ) dừng ở link vì `-Wl,--no-undefined` gặp
+`_dl_*@GLIBC_PRIVATE` của stock `libdl-2.30.so`; đã sửa bằng
+`-Wl,--allow-shlib-undefined`. Run sạch
+[`39287717224`](https://github.com/vunguyenbv175/C2M/actions/runs/39287717224)
+thành công toàn bộ: boot voice helper build + QEMU self-test `c2m-light 0.2.0`
++ 7/7 host test; ELF gate `NEEDED=['libdl.so.2','libc.so.6']`, max GLIBC 2.4;
+exact five-file deploy; P2/P3 `ALLOWLIST-OK`; release layout giữ stock token;
+publish vault và upload evidence. Artifact công khai `candidateF-evidence`
+(id `12204861285`) chỉ chứa source/hash/báo cáo, không có firmware/audio/key
+bytes.
 
 Trạng thái host local (2026-10-19):
 
@@ -186,14 +204,25 @@ Trạng thái host local (2026-10-19):
   vẫn giữ trần GLIBC 2.30).
 - `sh -n fw/voice/boot_voice.sh`, `sh -n fw/voice/build.sh` — OK.
 
-## 9. Điều kiện xác nhận của owner (chưa thực hiện)
+## 9. Chuẩn bị token cục bộ và điều kiện xác nhận của owner
 
-1. Dispatch workflow `firmware-candidateF.yml`, kiểm tra mọi gate xanh; nạp
-   package vào private vault.
-2. Chuẩn bị token cục bộ bằng `tools/fw/reversion_sd_package.py` (fail-closed,
-   token mới khác mọi token đã cài), deep validation, ghi thẻ + read-back 4/4.
-3. Chỉ flash sau khi owner cho phép; kiểm tra: câu chào khi boot; tiếng Việt
-   hệ thống; ADAS/FCW/HMW/ghi hình như trước.
+1. CI đã xong: run `39287717224` xanh toàn bộ; package F nằm trong private
+   vault (`deliverables/20261019-f-r39287717224`, commit `371e54d`), vẫn giữ
+   stock token.
+2. Token cục bộ đã chuẩn bị bằng `tools/fw/reversion_sd_package.py` trên đúng
+   bốn tệp F lấy từ vault (pin khớp CI), token đề xuất **`20261019000001`**
+   (khác mọi token đã cài/đã đặt trước). Kết quả:
+   - `verdict=ALLOWLIST-OK`, `readback_verified=true`,
+     `host_byte_proof_only=true`, `device_tested=false`, `flash_proven=false`;
+   - chỉ đổi token 14 byte trong inner image, `sysVer.txt` và
+     `minieye_firmware.md5`; mọi load command/padding/footer/`adas_upgrade.sh`
+     giữ nguyên;
+   - output: bin `04de4ddb...`, sysVer `0fba8463...`, md5 `741a68bb...`,
+     adas `0e18c91f...`; md5 sidecar mới khớp MD5 inner `174c5982...`.
+   Bản chuẩn bị nằm cục bộ (không nằm trong repo công khai); chỉ dùng bản này
+   để ghi thẻ, không dùng raw `C2M_FLASH_F/`.
+3. **Chờ owner xác nhận token `20261019000001` và cho phép flash.** Chưa flash;
+   chỉ flash sau khi owner cho phép.
 4. Nghe đúng một câu chào và đúng một câu nhắc đèn; kiểm tra
    `/tmp/c2m_voice_status` (`source=theme`, `schedule=06:00:01-17:59:59`).
    Thử cả hai khung giờ (sáng/tối) bằng cách đổi giờ hệ thống trong cửa sổ test
@@ -209,6 +238,9 @@ Trạng thái host local (2026-10-19):
 
 ## 10. Liên kết
 
+- CI F: https://github.com/vunguyenbv175/C2M/actions/runs/39287717224
+  (artifact `candidateF-evidence`, id `12204861285`).
+- Private vault F: `deliverables/20261019-f-r39287717224` (commit `371e54d`).
 - `docs/firmware/CANDIDATE_E_20261018.md` — nền E/E2.
 - `docs/firmware/C2M_NEXT_UPGRADE_PLAN_20261014.md` — override ghi nhận.
 - `docs/firmware/C2M_AUDIO_TSR_MECHANISM.md` — đường phát âm thanh stock.
