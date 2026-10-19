@@ -180,6 +180,11 @@ class BootVoiceTest(unittest.TestCase):
         mutation = json.loads(fixture.out.read_text(encoding="utf-8"))
         self.assertTrue(mutation.get("bootvoice_services"))
         self.assertEqual(mutation["bootvoice"]["threshold"], 500)
+        self.assertEqual(mutation["bootvoice"]["light_default_source"],
+                         "stock-day-night-schedule")
+        self.assertEqual(mutation["bootvoice"]["light_schedule"],
+                         "06:00:01-18:00:00")
+        self.assertEqual(mutation["bootvoice"]["ae_helper"], "manual-only")
         self.assertIn("voice-only", mutation["bootvoice"]["actuation"])
         added = {item["path"] for item in mutation["added"]}
         for name in VOICE_NAMES:
@@ -256,17 +261,26 @@ class BootVoiceTest(unittest.TestCase):
         self.assertIn("state=bright", hook)
         self.assertIn("timeout 5", hook)
         self.assertIn("exit 0", hook)
+        self.assertIn("_clock_state", hook)
+        self.assertIn("06:00:01-18:00:00", hook)
+        self.assertIn("AE_LIGHT_ENABLE", hook)
+        self.assertIn("date +%H", hook)
 
         helper = (ROOT / "fw" / "voice" / "light.c").read_text(encoding="utf-8")
         self.assertIn("MI_ISP_AE_QueryExposureInfo", helper)
         self.assertIn("0x230", helper)
         self.assertIn("DEFAULT_THRESHOLD 500", helper)
         self.assertIn('"state=%s lv=%d samples=%d threshold=%d\\n"', helper)
+        self.assertIn("libmi_sys.so", helper)
+        self.assertIn("libcam_os_wrapper.so", helper)
+        self.assertIn("libcus3a.so", helper)
+        self.assertIn("RTLD_GLOBAL", helper)
         self.assertIn("return 2;", helper)
 
         build = (ROOT / "fw" / "voice" / "build.sh").read_text(encoding="utf-8")
         self.assertIn("--sysroot", build)
         self.assertIn("libdl-2.30.so", build)
+        self.assertIn("--allow-shlib-undefined", build)
         self.assertIn("check_elf.py", build)
         self.assertIn("--self-test", build)
 

@@ -41,8 +41,10 @@ Mutation (exactly):
   8. (optional --bootvoice-services-dir, requires D3 + checked TSR):
      install exactly c2m-light, boot_voice.sh and the three pinned Vietnamese
      boot wavs; launch boot_voice.sh detached BEFORE the mount-wait block so
-     the greeting is not delayed by a missing recording card. Voice only:
-     no car-headlight actuation exists on C2M.
+     the greeting is not delayed by a missing recording card. The light
+     reminder defaults to the stock C2M display day/night schedule; c2m-light
+     is a manual-only AE helper gated by /customer/c2m/AE_LIGHT_ENABLE. Voice
+     only: no car-headlight actuation exists on C2M.
 
 Fail-closed guards:
   - --manifest (stock manifest JSON) REQUIRED: hook file content must hash
@@ -803,6 +805,10 @@ def main() -> int:
         doc["bootvoice_services"] = True
         doc["bootvoice"] = {
             "threshold": 500,
+            "light_default_source": "stock-day-night-schedule",
+            "light_schedule": "06:00:01-18:00:00",
+            "ae_helper": "manual-only",
+            "ae_enable_marker": "AE_LIGHT_ENABLE",
             "greeting": "xin chào chị Diệp",
             "dark": "Bật đèn xe",
             "bright": "Tắt đèn khi trời sáng",
@@ -815,7 +821,7 @@ def main() -> int:
         doc["added"].append({"path": "/c2m/health.sh", "type": "reg", "mode": 0o755,
                              "mode_oct": "0o755", "uid": 1001, "gid": 1001,
                              "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-    if d4_added or debug_added:
+    if d4_added or debug_added or bootvoice_added:
         with args.out_manifest.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(doc, indent=2))
     else:

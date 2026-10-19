@@ -75,14 +75,19 @@ before the bounded SD mount wait. It uses option 2 above:
 
 - `audioplay 1 dev0 /customer/c2m/Boot_Greeting.wav` into `/tmp/cardv_fifo`
   (the stock-verified command form) plays the Vietnamese greeting;
-- `/customer/c2m/c2m-light` reads the stock read-only ISP AE query
-  `MI_ISP_AE_QueryExposureInfo(0,0,&info)` and the `LVx10` field at
-  `info+0x230`, threshold 500 (the stock `cardv_detect_FCamAEToPWM`
-  comparison), median of five samples;
+- the default light state is the stock C2M display day/night schedule
+  (06:00:01–18:00:00, the `SendDisplayModeToScreenv` boundary);
+- `/customer/c2m/c2m-light` is a MANUAL-only helper that reads the stock
+  read-only ISP AE query `MI_ISP_AE_QueryExposureInfo(0,0,&info)` and the
+  `LVx10` field at `info+0x230`, threshold 500 (the stock
+  `cardv_detect_FCamAEToPWM` comparison), median of five samples. The hook
+  calls it only when `/customer/c2m/AE_LIGHT_ENABLE` exists after an owner
+  hardware test; it is not started automatically at boot;
 - exactly one reminder is played: dark → `Light_Dark_TurnOn.wav`
   ("Bật đèn xe"), bright → `Light_Bright_TurnOff.wav` ("Tắt đèn khi trời sáng");
-- invalid/unknown AE or a missing FIFO/asset ⇒ no advisory (fail-closed);
-  the hook logs one status line to `/tmp/c2m_voice_status`.
+- invalid schedule state or a missing FIFO/asset ⇒ no advisory (fail-closed);
+  a failed/invalid optional AE reading falls back to the stock schedule. The
+  hook logs one status line to `/tmp/c2m_voice_status`.
 
 This shares cardv's audio decoder. The greeting runs early in the stock boot
 path (before ADAS service), and arbitration with ADAS startup audio has NOT

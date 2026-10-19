@@ -3,9 +3,19 @@
  *
  * Stock cardv already calls MI_ISP_AE_QueryExposureInfo(0, 0, &info) and
  * consumes info+0x230 as "LVx10" (its cardv_detect_FCamAEToPWM path compares
- * that value with 500 and maps LVx10/10 to a backlight level).  Candidate F
+ * that value with 500 and maps LVx10/10 to a backlight level).  This helper
  * reuses only that read-only query; it never changes AE, backlight, screen
  * theme or any stock state.
+ *
+ * It is a MANUAL hardware-validation tool, not the default boot source.  The
+ * boot hook uses the stock display day/night schedule unless the owner has
+ * validated this helper and created /customer/c2m/AE_LIGHT_ENABLE.  A second
+ * ISP client is intentionally not opened automatically at boot.
+ *
+ * libmi_isp.so has no DT_NEEDED entries for the vendor support libraries; it
+ * expects the executable to have loaded libmi_sys.so, libcam_os_wrapper.so
+ * and libcus3a.so into the global symbol scope first.  Load them explicitly so
+ * dlopen(libmi_isp.so, RTLD_NOW) can resolve its undefined vendor symbols.
  *
  * Output is one line on stdout:
  *   state=dark lv=-123 samples=5 threshold=500
@@ -13,7 +23,7 @@
  *
  * No valid sample (missing library, API error, implausible value) prints a
  * diagnostic on stderr, writes nothing on stdout and exits 2.  The boot hook
- * treats that as "no advisory", never as a guessed state.
+ * treats that as "fall back to the stock schedule", never as a guessed state.
  */
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE
@@ -24,7 +34,7 @@
 #include <string.h>
 #include <time.h>
 
-#define LIGHT_VERSION "c2m-light 0.1.0"
+#define LIGHT_VERSION "c2m-light 0.2.0"
 #define INFO_BYTES 0x404u
 #define LV_OFFSET 0x230u
 #define DEFAULT_THRESHOLD 500
@@ -118,7 +128,26 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    library = dlopen(library_name, RTLD_NOW | RTLD_LOCAL);
+    if (strcmp(library_name, "libmi_isp.so") == 0) {
+        static const char *const vendor_deps[] = {
+            "libmi_sys.so",
+            "libcam_os_wrapper.so",
+            "libcus3a.so"
+        };
+        size_t dep;
+
+        for (dep = 0; dep < sizeof(vendor_deps) / sizeof(vendor_deps[0]); dep++) {
+            void *handle = dlopen(vendor_deps[dep], RTLD_NOW | RTLD_GLOBAL);
+            if (handle == NULL) {
+                error = dlerror();
+                fprintf(stderr, "c2m-light: cannot preload %s: %s\n",
+                        vendor_deps[dep], error != NULL ? error : "unknown error");
+                return 2;
+            }
+        }
+    }
+
+    library = dlopen(library_name, RTLD_NOW | RTLD_GLOBAL);
     if (library == NULL) {
         error = dlerror();
         fprintf(stderr, "c2m-light: cannot open %s: %s\n",

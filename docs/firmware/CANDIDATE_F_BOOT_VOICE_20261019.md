@@ -1,16 +1,24 @@
 # Candidate F — boot voice advisory (Vietnamese) — 2026-10-19
 
-**Trạng thái:** recipe đã viết, host gates đã chạy; chưa build CI, chưa flash,
-chưa nghiệm thu phần cứng. Token flash chưa cấp.
+**Trạng thái:** recipe F đã viết; CI run `39279662410` dừng ở bước build boot
+voice vì link stock `libdl-2.30.so` với `-Wl,--no-undefined`
+(`_dl_*@GLIBC_PRIVATE`). Đã sửa sang `-Wl,--allow-shlib-undefined`; **chưa
+rerun CI**, chưa flash, chưa nghiệm thu phần cứng. Token flash chưa cấp.
 
 ## 1. Yêu cầu owner và quyết định bị thay thế
 
 Owner yêu cầu bản firmware kế tiếp:
 
 1. Khi khởi động, phát câu chào tiếng Việt **"xin chào chị Diệp"**.
-2. Phát cảnh báo tiếng Việt theo ánh sáng môi trường:
+2. Phát cảnh báo tiếng Việt theo trạng thái ngày/đêm của C2M:
    - tối → **"Bật đèn xe"**;
    - sáng → **"Tắt đèn khi trời sáng"**.
+
+Bản F dùng **lịch ngày/đêm stock của C2M** (06:00:01–18:00:00) làm nguồn mặc
+định. Helper đọc ISP AE (`c2m-light`) chỉ dùng **thủ công** sau khi owner xác
+minh trên máy; lý do: chưa chứng minh được một tiến trình thứ hai gọi ISP an
+toàn, và mở client ISP thứ hai lúc boot có thể ảnh hưởng `cardv`. Lịch stock là
+theo giờ, không phải cảm biến lux; xem mục 7.
 
 Quyết định cũ ghi trong `C2M_NEXT_UPGRADE_PLAN_20261014.md` — "không thêm lời
 chào mỗi boot" — bị owner **thay thế rõ ràng** bằng yêu cầu ngày 2026-10-19.
@@ -24,8 +32,8 @@ năm tệp mới dưới `/customer/c2m`:
 
 | Tệp | Vai trò | Mode |
 |---|---|---|
-| `c2m-light` | đọc chỉ-đọc mức sáng từ ISP AE | 0755 |
-| `boot_voice.sh` | hook phát âm thanh một lần mỗi boot | 0755 |
+| `c2m-light` | helper đọc chỉ-đọc ISP AE; **chỉ dùng thủ công** | 0755 |
+| `boot_voice.sh` | hook phát chào + một nhắc đèn theo lịch stock | 0755 |
 | `Boot_Greeting.wav` | "xin chào chị Diệp" | 0644 |
 | `Light_Dark_TurnOn.wav` | "Bật đèn xe" | 0644 |
 | `Light_Bright_TurnOff.wav` | "Tắt đèn khi trời sáng" | 0644 |
@@ -43,26 +51,42 @@ bởi mutation allowlist; mọi tệp stock khác giữ nguyên byte.
 và ánh xạ `LVx10/10` sang mức đèn nền. Đây là bằng chứng **tĩnh** từ binary
 stock, không phải hành vi đã đo trên máy.
 
-### 3.2. Cách F đọc
+### 3.2. Nguồn mặc định: lịch ngày/đêm stock
 
-`c2m-light`:
+`SendDisplayModeToScreenv` trong `cardv` dùng cửa sổ ban ngày **06:00:01 đến
+18:00:00** (06:00:00 và 18:00:01 là tối). `boot_voice.sh` tính lại đúng cửa sổ
+này bằng `date +%H`, `%M`, `%S` của BusyBox:
 
-- `dlopen("libmi_isp.so")` và `dlsym("MI_ISP_AE_QueryExposureInfo")` từ thư viện
-  stock trong `/lib` (liên kết `dlopen` từ `libdl-2.30.so` stock, không dùng
-  libdl host);
-- gọi `(0, 0, &info)` với buffer 0x404 byte, lấy median của 5 mẫu, mỗi mẫu
-  cách 200 ms;
-- chỉ in `state=dark|bright`, kèm `lv`, số mẫu và ngưỡng;
-- `lv` ngoài khoảng hợp lệ hoặc API lỗi → in lỗi ở stderr và thoát `2`.
+- 06:00:01–18:00:00 → `bright` → `Light_Bright_TurnOff.wav`;
+- còn lại → `dark` → `Light_Dark_TurnOn.wav`.
 
-Ngưỡng mặc định `500` (cùng ngưỡng nhánh đèn nền stock). Ngưỡng này **chưa
-được hiệu chuẩn thực địa**; xem mục 7.
+Đây là trạng thái ngày/đêm mà C2M stock dùng để đổi giao diện; không phải cảm
+biến lux. Nó không mở thêm client ISP và không phụ thuộc thư viện vendor.
 
-### 3.3. Fail-closed
+### 3.3. Helper AE thủ công (`c2m-light`)
 
-Nếu thư viện/API không khả dụng, giá trị bất thường, hook không có hook khác
-để đoán: `boot_voice.sh` **không phát** câu cảnh báo đèn. Câu chào vẫn phát
-nếu FIFO cardv sẵn sàng. Không có nhánh suy diễn "trời tối" từ giờ hệ thống.
+`c2m-light` là công cụ **kiểm chứng thủ công**, không phải nguồn boot mặc định:
+
+- preload `libmi_sys.so`, `libcam_os_wrapper.so`, `libcus3a.so` bằng
+  `RTLD_GLOBAL` (vì `libmi_isp.so` không khai báo các thư viện này trong
+  `DT_NEEDED`), rồi `dlopen("libmi_isp.so")`;
+- `dlsym("MI_ISP_AE_QueryExposureInfo")` và gọi `(0, 0, &info)` với buffer
+  0x404 byte; đọc `LVx10` tại `info + 0x230`, lấy median 5 mẫu cách 200 ms;
+- chỉ in `state=dark|bright` kèm `lv`, số mẫu, ngưỡng;
+- `lv` ngoài khoảng hợp lệ hoặc API lỗi → stderr và thoát `2`.
+
+Hook chỉ gọi helper khi tồn tại `/customer/c2m/AE_LIGHT_ENABLE`, do owner tạo
+**sau khi** chạy thử và xác nhận `cardv`, ghi hình, ADAS không bị ảnh hưởng.
+Ngưỡng mặc định `500` (cùng ngưỡng nhánh đèn nền stock) **chưa hiệu chuẩn thực
+địa**.
+
+### 3.4. Fail-closed
+
+Nguồn mặc định (lịch stock) không phụ thuộc API AE. Nếu `date` lỗi hoặc trạng
+thái không hợp lệ, hook **không phát** câu cảnh báo đèn và ghi
+`light=unknown`; câu chào vẫn phát nếu FIFO cardv sẵn sàng. Nếu helper AE được
+bật nhưng lỗi/không hợp lệ, hook **quay về lịch stock**, không đoán theo giá
+trị AE sai.
 
 ## 4. Phát âm thanh
 
@@ -71,8 +95,11 @@ nếu FIFO cardv sẵn sàng. Không có nhánh suy diễn "trời tối" từ g
 1. chờ tối đa 15 s cho `/tmp/cardv_fifo` (do `cardv` tạo);
 2. gửi `audioplay 1 dev0 /customer/c2m/Boot_Greeting.wav` vào FIFO;
 3. chờ 3 s cho câu chào kết thúc;
-4. gọi `c2m-light --threshold 500`, chọn đúng một trong hai wav;
-5. ghi trạng thái vào `/tmp/c2m_voice_status` (chỉ trong `/tmp`, mode 0600).
+4. nếu có `AE_LIGHT_ENABLE`: gọi `timeout 10 c2m-light --threshold 500`
+   (chỉ dùng kết quả `state=dark|bright` hợp lệ); nếu không, hoặc nếu helper
+   lỗi, dùng lịch stock 06:00:01–18:00:00;
+5. chọn đúng một trong hai wav và phát;
+6. ghi trạng thái vào `/tmp/c2m_voice_status` (chỉ trong `/tmp`, mode 0600).
 
 Ghi FIFO dùng `timeout 5` của BusyBox để không treo vô hạn nếu cardv chết;
 khi thiếu `timeout`, dùng redirect thẳng như các script stock.
@@ -106,10 +133,14 @@ CI gate kiểm RIFF/WAVE, PCM16, mono, 24 kHz cho từng tệp trước khi cài
 
 ## 7. Chưa được xác minh (phải ghi rõ)
 
+- Lịch stock là **theo giờ**, không phải cảm biến ánh sáng. Trời âm u, gara,
+  hầm hoặc hoàng hôn có thể lệch với "trời sáng" thực tế. Đây là giới hạn đã
+  biết của nguồn mặc định.
 - `MI_ISP_AE_QueryExposureInfo` từ tiến trình riêng có trả dữ liệu hợp lệ trên
-  máy thật hay không; nếu không, không có câu cảnh báo đèn.
+  máy thật hay không; chưa xác minh. Helper preload ba thư viện vendor; việc mở
+  client ISP thứ hai có thể ảnh hưởng `cardv`, nên **không bật tự động**.
 - Ngưỡng `500` và đơn vị `LVx10` có đúng với ngày/đêm thực tế trên xe không.
-  Owner xem `/tmp/c2m_voice_status` sau các lần boot tối/sáng để đối chiếu.
+  Owner chạy helper thủ công và xem `lv` trước khi tạo `AE_LIGHT_ENABLE`.
 - Tranh chấp bộ giải mã âm thanh với ADAS lúc khởi động; chưa đo thứ tự phát.
 - Thời điểm phát câu chào so với âm hiệu chuẩn/khởi động của ADAS.
 - Chưa có read-back NAND hay soak; chưa flash.
@@ -119,7 +150,9 @@ CI gate kiểm RIFF/WAVE, PCM16, mono, 24 kHz cho từng tệp trước khi cài
 
 - `fw/voice/light.c` — helper chỉ-đọc.
 - `fw/voice/boot_voice.sh` — hook một lần, fail-closed.
-- `fw/voice/build.sh` — build ARM32/glibc-2.30, QEMU self-test, ELF gate.
+- `fw/voice/build.sh` — build ARM32/glibc-2.30, QEMU self-test, ELF gate; link
+  stock `libdl-2.30.so` với `--allow-shlib-undefined` (các ký hiệu
+  `_dl_*@GLIBC_PRIVATE` do `ld-linux-armhf.so.3` stock giải quyết lúc chạy).
 - `tools/fw/mutate_customer.py --bootvoice-services-dir` — cài đúng 5 tệp,
   chèn launch tách rời trước khối chờ mount SD.
 - `tools/fw/test_bootvoice_gates.py` — 7 host test: exact set, round-trip
@@ -130,9 +163,14 @@ CI gate kiểm RIFF/WAVE, PCM16, mono, 24 kHz cho từng tệp trước khi cài
   giữ bảo vệ CI cũ, bổ sung pin 3 wav, build/QEMU/ELF gate cho `c2m-light`, và
   kiểm tra allowlist/thứ tự launch.
 
-Private vault: `assets/bootvoice/` đã tạo commit cục bộ (WAV + MP3 + sums +
-README + generate.py). **Chưa push lên `origin/main`** trong phiên này (không có
-quyền đẩy); phải push trước khi dispatch CI, nếu không bước fetch sẽ fail closed.
+Private vault: `assets/bootvoice/` đã push lên `origin/main` (commit
+`8413b0b`; WAV + MP3 + sums + README + generate.py). CI fetch đã xác nhận đúng
+3 WAV và pin SHA256.
+
+CI: run `39279662410` xanh 16 bước đầu; bước boot voice dừng ở link vì
+`-Wl,--no-undefined` gặp `_dl_*@GLIBC_PRIVATE` của stock `libdl-2.30.so`.
+Đã thay bằng `-Wl,--allow-shlib-undefined`; **cần dispatch lại** sau khi push
+commit sửa. Chưa có artifact F từ CI.
 
 Trạng thái host local (2026-10-19):
 
@@ -153,9 +191,16 @@ Trạng thái host local (2026-10-19):
    token mới khác mọi token đã cài), deep validation, ghi thẻ + read-back 4/4.
 3. Chỉ flash sau khi owner cho phép; kiểm tra: câu chào khi boot; tiếng Việt
    hệ thống; ADAS/FCW/HMW/ghi hình như trước.
-4. Thử tối/sáng: che camera (tối) và để nơi sáng; nghe đúng một câu nhắc; ghi
-   lại `/tmp/c2m_voice_status` để hiệu chuẩn ngưỡng.
-5. Xác nhận không có thay đổi âm thanh/ghi hình/ADAS ngoài dự kiến. Bất kỳ treo,
+4. Nghe đúng một câu chào và đúng một câu nhắc đèn; kiểm tra
+   `/tmp/c2m_voice_status` (`source=theme`, `schedule=06:00:01-18:00:00`).
+   Thử cả hai khung giờ (sáng/tối) bằng cách đổi giờ hệ thống trong cửa sổ test
+   hoặc chờ đúng giờ; không cần che camera cho nguồn mặc định.
+5. Nếu owner muốn thử AE: SSH chạy `/customer/c2m/c2m-light --threshold 500`
+   trong điều kiện sáng/tối đã biết; so `lv` với thực tế. Chỉ khi helper trả
+   đúng và `cardv`/ghi hình/ADAS không bị ảnh hưởng, tạo
+   `/customer/c2m/AE_LIGHT_ENABLE` rồi reboot. Nếu có bất kỳ treo hoặc sai,
+   xóa marker và quay về lịch stock.
+6. Xác nhận không có thay đổi âm thanh/ghi hình/ADAS ngoài dự kiến. Bất kỳ treo,
    reboot lặp, mất ghi hình hoặc cảnh báo sai → dừng, dùng rollback đã chuẩn bị.
 
 ## 10. Liên kết
