@@ -16,7 +16,9 @@ tiếp có câu chào tiếng Việt "xin chào chị Diệp" mỗi boot và m�
 `docs/firmware/CANDIDATE_F_BOOT_VOICE_20261019.md`. Bản F dùng lịch ngày/đêm
 stock 06:00:01-17:59:59 làm mặc định; helper ISP AE chỉ dùng thủ công sau khi
 owner xác minh trên máy. Bản F chỉ phát lời nhắc bằng giọng nói — C2M không có
-đầu ra điều khiển đèn xe đã xác minh.
+đầu ra điều khiển đèn xe đã xác minh. CI F đã xanh (run `39287717224`); token
+cục bộ đề xuất `20261019000001` đã chuẩn bị host-byte (`ALLOWLIST-OK`), chờ
+owner cho phép flash.
 
 ## 1. Kết luận phân tích
 
