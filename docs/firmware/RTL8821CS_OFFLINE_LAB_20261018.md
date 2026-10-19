@@ -224,3 +224,45 @@ macros only), and the WEXT layout probe is compiled with both defines and
 measures `sizeof(struct iw_handler_def)` directly. The artifact-upload step
 now preserves evidence even when the evidence-validation step fails, so
 experiment data is never lost to a harness assertion.
+
+### Iteration6 results
+
+Run [39178590410](https://github.com/vunguyenbv175/C2M/actions/runs/39178590410)
+(source `254e5a1`) **passed**: all three profiles built, the iteration-2
+config choices stuck after olddefconfig, and the workflow evidence check
+accepted the wext module (the first run, 39177757068, is the one described
+above). Downloaded artifact inspection:
+
+- **Named object reproduced exactly.** `rtw_handlers_def` is emitted as an
+  `STB_GLOBAL` 24-byte `.data` object in the wext module — the stock
+  module's sole stock-only named writable object. The standard-handler
+  table `rtw_handlers` (224 bytes, `.data`) appears with it because the
+  definition references it; without the gate the unreferenced table is
+  dropped. `rtw_private_handler` (120 bytes) was already present.
+- **Section deltas (wext minus baseline, same run, same toolchain):**
+  `.text` +9,064, `.rodata` +312, `.data` +248 (exactly 224 + 24, the two
+  handler tables), `.bss` ±0; module bytes +9,340. The `.text` effect
+  closes only about 15% of the 58,388-byte stock `.text` gap recorded in
+  iteration4, **leaving ≈49,324 bytes** attributable to vendor downstream
+  source differences and/or vendor gcc-9.1.0 codegen. The named-object gap
+  is closed; the `.text` question is not.
+- **Undefined symbols unchanged**: 220 in baseline, wext and concurrent
+  alike (the stock 219 plus `__memzero`); the WEXT-gated code adds no new
+  kernel references and the object-level `__memzero` attribution stays at
+  the same 11 objects.
+- **Layout facts (compile-only probes, pinned headers):** plain
+  `sizeof(struct net_device)` = 1,280; with the WEXT defines 1,344 (+64),
+  with `wireless_handlers` at offset 304 and `wireless_data` at 308;
+  `sizeof(struct iw_handler_def)` = 24 exactly (the `CONFIG_WEXT_PRIV`
+  private-handler fields turn the 12-byte form into the stock's 24). The
+  vendor kernel's `net_device` necessarily carried these gated members.
+- The recorded iteration-2 stock `.data` difference (328 bytes) would leave
+  a small (~80-byte) remainder after the 248-byte wext gain; that reference
+  predates the iteration-4 `-fno-common` change and is not re-measured.
+
+Interpretation: legacy WEXT (both macros) explains the stock module's
+`rtw_handlers_def`/`rtw_handlers` `.data` objects and roughly 15% of the
+`.text` gap; the remaining ≈49 KB `.text` difference must come from vendor
+downstream source and/or vendor toolchain codegen, which this lab has not
+reproduced. Still NO_LOAD; no ABI or load-safety claim; AP-independent
+recovery and any live test remain open gates.
