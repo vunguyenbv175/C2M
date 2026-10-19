@@ -806,7 +806,7 @@ def main() -> int:
         doc["bootvoice"] = {
             "threshold": 500,
             "light_default_source": "stock-day-night-schedule",
-            "light_schedule": "06:00:01-18:00:00",
+            "light_schedule": "06:00:01-17:59:59",
             "ae_helper": "manual-only",
             "ae_enable_marker": "AE_LIGHT_ENABLE",
             "greeting": "xin chào chị Diệp",

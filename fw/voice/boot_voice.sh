@@ -8,7 +8,7 @@
 #   bright -> Light_Bright_TurnOff.wav ("Tắt đèn khi trời sáng")
 #
 # Default light source: the stock C2M display day/night schedule
-# (06:00:01..18:00:00, the same boundary used by SendDisplayModeToScreenv).
+# (06:00:01..17:59:59, the same boundary used by SendDisplayModeToScreenv).
 # The camera exposes no shell-readable ambient sensor state.  c2m-light is an
 # optional, read-only stock-ISP AE helper; it is NOT called unless the owner
 # has manually validated it on the device and created
@@ -55,14 +55,6 @@ _clock_state() {
             ;;
         0[7-9]|1[0-7])
             printf 'bright\n'
-            ;;
-        18)
-            # Stock day window includes 18:00:00 exactly.
-            if [ "$_m" = 00 ] && [ "$_s" = 00 ]; then
-                printf 'bright\n'
-            else
-                printf 'dark\n'
-            fi
             ;;
         *)
             printf 'dark\n'
@@ -150,7 +142,7 @@ if [ -z "$_state" ]; then
     case "$_state" in
         dark|bright)
             _source=theme
-            _detail="schedule=06:00:01-18:00:00"
+            _detail="schedule=06:00:01-17:59:59"
             ;;
         *)
             _status_write "greeting=played light=unknown"

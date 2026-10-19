@@ -76,7 +76,7 @@ before the bounded SD mount wait. It uses option 2 above:
 - `audioplay 1 dev0 /customer/c2m/Boot_Greeting.wav` into `/tmp/cardv_fifo`
   (the stock-verified command form) plays the Vietnamese greeting;
 - the default light state is the stock C2M display day/night schedule
-  (06:00:01–18:00:00, the `SendDisplayModeToScreenv` boundary);
+  (06:00:01-17:59:59, the `SendDisplayModeToScreenv` boundary);
 - `/customer/c2m/c2m-light` is a MANUAL-only helper that reads the stock
   read-only ISP AE query `MI_ISP_AE_QueryExposureInfo(0,0,&info)` and the
   `LVx10` field at `info+0x230`, threshold 500 (the stock
