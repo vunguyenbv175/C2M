@@ -2,13 +2,17 @@ name: firmware-candidateF
 # MANUAL ONLY. F = E2 content (D4-debug EN core + checked VI oneed_cust
 # system-audio swap: exactly the 17 /audio wavs whose EN and VI bytes differ)
 # PLUS the boot voice advisory:
-#   - /customer/c2m/c2m-light reads the stock ISP AE LVx10 field through the
-#     same read-only MI_ISP_AE_QueryExposureInfo(0,0,&info) call stock cardv
-#     uses; threshold 500 (the stock cardv_detect_FCamAEToPWM comparison);
 #   - /customer/c2m/boot_voice.sh plays the Vietnamese greeting through the
 #     stock cardv FIFO (`audioplay 1 dev0 <absolute wav>`), then exactly one
 #     light reminder: dark -> Light_Dark_TurnOn.wav, bright ->
 #     Light_Bright_TurnOff.wav;
+#   - the default light source is the stock C2M display day/night schedule
+#     (06:00:01..18:00:00, the SendDisplayModeToScreenv boundary), so the
+#     advisory does not depend on an unverified second ISP client;
+#   - /customer/c2m/c2m-light is the read-only stock ISP AE LVx10 helper
+#     (MI_ISP_AE_QueryExposureInfo(0,0,&info), threshold 500) and is MANUAL
+#     ONLY: the hook starts it only when /customer/c2m/AE_LIGHT_ENABLE exists
+#     after an owner hardware test, otherwise it uses the stock schedule;
 #   - VOICE ONLY. C2M has no verified car-headlight output; F never actuates
 #     a vehicle circuit. The wavs are driver reminders.
 # Owner override (2026-10-19): the earlier project decision "no greeting each
@@ -16,7 +20,8 @@ name: firmware-candidateF
 # docs/firmware/C2M_NEXT_UPGRADE_PLAN_20261014.md.
 # Owner-approved: one authorized flash of the owner's own camera, then RAM
 # upload/run over the owner laptop SSH session. Modern SSH only.
-# Never stock-speaker output, numeric speed/current-limit display or camera TSR.
+# Stock-speaker output is limited to the pinned greeting/light wavs; no numeric
+# speed/current-limit display or camera TSR.
 # No stock camera/kernel/ADAS/GPS/cardv/model binary changes; no radio/device/card use.
 #
 # Firmware/audio/database/owner-key bytes stay in the PRIVATE vault.
@@ -736,6 +741,10 @@ jobs:
               "bright_sha256": digest("work/bootvoice-services/Light_Bright_TurnOff.wav"),
               "threshold": 500,
               "actuation": "voice-only; no car headlight output on C2M",
+              "light_default_source": "stock-day-night-schedule",
+              "light_schedule": "06:00:01-18:00:00",
+              "ae_helper": "manual-only",
+              "ae_enable_marker": "AE_LIGHT_ENABLE",
               "samples": 5,
               "lv_offset": "0x230",
               "assets_count": 5,
@@ -745,11 +754,16 @@ jobs:
                   raise SystemExit("BOOTVOICE-GATE: deploy wav changed after pin: " + name)
           expected = {"build_script_sha256", "boot_script_sha256", "helper_sha256",
                       "greeting_sha256", "dark_sha256", "bright_sha256",
-                      "threshold", "actuation", "samples", "lv_offset",
-                      "assets_count"}
+                      "threshold", "actuation", "light_default_source",
+                      "light_schedule", "ae_helper", "ae_enable_marker",
+                      "samples", "lv_offset", "assets_count"}
           if set(report) != expected:
               raise SystemExit("BOOTVOICE-GATE: report key mismatch")
-          if report["threshold"] != 500 or report["assets_count"] != 5:
+          if (report["threshold"] != 500 or report["assets_count"] != 5
+                  or report["light_default_source"] != "stock-day-night-schedule"
+                  or report["light_schedule"] != "06:00:01-18:00:00"
+                  or report["ae_helper"] != "manual-only"
+                  or report["ae_enable_marker"] != "AE_LIGHT_ENABLE"):
               raise SystemExit("BOOTVOICE-GATE: report constants mismatch")
           Path("work/bootvoice_report.json").write_text(json.dumps(report, indent=2) + "\n")
           print(json.dumps(report, sort_keys=True))
@@ -838,7 +852,11 @@ jobs:
               raise SystemExit("F-GATE: mutation boot voice flag mismatch")
           metadata = report.get("bootvoice") or {}
           if (metadata.get("threshold") != voice.get("threshold")
-                  or metadata.get("actuation") != voice.get("actuation")):
+                  or metadata.get("actuation") != voice.get("actuation")
+                  or metadata.get("light_default_source") != voice.get("light_default_source")
+                  or metadata.get("light_schedule") != voice.get("light_schedule")
+                  or metadata.get("ae_helper") != voice.get("ae_helper")
+                  or metadata.get("ae_enable_marker") != voice.get("ae_enable_marker")):
               raise SystemExit("F-GATE: mutation boot voice metadata mismatch")
           if report.get("debug_owner_key_sha256") != owner["sha256"]:
               raise SystemExit("D4-DEBUG-GATE: mutation owner key hash mismatch")
@@ -1042,20 +1060,23 @@ jobs:
           decision is superseded. On boot, /customer/c2m/boot_voice.sh (detached,
           one-shot, fail-closed) plays the greeting Boot_Greeting.wav through
           cardv's stock FIFO command `audioplay 1 dev0 <absolute wav>`, then
-          reads the ambient estimate from /customer/c2m/c2m-light and plays
-          exactly one reminder: Light_Dark_TurnOn.wav ("Bật đèn xe") when dark,
-          Light_Bright_TurnOff.wav ("Tắt đèn khi trời sáng") when bright.
-          c2m-light only calls the stock read-only ISP AE query
-          MI_ISP_AE_QueryExposureInfo(0,0,&info) and reads info+0x230 (LVx10)
-          with threshold 500, the same value stock cardv uses in its
-          cardv_detect_FCamAEToPWM path; it never changes AE, backlight, theme
-          or any device state. NO VERIFIED C2M HEADLIGHT OUTPUT EXISTS: F never
-          switches a car circuit, and the wavs are driver reminders only. The
-          stock shared audio decoder is used; the greeting is played early in
-          the stock boot path before ADAS startup, and the advisory is skipped
-          entirely when the query is unavailable/invalid. Threshold and runtime
-          AE availability remain UNVERIFIED until an owner session reports the
-          /tmp/c2m_voice_status LV values.
+          plays exactly one reminder based on the stock C2M display day/night
+          schedule (06:00:01..18:00:00, the same boundary used by
+          SendDisplayModeToScreenv): Light_Dark_TurnOn.wav ("Bật đèn xe") when
+          dark, Light_Bright_TurnOff.wav ("Tắt đèn khi trời sáng") when bright.
+          The default schedule does not depend on a second ISP client.
+          /customer/c2m/c2m-light is the read-only AE helper for MANUAL hardware
+          validation only: it calls MI_ISP_AE_QueryExposureInfo(0,0,&info) and
+          reads info+0x230 (LVx10) with threshold 500, the same value stock
+          cardv uses in its cardv_detect_FCamAEToPWM path. The hook starts it
+          only when /customer/c2m/AE_LIGHT_ENABLE exists after an owner test;
+          otherwise it uses the stock schedule. It never changes AE, backlight,
+          theme or any device state. NO VERIFIED C2M HEADLIGHT OUTPUT EXISTS: F
+          never switches a car circuit, and the wavs are driver reminders only.
+          The stock shared audio decoder is used; the greeting is played early
+          in the stock boot path before ADAS startup. The stock schedule is
+          clock-based, not a lux sensor; AE threshold and runtime availability
+          remain UNVERIFIED until the owner validates c2m-light on the device.
 
           ### Current owner-approved D4 scope
           Preserve C's exact eight VI ADAS WAVs and minimal idle daemon, the

@@ -13,8 +13,10 @@ chào mỗi boot, không ép hiệu chuẩn lại chỉ để nghe câu chào.
 tiếp có câu chào tiếng Việt "xin chào chị Diệp" mỗi boot và một câu nhắc theo
 ánh sáng ("Bật đèn xe" khi tối, "Tắt đèn khi trời sáng" khi sáng). Quyết định
 "không thêm lời chào mỗi boot" ở trên bị **thay thế** cho dòng F; chi tiết ở
-`docs/firmware/CANDIDATE_F_BOOT_VOICE_20261019.md`. Bản F chỉ phát lời nhắc
-bằng giọng nói — C2M không có đầu ra điều khiển đèn xe đã xác minh.
+`docs/firmware/CANDIDATE_F_BOOT_VOICE_20261019.md`. Bản F dùng lịch ngày/đêm
+stock 06:00:01–18:00:00 làm mặc định; helper ISP AE chỉ dùng thủ công sau khi
+owner xác minh trên máy. Bản F chỉ phát lời nhắc bằng giọng nói — C2M không có
+đầu ra điều khiển đèn xe đã xác minh.
 
 ## 1. Kết luận phân tích
 

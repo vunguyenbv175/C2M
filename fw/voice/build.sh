@@ -36,9 +36,15 @@ arm-linux-gnueabihf-gcc -std=c99 -Os -Wall -Wextra -Werror \
     -fno-stack-protector -fno-pie \
     -c "$root/fw/voice/light.c" -o "$out/objects/light.o"
 
+# Do NOT pass -Wl,--no-undefined here.  The stock glibc-2.30 libdl.so has
+# legitimate undefined `_dl_*@GLIBC_PRIVATE` references that are resolved at
+# runtime by the stock /lib/ld-linux-armhf.so.3 (NEEDED by libdl), not by the
+# link-time host libc.  `--no-undefined` makes GNU ld try to resolve those
+# private loader symbols and fails.  Our own object's undefined symbols are
+# still required by the linker; only shared-library internals are deferred.
 arm-linux-gnueabihf-gcc -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
     -nostartfiles -no-pie -Wl,--dynamic-linker=/lib/ld-linux-armhf.so.3 \
-    -Wl,--no-undefined -Wl,-z,noexecstack \
+    -Wl,--allow-shlib-undefined -Wl,-z,noexecstack \
     -Wl,-rpath-link,"$sysroot/lib" -L "$sysroot/lib" \
     "$root/fw/device_minimal/start.S" "$out/objects/light.o" \
     "$sysroot/lib/libdl-2.30.so" -o "$out/c2m-light"

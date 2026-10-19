@@ -2,11 +2,18 @@
 # Candidate F boot voice advisory. Detached, one-shot, fail-closed.
 #
 # Plays the owner-requested Vietnamese greeting through cardv's own stock
-# `audioplay 1 dev0 <absolute wav>` FIFO command, then reads the ambient
-# light estimate from c2m-light (stock ISP AE LVx10, read-only) and plays
-# exactly one light reminder:
+# `audioplay 1 dev0 <absolute wav>` FIFO command, then plays exactly one light
+# reminder:
 #   dark   -> Light_Dark_TurnOn.wav   ("Bật đèn xe")
 #   bright -> Light_Bright_TurnOff.wav ("Tắt đèn khi trời sáng")
+#
+# Default light source: the stock C2M display day/night schedule
+# (06:00:01..18:00:00, the same boundary used by SendDisplayModeToScreenv).
+# The camera exposes no shell-readable ambient sensor state.  c2m-light is an
+# optional, read-only stock-ISP AE helper; it is NOT called unless the owner
+# has manually validated it on the device and created
+# /customer/c2m/AE_LIGHT_ENABLE.  Until then the stock schedule is used so
+# the advisory still works and no second ISP client is opened at boot.
 #
 # This script NEVER changes a car circuit.  The camera has no verified
 # headlight output; the wavs are spoken reminders only.
@@ -23,10 +30,44 @@ _greeting="$_dir/Boot_Greeting.wav"
 _dark_wav="$_dir/Light_Dark_TurnOn.wav"
 _bright_wav="$_dir/Light_Bright_TurnOff.wav"
 _light_bin="$_dir/c2m-light"
+_ae_enable="$_dir/AE_LIGHT_ENABLE"
 _threshold=500
 
 _status_write() {
     printf '%s\n' "$1" > "$_status" 2>/dev/null
+}
+
+_clock_state() {
+    _h=$(date +%H 2>/dev/null) || return 1
+    _m=$(date +%M 2>/dev/null) || return 1
+    _s=$(date +%S 2>/dev/null) || return 1
+    case "$_h$_m$_s" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    case "$_h" in
+        06)
+            # Stock day window starts at 06:00:01, not 06:00:00.
+            if [ "$_m" = 00 ] && [ "$_s" = 00 ]; then
+                printf 'dark\n'
+            else
+                printf 'bright\n'
+            fi
+            ;;
+        0[7-9]|1[0-7])
+            printf 'bright\n'
+            ;;
+        18)
+            # Stock day window includes 18:00:00 exactly.
+            if [ "$_m" = 00 ] && [ "$_s" = 00 ]; then
+                printf 'bright\n'
+            else
+                printf 'dark\n'
+            fi
+            ;;
+        *)
+            printf 'dark\n'
+            ;;
+    esac
 }
 
 # One attempt per boot; /tmp is a tmpfs boot artifact.
@@ -79,34 +120,57 @@ _status_write "greeting=played"
 # the light query and the advisory.
 sleep 3
 
-if [ ! -x "$_light_bin" ] || [ -L "$_light_bin" ]; then
-    _status_write "greeting=played light=unavailable"
-    exit 0
-fi
-_reading=$("$_light_bin" --threshold "$_threshold" 2>/dev/null)
-if [ $? -ne 0 ]; then
-    _status_write "greeting=played light=unknown"
-    exit 0
+# Optional AE path, intended for a manually validated build only.  Bounded so
+# a broken vendor library can never hold the detached hook forever.  The
+# helper is a separate process; it is never started unless the explicit
+# AE_LIGHT_ENABLE marker was created after a hardware test.
+_state=
+_source=
+_detail=
+if [ -f "$_ae_enable" ] && [ ! -L "$_ae_enable" ] &&
+   [ -x "$_light_bin" ] && [ ! -L "$_light_bin" ] &&
+   command -v timeout >/dev/null 2>&1; then
+    _reading=$(timeout 10 "$_light_bin" --threshold "$_threshold" 2>/dev/null)
+    case "$_reading" in
+        state=dark*)
+            _state=dark
+            _source=ae
+            _detail=$_reading
+            ;;
+        state=bright*)
+            _state=bright
+            _source=ae
+            _detail=$_reading
+            ;;
+    esac
 fi
 
-case "$_reading" in
-    state=dark*)
-        _advisory="$_dark_wav"
-        _state=dark
-        ;;
-    state=bright*)
-        _advisory="$_bright_wav"
-        _state=bright
-        ;;
+if [ -z "$_state" ]; then
+    _state=$(_clock_state 2>/dev/null)
+    case "$_state" in
+        dark|bright)
+            _source=theme
+            _detail="schedule=06:00:01-18:00:00"
+            ;;
+        *)
+            _status_write "greeting=played light=unknown"
+            exit 0
+            ;;
+    esac
+fi
+
+case "$_state" in
+    dark) _advisory="$_dark_wav" ;;
+    bright) _advisory="$_bright_wav" ;;
     *)
-        _status_write "greeting=played light=invalid output=$_reading"
+        _status_write "greeting=played light=invalid detail=$_detail"
         exit 0
         ;;
 esac
 
 _play "$_advisory" || {
-    _status_write "greeting=played light=$_reading advisory=play-failed"
+    _status_write "greeting=played light=$_state source=$_source detail=$_detail advisory=play-failed"
     exit 0
 }
-_status_write "greeting=played light=$_reading advisory=played"
+_status_write "greeting=played light=$_state source=$_source detail=$_detail advisory=played"
 exit 0
