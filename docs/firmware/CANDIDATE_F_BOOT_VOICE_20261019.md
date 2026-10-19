@@ -14,7 +14,7 @@ Owner yêu cầu bản firmware kế tiếp:
    - tối → **"Bật đèn xe"**;
    - sáng → **"Tắt đèn khi trời sáng"**.
 
-Bản F dùng **lịch ngày/đêm stock của C2M** (06:00:01–18:00:00) làm nguồn mặc
+Bản F dùng **lịch ngày/đêm stock của C2M** (06:00:01–17:59:59) làm nguồn mặc
 định. Helper đọc ISP AE (`c2m-light`) chỉ dùng **thủ công** sau khi owner xác
 minh trên máy; lý do: chưa chứng minh được một tiến trình thứ hai gọi ISP an
 toàn, và mở client ISP thứ hai lúc boot có thể ảnh hưởng `cardv`. Lịch stock là
@@ -54,10 +54,10 @@ stock, không phải hành vi đã đo trên máy.
 ### 3.2. Nguồn mặc định: lịch ngày/đêm stock
 
 `SendDisplayModeToScreenv` trong `cardv` dùng cửa sổ ban ngày **06:00:01 đến
-18:00:00** (06:00:00 và 18:00:01 là tối). `boot_voice.sh` tính lại đúng cửa sổ
+17:59:59** (06:00:00 và 18:00:00 là tối). `boot_voice.sh` tính lại đúng cửa sổ
 này bằng `date +%H`, `%M`, `%S` của BusyBox:
 
-- 06:00:01–18:00:00 → `bright` → `Light_Bright_TurnOff.wav`;
+- 06:00:01–17:59:59 → `bright` → `Light_Bright_TurnOff.wav`;
 - còn lại → `dark` → `Light_Dark_TurnOn.wav`.
 
 Đây là trạng thái ngày/đêm mà C2M stock dùng để đổi giao diện; không phải cảm
@@ -97,7 +97,7 @@ trị AE sai.
 3. chờ 3 s cho câu chào kết thúc;
 4. nếu có `AE_LIGHT_ENABLE`: gọi `timeout 10 c2m-light --threshold 500`
    (chỉ dùng kết quả `state=dark|bright` hợp lệ); nếu không, hoặc nếu helper
-   lỗi, dùng lịch stock 06:00:01–18:00:00;
+   lỗi, dùng lịch stock 06:00:01–17:59:59;
 5. chọn đúng một trong hai wav và phát;
 6. ghi trạng thái vào `/tmp/c2m_voice_status` (chỉ trong `/tmp`, mode 0600).
 
@@ -192,7 +192,7 @@ Trạng thái host local (2026-10-19):
 3. Chỉ flash sau khi owner cho phép; kiểm tra: câu chào khi boot; tiếng Việt
    hệ thống; ADAS/FCW/HMW/ghi hình như trước.
 4. Nghe đúng một câu chào và đúng một câu nhắc đèn; kiểm tra
-   `/tmp/c2m_voice_status` (`source=theme`, `schedule=06:00:01-18:00:00`).
+   `/tmp/c2m_voice_status` (`source=theme`, `schedule=06:00:01-17:59:59`).
    Thử cả hai khung giờ (sáng/tối) bằng cách đổi giờ hệ thống trong cửa sổ test
    hoặc chờ đúng giờ; không cần che camera cho nguồn mặc định.
 5. Nếu owner muốn thử AE: SSH chạy `/customer/c2m/c2m-light --threshold 500`

@@ -183,7 +183,7 @@ class BootVoiceTest(unittest.TestCase):
         self.assertEqual(mutation["bootvoice"]["light_default_source"],
                          "stock-day-night-schedule")
         self.assertEqual(mutation["bootvoice"]["light_schedule"],
-                         "06:00:01-18:00:00")
+                         "06:00:01-17:59:59")
         self.assertEqual(mutation["bootvoice"]["ae_helper"], "manual-only")
         self.assertIn("voice-only", mutation["bootvoice"]["actuation"])
         added = {item["path"] for item in mutation["added"]}
@@ -262,7 +262,7 @@ class BootVoiceTest(unittest.TestCase):
         self.assertIn("timeout 5", hook)
         self.assertIn("exit 0", hook)
         self.assertIn("_clock_state", hook)
-        self.assertIn("06:00:01-18:00:00", hook)
+        self.assertIn("06:00:01-17:59:59", hook)
         self.assertIn("AE_LIGHT_ENABLE", hook)
         self.assertIn("date +%H", hook)
 

@@ -7,7 +7,7 @@ name: firmware-candidateF
 #     light reminder: dark -> Light_Dark_TurnOn.wav, bright ->
 #     Light_Bright_TurnOff.wav;
 #   - the default light source is the stock C2M display day/night schedule
-#     (06:00:01..18:00:00, the SendDisplayModeToScreenv boundary), so the
+#     (06:00:01..17:59:59, the SendDisplayModeToScreenv boundary), so the
 #     advisory does not depend on an unverified second ISP client;
 #   - /customer/c2m/c2m-light is the read-only stock ISP AE LVx10 helper
 #     (MI_ISP_AE_QueryExposureInfo(0,0,&info), threshold 500) and is MANUAL
@@ -742,7 +742,7 @@ jobs:
               "threshold": 500,
               "actuation": "voice-only; no car headlight output on C2M",
               "light_default_source": "stock-day-night-schedule",
-              "light_schedule": "06:00:01-18:00:00",
+              "light_schedule": "06:00:01-17:59:59",
               "ae_helper": "manual-only",
               "ae_enable_marker": "AE_LIGHT_ENABLE",
               "samples": 5,
@@ -761,7 +761,7 @@ jobs:
               raise SystemExit("BOOTVOICE-GATE: report key mismatch")
           if (report["threshold"] != 500 or report["assets_count"] != 5
                   or report["light_default_source"] != "stock-day-night-schedule"
-                  or report["light_schedule"] != "06:00:01-18:00:00"
+                  or report["light_schedule"] != "06:00:01-17:59:59"
                   or report["ae_helper"] != "manual-only"
                   or report["ae_enable_marker"] != "AE_LIGHT_ENABLE"):
               raise SystemExit("BOOTVOICE-GATE: report constants mismatch")
@@ -1061,7 +1061,7 @@ jobs:
           one-shot, fail-closed) plays the greeting Boot_Greeting.wav through
           cardv's stock FIFO command `audioplay 1 dev0 <absolute wav>`, then
           plays exactly one reminder based on the stock C2M display day/night
-          schedule (06:00:01..18:00:00, the same boundary used by
+          schedule (06:00:01..17:59:59, the same boundary used by
           SendDisplayModeToScreenv): Light_Dark_TurnOn.wav ("Bật đèn xe") when
           dark, Light_Bright_TurnOff.wav ("Tắt đèn khi trời sáng") when bright.
           The default schedule does not depend on a second ISP client.
