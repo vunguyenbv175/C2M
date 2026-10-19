@@ -49,7 +49,9 @@ bởi mutation allowlist; mọi tệp stock khác giữ nguyên byte.
 `cardv` (stock) gọi `MI_ISP_AE_QueryExposureInfo(0, 0, &info)` và đọc trường
 `LVx10` tại `info + 0x230`; nhánh `cardv_detect_FCamAEToPWM` dùng ngưỡng `500`
 và ánh xạ `LVx10/10` sang mức đèn nền. Đây là bằng chứng **tĩnh** từ binary
-stock, không phải hành vi đã đo trên máy.
+stock, không phải hành vi đã đo trên máy. Trong bản build này hàm đó chỉ còn
+trong dynsym, không thấy call site trực tiếp; vì vậy F **không** dựa vào nó để
+lấy trạng thái lúc boot.
 
 ### 3.2. Nguồn mặc định: lịch ngày/đêm stock
 
@@ -136,6 +138,7 @@ CI gate kiểm RIFF/WAVE, PCM16, mono, 24 kHz cho từng tệp trước khi cài
 - Lịch stock là **theo giờ**, không phải cảm biến ánh sáng. Trời âm u, gara,
   hầm hoặc hoàng hôn có thể lệch với "trời sáng" thực tế. Đây là giới hạn đã
   biết của nguồn mặc định.
+- Đồng hồ hệ thống phải đúng; lịch stock dùng cùng clock với giao diện C2M.
 - `MI_ISP_AE_QueryExposureInfo` từ tiến trình riêng có trả dữ liệu hợp lệ trên
   máy thật hay không; chưa xác minh. Helper preload ba thư viện vendor; việc mở
   client ISP thứ hai có thể ảnh hưởng `cardv`, nên **không bật tự động**.
@@ -198,8 +201,9 @@ Trạng thái host local (2026-10-19):
 5. Nếu owner muốn thử AE: SSH chạy `/customer/c2m/c2m-light --threshold 500`
    trong điều kiện sáng/tối đã biết; so `lv` với thực tế. Chỉ khi helper trả
    đúng và `cardv`/ghi hình/ADAS không bị ảnh hưởng, tạo
-   `/customer/c2m/AE_LIGHT_ENABLE` rồi reboot. Nếu có bất kỳ treo hoặc sai,
-   xóa marker và quay về lịch stock.
+   `/customer/c2m/AE_LIGHT_ENABLE` rồi reboot. Nếu helper gây treo, mất ghi
+   hình hoặc bất thường: reboot ngay, **không tạo marker**; nếu đã tạo thì xóa
+   và quay về lịch stock.
 6. Xác nhận không có thay đổi âm thanh/ghi hình/ADAS ngoài dự kiến. Bất kỳ treo,
    reboot lặp, mất ghi hình hoặc cảnh báo sai → dừng, dùng rollback đã chuẩn bị.
 
