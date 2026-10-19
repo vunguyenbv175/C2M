@@ -31,7 +31,10 @@ TAG_NAMES = {5: "CPU_name", 6: "CPU_arch", 7: "CPU_arch_profile",
              12: "Advanced_SIMD_arch", 18: "ABI_PCS_wchar_t",
              28: "ABI_VFP_args", 34: "CPU_unaligned_access"}
 INTERP_WANT = b"/lib/ld-linux-armhf.so.3"
-NEEDED_ALLOW = {"libc.so.6", "libm.so.6", "libgcc_s.so.1"}
+# libdl.so.2 is the stock glibc-2.30 loader library (Soname of
+# /lib/libdl-2.30.so); Candidate F links dlopen/dlsym from the stock rootfs
+# copy so the device loader never binds a host GLIBC_2.34 merged-libc symbol.
+NEEDED_ALLOW = {"libc.so.6", "libm.so.6", "libgcc_s.so.1", "libdl.so.2"}
 
 EF_ARM_EABI_VER5 = 0x05000000
 EF_ARM_ABI_FLOAT_HARD = 0x00000400

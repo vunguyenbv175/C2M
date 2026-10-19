@@ -38,6 +38,11 @@ Mutation (exactly):
      R.420/R.421 records are permitted. Launch d4_boot.sh detached after
      D3 boot in the same bounded background mount-wait block. Database
      reports contain only count/hash, never coordinates, labels or bytes.
+  8. (optional --bootvoice-services-dir, requires D3 + checked TSR):
+     install exactly c2m-light, boot_voice.sh and the three pinned Vietnamese
+     boot wavs; launch boot_voice.sh detached BEFORE the mount-wait block so
+     the greeting is not delayed by a missing recording card. Voice only:
+     no car-headlight actuation exists on C2M.
 
 Fail-closed guards:
   - --manifest (stock manifest JSON) REQUIRED: hook file content must hash
@@ -86,6 +91,14 @@ DEBUG_MAX_DROPBEAR = 2 * 1024 * 1024
 DEBUG_MAX_SHELL = 64 * 1024
 DEBUG_OWNER_COMMENT = "c2m-debug-owner"
 DEBUG_OWNER_MAX_BYTES = 1024
+BOOTVOICE_MODES = {"c2m-light": 0o755, "boot_voice.sh": 0o755,
+                   "Boot_Greeting.wav": 0o644, "Light_Dark_TurnOn.wav": 0o644,
+                   "Light_Bright_TurnOff.wav": 0o644}
+BOOTVOICE_NAMES = ("c2m-light", "boot_voice.sh", "Boot_Greeting.wav",
+                   "Light_Dark_TurnOn.wav", "Light_Bright_TurnOff.wav")
+BOOTVOICE_MAX_ELF = 256 * 1024
+BOOTVOICE_MAX_SHELL = 64 * 1024
+BOOTVOICE_LAUNCH = "/bin/sh /customer/c2m/boot_voice.sh >/dev/null 2>&1 &"
 
 
 def has_symlink(path: Path) -> bool:
@@ -267,6 +280,9 @@ def main() -> int:
                     help="AP-only Ed25519 owner public key OpenSSH line")
     ap.add_argument("--debug-owner-key-sha256",
                     help="mandatory exact 64-hex SHA256 of the owner public key")
+    ap.add_argument("--bootvoice-services-dir", type=Path,
+                    help="Candidate F boot voice: c2m-light + boot_voice.sh + 3 wavs "
+                         "(requires D3 and checked TSR)")
     ap.add_argument("--d5-health", action="store_true",
                     help="install fixed read-only on-demand D5 health.sh (requires D4)")
     ap.add_argument("--out-manifest", type=Path, required=True)
@@ -396,6 +412,41 @@ def main() -> int:
         except ValueError as exc:
             ap.error(str(exc))
 
+    bootvoice_assets: dict[str, bytes] = {}
+    if args.bootvoice_services_dir is not None:
+        if args.d3_services_dir is None or not args.tsr_experiment:
+            ap.error("Boot voice requires --d3-services-dir and --tsr-experiment")
+        try:
+            services = args.bootvoice_services_dir
+            if has_symlink(services) or not services.is_dir():
+                raise ValueError("Boot voice services must be a nonsymlink directory")
+            if {p.name for p in services.iterdir()} != set(BOOTVOICE_NAMES):
+                raise ValueError("Boot voice services must contain exactly "
+                                 + ", ".join(BOOTVOICE_NAMES))
+            for name in BOOTVOICE_NAMES:
+                source = services / name
+                if has_symlink(source) or not source.is_file():
+                    raise ValueError(f"missing/nonregular boot voice asset {name}")
+                data = source.read_bytes()
+                if name.endswith(".wav"):
+                    check_wav(data, name)
+                elif name.endswith(".sh"):
+                    if not 1 <= len(data) <= BOOTVOICE_MAX_SHELL:
+                        raise ValueError("boot voice shell size out of bounds")
+                    if b"\r" in data or not data.startswith(b"#!/bin/sh\n"):
+                        raise ValueError("boot voice shell must be LF: boot_voice.sh")
+                else:
+                    if not 1 <= len(data) <= BOOTVOICE_MAX_ELF:
+                        raise ValueError("boot voice helper size out of bounds")
+                    if (len(data) < 52 or data[:6] != b"\x7fELF\x01\x01"
+                            or int.from_bytes(data[18:20], "little") != 40):
+                        raise ValueError("boot voice helper must be ELF32 little-endian ARM")
+                bootvoice_assets[name] = data
+        except OSError:
+            ap.error("cannot read boot voice inputs")
+        except ValueError as exc:
+            ap.error(str(exc))
+
     stock = {r["path"]: r for r in
              json.loads(args.manifest.read_text(encoding="utf-8"))["entries"]}
     hook_rel = args.hook.lstrip("/")
@@ -423,6 +474,9 @@ def main() -> int:
         return 1
     if args.hook_line in text:
         print("MUTATE-FAIL: launch line already present (refusing double-hook)")
+        return 1
+    if bootvoice_assets and BOOTVOICE_LAUNCH in text:
+        print("MUTATE-FAIL: boot voice launch already present (refusing double-hook)")
         return 1
     if not text.endswith("\n"):
         print("MUTATE-FAIL: unexpected hook EOF (no trailing newline)")
@@ -452,6 +506,11 @@ def main() -> int:
         # itself still exits immediately; a never-mounted card still gets
         # the daemon after the wait expires. Only grep/sleep/$(( )).
         block = ["_c2m_rc=$?"]
+        if bootvoice_assets:
+            # Runs detached BEFORE the bounded SD mount wait so the greeting
+            # is not delayed by a missing recording card; never touches the
+            # stock rc path or exit status.
+            block.append(BOOTVOICE_LAUNCH)
         if args.tsr_patch:
             if "c2m_adas_de.tmp" in text:
                 print("MUTATE-FAIL: TSR patch already present")
@@ -521,6 +580,8 @@ def main() -> int:
         assets.update({name: (data, 0o755) for name, data in d3_assets.items()})
         assets.update({name: (data, D4_MODES[name]) for name, data in d4_assets.items()})
         assets.update({name: (data, DEBUG_MODES[name]) for name, data in debug_assets.items()})
+        assets.update({name: (data, BOOTVOICE_MODES[name])
+                       for name, data in bootvoice_assets.items()})
         if args.d5_health:
             source = Path(__file__).resolve().parents[2] / "fw/d5/health.sh"
             if has_symlink(source) or not source.is_file():
@@ -535,11 +596,11 @@ def main() -> int:
             dest = idle.parent / name
             if dest.exists() or dest.is_symlink() or "/c2m/" + name in stock:
                 raise ValueError(f"existing asset path c2m/{name}")
-        if d4_assets or debug_assets:
+        if d4_assets or debug_assets or bootvoice_assets:
             report = args.out_manifest
             if (has_symlink(report) or report.exists() or not report.parent.is_dir()
                     or report.resolve().is_relative_to(args.tree.resolve())):
-                raise ValueError("D4/debug report must be a new path outside the tree")
+                raise ValueError("D4/debug/boot voice report must be a new path outside the tree")
     except OSError:
         print("MUTATE-FAIL: cannot read mutation inputs")
         return 1
@@ -699,6 +760,12 @@ def main() -> int:
                     "mode_oct": oct(DEBUG_MODES[name]), "uid": 1001, "gid": 1001,
                     "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
                    for name, data in debug_assets.items()]
+    bootvoice_added = [{"path": "/c2m/" + name, "type": "reg",
+                        "mode": BOOTVOICE_MODES[name],
+                        "mode_oct": oct(BOOTVOICE_MODES[name]),
+                        "uid": 1001, "gid": 1001,
+                        "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+                       for name, data in bootvoice_assets.items()]
     doc = {"hook": hook_img_path,
            "hook_line": args.hook_line,
            "hook_mode": mode,
@@ -732,6 +799,16 @@ def main() -> int:
         doc["debug_services"] = True
         doc["debug_owner_key_sha256"] = debug_owner["sha256"]
         doc["added"].extend(debug_added)
+    if bootvoice_added:
+        doc["bootvoice_services"] = True
+        doc["bootvoice"] = {
+            "threshold": 500,
+            "greeting": "xin chào chị Diệp",
+            "dark": "Bật đèn xe",
+            "bright": "Tắt đèn khi trời sáng",
+            "actuation": "voice-only; no car headlight output on C2M",
+        }
+        doc["added"].extend(bootvoice_added)
     if args.d5_health:
         data = assets["health.sh"][0]
         doc["d5_health"] = True

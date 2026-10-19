@@ -67,6 +67,28 @@ TSR recognition/output and the effective device flags remain unverified.
 3. Replace a oneed system wav (e.g. Record_On): requires extending the
    B-pipeline allowlist to `oneed_cust.es` (new contract exception, deferred).
 
+### Implemented in Candidate F (2026-10-19)
+
+Owner overrode the earlier "no greeting each boot" decision. F adds a detached,
+one-shot hook `/customer/c2m/boot_voice.sh` launched from `rcInsDriver.sh`
+before the bounded SD mount wait. It uses option 2 above:
+
+- `audioplay 1 dev0 /customer/c2m/Boot_Greeting.wav` into `/tmp/cardv_fifo`
+  (the stock-verified command form) plays the Vietnamese greeting;
+- `/customer/c2m/c2m-light` reads the stock read-only ISP AE query
+  `MI_ISP_AE_QueryExposureInfo(0,0,&info)` and the `LVx10` field at
+  `info+0x230`, threshold 500 (the stock `cardv_detect_FCamAEToPWM`
+  comparison), median of five samples;
+- exactly one reminder is played: dark → `Light_Dark_TurnOn.wav`
+  ("Bật đèn xe"), bright → `Light_Bright_TurnOff.wav` ("Tắt đèn khi trời sáng");
+- invalid/unknown AE or a missing FIFO/asset ⇒ no advisory (fail-closed);
+  the hook logs one status line to `/tmp/c2m_voice_status`.
+
+This shares cardv's audio decoder. The greeting runs early in the stock boot
+path (before ADAS service), and arbitration with ADAS startup audio has NOT
+been measured. F is voice-only: no C2M headlight output exists or is claimed.
+Details and pins: `docs/firmware/CANDIDATE_F_BOOT_VOICE_20261019.md`.
+
 ## Vietnamese audio source
 
 The hash-verified VI TAR has now supplied seven changed ADAS wavs; FCW/HMW
