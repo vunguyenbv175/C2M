@@ -11,7 +11,8 @@ Verified raw cpio facts (parent):
   live tmpfs /tmp root sticky 01777 (likely 0755 root observed).
 Exact trust enforced:
   /tmp: root 01777, root 0755, 1001:1001 0775 (EN), 1000:1000 0755 (VI).
-  /customer: 1000:1000 0755 (VI), 1001:1001 0755 (EN/UBIFS/installer).
+  /customer: 1000:1000 0755 (VI), 1001:1001 0755 (EN legacy/installer),
+             1001:1001 0775 (stock EN UBIFS; Candidate E/F field).
   /customer/c2m: installer 1001:1001 0755 only.
   Root non-writable dirs otherwise valid (unchanged default).
 NO generic uid-1000/1001 writable trust; gid always checked; /tmp never
@@ -91,11 +92,11 @@ int main(void) {
         {"/tmp", 0, 1001, 01777, 1, 0, 0},
         {"/tmp", 1000, 0, 0755, 1, 0, 0},
         {"/tmp", 1001, 1001, 0777, 1, 0, 0},
-        /* /customer exact 0755 only for 1000/1001 (+ root default) */
+        /* /customer: VI 1000:1000 0755; EN 1001:1001 0755 or 0775 */
         {"/customer", 0, 0, 0755, 1, 0, 1},
         {"/customer", 1001, 1001, 0755, 1, 0, 1},
         {"/customer", 1000, 1000, 0755, 1, 0, 1},
-        {"/customer", 1001, 1001, 0775, 1, 0, 0},
+        {"/customer", 1001, 1001, 0775, 1, 0, 1},
         {"/customer", 1000, 1000, 0775, 1, 0, 0},
         {"/customer", 1001, 0, 0755, 1, 0, 0},
         /* /customer/c2m installer 1001:1001 0755 only (+ root default) */

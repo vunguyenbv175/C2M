@@ -82,7 +82,8 @@ static int directory_ok(const struct stat *s, const char *prefix, int fixture)
     mode_t mode = s->st_mode & 07777;
     if (!S_ISDIR(s->st_mode)) return 0;
     /* Exact stock ancestry trust (verified raw cpio facts; never chmod here).
-     * EN /tmp is 0775 1001:1001; VI /tmp,/var,/customer is 0755 1000:1000;
+     * EN /tmp is 0775 1001:1001; VI /tmp,/customer is 0755 1000:1000;
+     * stock EN /customer is 0775 1001:1001 (Candidate E/F field);
      * live tmpfs /tmp is root sticky 01777 (likely 0755 root observed).
      * Only these exact path+uid+gid+mode tuples are trusted as shared
      * ancestors; there is NO generic uid-1000/1001 writable trust and gid
@@ -97,9 +98,10 @@ static int directory_ok(const struct stat *s, const char *prefix, int fixture)
         return 0; /* exact /tmp branch never takes a fixture override */
     }
     if (s->st_uid == 0 && !(mode & 0022)) return 1;
-    if (mode == 0755 && !strcmp(prefix, "/customer") &&
-        ((s->st_uid == 1001 && s->st_gid == 1001) ||
-         (s->st_uid == 1000 && s->st_gid == 1000))) return 1;
+    if (!strcmp(prefix, "/customer") &&
+        ((s->st_uid == 1001 && s->st_gid == 1001 &&
+          (mode == 0755 || mode == 0775)) ||
+         (s->st_uid == 1000 && s->st_gid == 1000 && mode == 0755))) return 1;
     if (s->st_uid == 1001 && s->st_gid == 1001 && mode == 0755 &&
         !strcmp(prefix, "/customer/c2m")) return 1;
     return fixture && s->st_uid == geteuid() && !(mode & 0022);
