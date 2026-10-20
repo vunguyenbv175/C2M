@@ -77,26 +77,37 @@ the boundaries without changing the system clock:
 - offset file removed → default +7; no repeat at the same state.
 
 The status proves the FIFO command was sent; the owner still needs to confirm
-that the greeting and both advisories were audible. The C2M AP dropped after
-the test (Wi-Fi moved to APIPA), so boot-after-reboot verification is pending.
+that the greeting and both advisories were audible. The C2M AP dropped during
+the test (Wi-Fi moved to APIPA), then returned. The camera had rebooted; the
+hotfixed script was still installed (`8743ad0b...`) and the real boot hook ran:
+
+```text
+greeting=played light=dark source=theme detail=schedule=06:00:01-17:59:59 tz=7 local=2026-10-21T05:10:08+0700 advisory=played
+2026-10-21T05:10:11+0700 monitor=start seed=dark retry=0 tz=7 interval=30s
+```
+
+So boot-after-reboot is verified at FIFO/status level; audible confirmation is
+still pending.
 
 ## 5. Remaining acceptance
 
-- Reboot with the hotfixed script and confirm:
-  - one greeting and exactly one boot advisory;
-  - `/tmp/c2m_voice_status` has `source=theme`,
-    `detail=schedule=06:00:01-17:59:59`, `tz=7`, `local=...+0700`,
-    `advisory=played`;
-  - monitor starts and logs `/tmp/c2m_light_monitor_status`.
+- Reboot with the hotfixed script: **status-level pass** (boot hook ran and
+  monitor started, see above); owner still needs to confirm one audible greeting
+  and exactly one boot advisory.
 - While driving, confirm the 06:00:01 local dark→bright and 18:00:00 local
-  bright→dark transitions each produce one advisory, no repeat.
+  bright→dark transitions each produce one advisory, no repeat. The 30 s
+  transition behaviour was already exercised with the offset test; the real
+  wall-clock transition is the remaining field check.
 - Confirm ADAS/FCW/HMW, recording, AP/SSH and Vietnamese system audio remain
-  normal. The monitor uses the shared cardv audio FIFO; real driving arbitration
-  with ADAS warnings is still unmeasured.
-- Remove the four updater files from the recording SD card after the flash
-  (`SigmastarUpgradeSD_SSC8838G.bin`, `adas_upgrade.sh`,
-  `minieye_firmware.md5`, `sysVer.txt`) so a later boot cannot re-run the
-  pre-hotfix package. Keep the recordings and diagnostic directories.
+  normal. The recordings were intact after cleanup (Normal 260, Event 13,
+  Photo 1, C2M_DIAG 11); the monitor uses the shared cardv audio FIFO, so real
+  driving arbitration with ADAS warnings is still unmeasured.
+- Card cleanup **done over SSH**: the stock updater had already removed
+  `SigmastarUpgradeSD_SSC8838G.bin` and `sysVer.txt`; the remaining
+  `adas_upgrade.sh` and `minieye_firmware.md5` were removed from `/mnt/mmc`.
+  All four updater names are now absent; no recording/diagnostic file was
+  touched. Evidence: `work/private-f-local-20261019/card_cleanup_report.json`
+  (local, ignored by git). A later boot cannot re-run the pre-hotfix F package.
 - Rollback package to E2 content is local: token `20261020000001`, at
   `work/private-f-local-20261019/rollback-e2-20261020000001/out/`; never stage it
   on the same card as F. It is host-byte proof only, not device-tested.

@@ -16,8 +16,11 @@ nhân: C2M BusyBox v1.20.2 dùng `timeout [-t SECS] ...`, còn script cũ gọi
 `timeout 5 ...`, nên lệnh fail ngay và không ghi được `/tmp/cardv_fifo`. Đã
 hotfix file-level qua SSH, thêm monitor chuyển ngày/đêm mỗi 30 s theo giờ local
 UTC+7; token vẫn `20261019000001`. Chi tiết và bằng chứng:
-`CANDIDATE_F_HOTFIX_20261020.md`. Nghiệm thu sau reboot (boot voice, chuyển
-06:00/18:00 local, ADAS/FCW/HMW, ghi hình, AP/SSH) vẫn đang chờ.
+`CANDIDATE_F_HOTFIX_20261020.md`. Camera đã reboot lại; boot hook chạy đúng
+(`greeting=played ... light=dark ... advisory=played`) và monitor start lúc
+05:10 local. Nghiệm thu còn lại: xác nhận âm thanh thực tế, chuyển 06:00/18:00
+local khi lái, ADAS/FCW/HMW/ghi hình/AP/SSH. Thẻ F đã được dọn updater qua SSH,
+giữ nguyên video.
 
 ## 1. Yêu cầu owner và quyết định bị thay thế
 
