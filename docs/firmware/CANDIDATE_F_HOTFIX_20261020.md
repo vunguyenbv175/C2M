@@ -86,18 +86,20 @@ greeting=played light=dark source=theme detail=schedule=06:00:01-17:59:59 tz=7 l
 2026-10-21T05:10:11+0700 monitor=start seed=dark retry=0 tz=7 interval=30s
 ```
 
-So boot-after-reboot is verified at FIFO/status level; audible confirmation is
-still pending.
+So boot-after-reboot is verified at FIFO/status level. The owner then confirmed
+the actual audio: the boot greeting and the boot “Bật đèn xe” advisory were
+audible after this reboot (2026-10-21 ~05:33 local). The periodic transition
+audio is the remaining check.
 
 ## 5. Remaining acceptance
 
-- Reboot with the hotfixed script: **status-level pass** (boot hook ran and
-  monitor started, see above); owner still needs to confirm one audible greeting
-  and exactly one boot advisory.
+- Reboot with the hotfixed script: **PASS** at status level and **owner-confirmed
+  audible** (one greeting and the boot “Bật đèn xe” advisory) at
+  2026-10-21 ~05:33 local.
 - While driving, confirm the 06:00:01 local dark→bright and 18:00:00 local
   bright→dark transitions each produce one advisory, no repeat. The 30 s
   transition behaviour was already exercised with the offset test; the real
-  wall-clock transition is the remaining field check.
+  wall-clock transition audio is the remaining field check.
 - Confirm ADAS/FCW/HMW, recording, AP/SSH and Vietnamese system audio remain
   normal. The recordings were intact after cleanup (Normal 260, Event 13,
   Photo 1, C2M_DIAG 11); the monitor uses the shared cardv audio FIFO, so real

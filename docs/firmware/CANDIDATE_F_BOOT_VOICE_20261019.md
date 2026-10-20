@@ -17,10 +17,11 @@ nhân: C2M BusyBox v1.20.2 dùng `timeout [-t SECS] ...`, còn script cũ gọi
 hotfix file-level qua SSH, thêm monitor chuyển ngày/đêm mỗi 30 s theo giờ local
 UTC+7; token vẫn `20261019000001`. Chi tiết và bằng chứng:
 `CANDIDATE_F_HOTFIX_20261020.md`. Camera đã reboot lại; boot hook chạy đúng
-(`greeting=played ... light=dark ... advisory=played`) và monitor start lúc
-05:10 local. Nghiệm thu còn lại: xác nhận âm thanh thực tế, chuyển 06:00/18:00
-local khi lái, ADAS/FCW/HMW/ghi hình/AP/SSH. Thẻ F đã được dọn updater qua SSH,
-giữ nguyên video.
+(`greeting=played ... light=dark ... advisory=played`), monitor start, và owner
+đã xác nhận **nghe được lời chào + câu “Bật đèn xe” lúc boot** (2026-10-21
+~05:33 local). Nghiệm thu còn lại: chuyển 06:00/18:00 local khi lái,
+ADAS/FCW/HMW/ghi hình/AP/SSH. Thẻ F đã được dọn updater qua SSH, giữ nguyên
+video.
 
 ## 1. Yêu cầu owner và quyết định bị thay thế
 
@@ -258,7 +259,8 @@ Trạng thái host local (2026-10-19):
    tra `/tmp/c2m_voice_status` phải có `source=theme`,
    `detail=schedule=06:00:01-17:59:59`, `tz=7`, `local=...+0700`,
    `advisory=played`. Monitor ghi `/tmp/c2m_light_monitor_status` và
-   `/tmp/c2m_light_monitor.log`.
+   `/tmp/c2m_light_monitor.log`. Owner đã xác nhận boot audio (chào + “Bật đèn
+   xe”) ngày 2026-10-21 ~05:33 local; còn câu chuyển giờ thực địa.
 5. Monitor phải phát đúng một câu khi giờ local chuyển **06:00:01**
    (dark → bright, "Tắt đèn khi trời sáng") và **18:00:00** (bright → dark,
    "Bật đèn xe"), kể cả khi đang lái; không phát lặp mỗi 30 s. Có thể thử nhanh
