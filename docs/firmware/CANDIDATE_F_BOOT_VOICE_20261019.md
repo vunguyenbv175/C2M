@@ -1,15 +1,23 @@
 # Candidate F — boot voice advisory (Vietnamese) — 2026-10-19
 
-**Trạng thái:** recipe F đã được CI xác nhận đầy đủ tại run
+**Trạng thái (2026-10-20):** recipe F đã được CI xác nhận đầy đủ tại run
 [`39287717224`](https://github.com/vunguyenbv175/C2M/actions/runs/39287717224)
 (commit `f954e0d`): toàn bộ gate xanh, gồm boot voice helper build/QEMU/host
 tests 7/7, exact five-file deploy, P2/P3 allowlist và publish private vault.
 Deliverable riêng tư: `deliverables/20261019-f-r39287717224` (vault commit
-`371e54d`), **giữ nguyên stock token — NOT FLASH-READY**. Token cục bộ đề xuất
+`371e54d`), **giữ nguyên stock token — NOT FLASH-READY**. Token cục bộ
 `20261019000001` đã được chuẩn bị bằng `reversion_sd_package.py`:
 `ALLOWLIST-OK`, read-back host 4/4, chỉ đổi token 14 byte + `sysVer.txt` +
-`minieye_firmware.md5`. **Chưa flash, chưa nghiệm thu phần cứng; đang chờ owner
-xác nhận token và cho phép flash.**
+`minieye_firmware.md5`; owner đã flash ngày 2026-10-20.
+
+Field test đầu tiên: camera boot/ADAS bình thường nhưng **không có lời chào và
+không có nhắc đèn**; `/tmp/c2m_voice_status` = `greeting=play-failed`. Nguyên
+nhân: C2M BusyBox v1.20.2 dùng `timeout [-t SECS] ...`, còn script cũ gọi
+`timeout 5 ...`, nên lệnh fail ngay và không ghi được `/tmp/cardv_fifo`. Đã
+hotfix file-level qua SSH, thêm monitor chuyển ngày/đêm mỗi 30 s theo giờ local
+UTC+7; token vẫn `20261019000001`. Chi tiết và bằng chứng:
+`CANDIDATE_F_HOTFIX_20261020.md`. Nghiệm thu sau reboot (boot voice, chuyển
+06:00/18:00 local, ADAS/FCW/HMW, ghi hình, AP/SSH) vẫn đang chờ.
 
 ## 1. Yêu cầu owner và quyết định bị thay thế
 
@@ -100,17 +108,25 @@ trị AE sai.
 
 `boot_voice.sh` chạy tách rời, một lần mỗi boot (guard `/tmp`):
 
-1. chờ tối đa 15 s cho `/tmp/cardv_fifo` (do `cardv` tạo);
-2. gửi `audioplay 1 dev0 /customer/c2m/Boot_Greeting.wav` vào FIFO;
+1. chờ tối đa 30 s cho `/tmp/cardv_fifo` (do `cardv` tạo);
+2. gửi `audioplay 1 dev0 /customer/c2m/Boot_Greeting.wav` vào FIFO, retry 4
+   lần nếu cardv chưa mở reader;
 3. chờ 3 s cho câu chào kết thúc;
-4. nếu có `AE_LIGHT_ENABLE`: gọi `timeout 10 c2m-light --threshold 500`
-   (chỉ dùng kết quả `state=dark|bright` hợp lệ); nếu không, hoặc nếu helper
-   lỗi, dùng lịch stock 06:00:01–17:59:59;
-5. chọn đúng một trong hai wav và phát;
-6. ghi trạng thái vào `/tmp/c2m_voice_status` (chỉ trong `/tmp`, mode 0600).
+4. nếu có `AE_LIGHT_ENABLE`: gọi `c2m-light --threshold 500` có timeout
+   BusyBox đúng cú pháp (chỉ dùng kết quả `state=dark|bright` hợp lệ); nếu
+   không, hoặc nếu helper lỗi, dùng lịch local 06:00:01–17:59:59;
+5. chọn đúng một trong hai wav và phát, retry 3 lần;
+6. ghi trạng thái vào `/tmp/c2m_voice_status` (chỉ trong `/tmp`, mode 0600);
+7. khởi động monitor tách rời `--monitor-only`, seed theo trạng thái vừa phát;
+   monitor kiểm tra mỗi 30 s và phát đúng một câu khi trạng thái đổi. Trạng thái
+   monitor ở `/tmp/c2m_light_monitor_status`, log ở
+   `/tmp/c2m_light_monitor.log`.
 
-Ghi FIFO dùng `timeout 5` của BusyBox để không treo vô hạn nếu cardv chết;
-khi thiếu `timeout`, dùng redirect thẳng như các script stock.
+Ghi FIFO dùng `_timeout_init`/`_timeout_run`: BusyBox v1.20.2 cần
+`timeout -t SECS ...`, coreutils dùng `timeout SECS ...`; khi thiếu `timeout`,
+dùng watchdog nền. Đây là hotfix sau field test 2026-10-20: dạng cũ
+`timeout 5 ...` fail ngay trên camera, khiến FIFO không nhận lệnh và
+`greeting=play-failed`.
 
 `audioplay` dùng chung bộ giải mã âm thanh stock. F phát câu chào sớm trong
 luồng boot, trước khi ADAS khởi động; câu cảnh báo đèn phát sau đó. Việc tranh
@@ -144,7 +160,14 @@ CI gate kiểm RIFF/WAVE, PCM16, mono, 24 kHz cho từng tệp trước khi cài
 - Lịch stock là **theo giờ**, không phải cảm biến ánh sáng. Trời âm u, gara,
   hầm hoặc hoàng hôn có thể lệch với "trời sáng" thực tế. Đây là giới hạn đã
   biết của nguồn mặc định.
-- Đồng hồ hệ thống phải đúng; lịch stock dùng cùng clock với giao diện C2M.
+- Đồng hồ hệ thống phải đúng. Camera field đang chạy UTC; script mặc định
+  cộng **+7** để lịch 06:00:01–17:59:59 là giờ Việt Nam. Nếu app/camera đã được
+  đặt giờ local, tạo `/customer/c2m/voice_tz_offset` chứa `0` (hoặc sửa offset
+  phù hợp) để tránh lệch giờ.
+- Monitor chuyển ngày/đêm chạy mỗi 30 s, chỉ dựa vào đồng hồ; không phải cảm
+  biến lux. Nếu tiến trình monitor chết hoặc bị kill, không có cơ chế respawn
+  riêng; reboot sẽ khởi động lại. Chưa đo tranh chấp âm thanh với cảnh báo ADAS
+  khi đang lái.
 - `MI_ISP_AE_QueryExposureInfo` từ tiến trình riêng có trả dữ liệu hợp lệ trên
   máy thật hay không; chưa xác minh. Helper preload ba thư viện vendor; việc mở
   client ISP thứ hai có thể ảnh hưởng `cardv`, nên **không bật tự động**.
@@ -152,7 +175,9 @@ CI gate kiểm RIFF/WAVE, PCM16, mono, 24 kHz cho từng tệp trước khi cài
   Owner chạy helper thủ công và xem `lv` trước khi tạo `AE_LIGHT_ENABLE`.
 - Tranh chấp bộ giải mã âm thanh với ADAS lúc khởi động; chưa đo thứ tự phát.
 - Thời điểm phát câu chào so với âm hiệu chuẩn/khởi động của ADAS.
-- Chưa có read-back NAND hay soak; chưa flash.
+- Đã flash token `20261019000001` nhưng chưa có read-back NAND/soak; hotfix
+  `boot_voice.sh` là thay đổi file-level sau flash, chưa được đóng gói bằng token
+  mới. Boot-after-reboot và chuyển giờ thực địa vẫn đang chờ nghiệm thu.
 - Không có điều khiển đèn xe (mục 5).
 
 ## 8. Recipe build/CI
@@ -221,26 +246,39 @@ Trạng thái host local (2026-10-19):
      adas `0e18c91f...`; md5 sidecar mới khớp MD5 inner `174c5982...`.
    Bản chuẩn bị nằm cục bộ (không nằm trong repo công khai); chỉ dùng bản này
    để ghi thẻ, không dùng raw `C2M_FLASH_F/`.
-3. **Chờ owner xác nhận token `20261019000001` và cho phép flash.** Chưa flash;
-   chỉ flash sau khi owner cho phép.
-4. Nghe đúng một câu chào và đúng một câu nhắc đèn; kiểm tra
-   `/tmp/c2m_voice_status` (`source=theme`, `schedule=06:00:01-17:59:59`).
-   Thử cả hai khung giờ (sáng/tối) bằng cách đổi giờ hệ thống trong cửa sổ test
-   hoặc chờ đúng giờ; không cần che camera cho nguồn mặc định.
-5. Nếu owner muốn thử AE: SSH chạy `/customer/c2m/c2m-light --threshold 500`
+3. Owner đã xác nhận token `20261019000001`, thẻ D: đã được ghi và owner đã
+   flash ngày 2026-10-20. Field test đầu tiên chỉ thấy `greeting=play-failed`;
+   nguyên nhân BusyBox `timeout 5` sai cú pháp, đã hotfix qua SSH (xem
+   `CANDIDATE_F_HOTFIX_20261020.md`). Token/`sysVer` vẫn `20261019000001`;
+   hotfix hiện là thay đổi file-level, chưa có gói reflash token mới.
+4. Sau hotfix, boot phải nghe đúng một câu chào và đúng một câu nhắc đèn; kiểm
+   tra `/tmp/c2m_voice_status` phải có `source=theme`,
+   `detail=schedule=06:00:01-17:59:59`, `tz=7`, `local=...+0700`,
+   `advisory=played`. Monitor ghi `/tmp/c2m_light_monitor_status` và
+   `/tmp/c2m_light_monitor.log`.
+5. Monitor phải phát đúng một câu khi giờ local chuyển **06:00:01**
+   (dark → bright, "Tắt đèn khi trời sáng") và **18:00:00** (bright → dark,
+   "Bật đèn xe"), kể cả khi đang lái; không phát lặp mỗi 30 s. Có thể thử nhanh
+   bằng cách tạo `/customer/c2m/voice_tz_offset` với `8` rồi `7` (như field
+   test), sau đó xóa file để về mặc định `+7`.
+6. Nếu owner muốn thử AE: SSH chạy `/customer/c2m/c2m-light --threshold 500`
    trong điều kiện sáng/tối đã biết; so `lv` với thực tế. Chỉ khi helper trả
    đúng và `cardv`/ghi hình/ADAS không bị ảnh hưởng, tạo
    `/customer/c2m/AE_LIGHT_ENABLE` rồi reboot. Nếu helper gây treo, mất ghi
    hình hoặc bất thường: reboot ngay, **không tạo marker**; nếu đã tạo thì xóa
-   và quay về lịch stock.
-6. Xác nhận không có thay đổi âm thanh/ghi hình/ADAS ngoài dự kiến. Bất kỳ treo,
+   và quay về lịch stock. Monitor định kỳ **không** gọi helper AE.
+7. Xác nhận không có thay đổi âm thanh/ghi hình/ADAS ngoài dự kiến. Bất kỳ treo,
    reboot lặp, mất ghi hình hoặc cảnh báo sai → dừng, dùng rollback đã chuẩn bị.
+   Sau khi flash xong nên lấy bốn file updater ra khỏi thẻ ghi hình để tránh
+   updater chạy lại và ghi đè hotfix; giữ nguyên video/C2M_DIAG.
 
 ## 10. Liên kết
 
 - CI F: https://github.com/vunguyenbv175/C2M/actions/runs/39287717224
   (artifact `candidateF-evidence`, id `12204861285`).
 - Private vault F: `deliverables/20261019-f-r39287717224` (commit `371e54d`).
+- `docs/firmware/CANDIDATE_F_HOTFIX_20261020.md` — field timeout fix, periodic
+  transition monitor, local UTC+7, device hotfix evidence.
 - `docs/firmware/CANDIDATE_E_20261018.md` — nền E/E2.
 - `docs/firmware/C2M_NEXT_UPGRADE_PLAN_20261014.md` — override ghi nhận.
 - `docs/firmware/C2M_AUDIO_TSR_MECHANISM.md` — đường phát âm thanh stock.
